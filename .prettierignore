@@ -1,0 +1,5 @@
+dist
+node_modules
+.qodo
+.husky
+package-lock.json

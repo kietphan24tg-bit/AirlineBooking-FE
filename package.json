@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "npm run typecheck && npm run build",
     "typecheck": "tsc --noEmit",
     "precommit": "lint-staged",
     "prepush": "npm run typecheck",
@@ -18,7 +19,8 @@
   },
   "dependencies": {
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "react-select": "^5.10.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

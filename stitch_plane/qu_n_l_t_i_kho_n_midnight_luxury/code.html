@@ -1,0 +1,533 @@
+<!doctype html>
+
+<html class="light" lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Quản Lý Tài Khoản - Midnight Luxury | The Sovereign</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700;900&amp;family=Manrope:wght@300;400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'on-tertiary': '#ffffff',
+              'tertiary-fixed': '#ffddaf',
+              'surface-container-lowest': '#ffffff',
+              'surface-container': '#eeeeee',
+              'secondary-fixed-dim': '#e6c275',
+              'on-error-container': '#93000a',
+              'on-primary': '#ffffff',
+              'outline-variant': '#e6bdb8',
+              'tertiary-fixed-dim': '#ecbf7c',
+              'on-tertiary-fixed-variant': '#5f4108',
+              'secondary-fixed': '#ffdf9e',
+              'on-secondary-fixed-variant': '#5b4300',
+              'inverse-primary': '#ffb3ae',
+              tertiary: '#6f4f16',
+              'on-primary-fixed-variant': '#8d131c',
+              'surface-container-highest': '#e2e2e2',
+              'primary-fixed': '#ffdad7',
+              'on-tertiary-fixed': '#281800',
+              'primary-container': '#c33d3d',
+              'secondary-container': '#fed888',
+              secondary: '#765a17',
+              'inverse-surface': '#2f3131',
+              'surface-bright': '#f9f9f9',
+              surface: '#f9f9f9',
+              'on-primary-container': '#ffecea',
+              'on-error': '#ffffff',
+              'on-tertiary-container': '#ffeed9',
+              'surface-variant': '#e2e2e2',
+              'on-secondary-fixed': '#261a00',
+              'on-primary-fixed': '#410005',
+              'surface-tint': '#af2e30',
+              error: '#ba1a1a',
+              background: '#f9f9f9',
+              'primary-fixed-dim': '#ffb3ae',
+              'on-surface': '#1a1c1c',
+              'on-secondary': '#ffffff',
+              'inverse-on-surface': '#f1f1f1',
+              primary: '#a12428',
+              'surface-dim': '#dadada',
+              'on-background': '#1a1c1c',
+              'surface-container-high': '#e8e8e8',
+              'surface-container-low': '#f3f3f3',
+              outline: '#926f6b',
+              'on-surface-variant': '#5d3f3c',
+              'on-secondary-container': '#785d19',
+              'error-container': '#ffdad6',
+              'tertiary-container': '#8b672c',
+            },
+            fontFamily: {
+              headline: ['Be Vietnam Pro'],
+              body: ['Manrope'],
+              label: ['Manrope'],
+            },
+            borderRadius: { DEFAULT: '0.125rem', lg: '0.25rem', xl: '0.5rem', full: '0.75rem' },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          'FILL' 0,
+          'wght' 400,
+          'GRAD' 0,
+          'opsz' 24;
+      }
+      .gold-pattern-bg {
+        background-color: #f9f9f9;
+        background-image: radial-gradient(#ffdf9e 0.5px, transparent 0.5px);
+        background-size: 24px 24px;
+        background-position: 0 0;
+      }
+      .glass-card {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+      }
+    </style>
+  </head>
+  <body class="bg-surface font-body text-on-surface antialiased">
+    <!-- TopNavBar -->
+    <header
+      class="bg-[#D71920] dark:bg-[#a12428] docked full-width top-0 z-50 tonal-transition shadow-none transition-shadow duration-300 hover:shadow-lg"
+    >
+      <nav class="flex justify-between items-center w-full px-8 h-20 max-w-none ml-auto mr-auto">
+        <div class="flex items-center gap-12">
+          <span class="text-2xl font-black text-white tracking-tight font-headline"
+            >The Sovereign</span
+          >
+          <div class="hidden md:flex gap-8">
+            <a
+              class="font-['Be_Vietnam_Pro'] uppercase tracking-[0.05rem] text-[0.6875rem] font-bold text-white/80 hover:text-white transition-all duration-200 scale-95 active:scale-90"
+              href="#"
+              >Book</a
+            >
+            <a
+              class="font-['Be_Vietnam_Pro'] uppercase tracking-[0.05rem] text-[0.6875rem] font-bold text-white/80 hover:text-white transition-all duration-200 scale-95 active:scale-90"
+              href="#"
+              >Explore</a
+            >
+            <a
+              class="font-['Be_Vietnam_Pro'] uppercase tracking-[0.05rem] text-[0.6875rem] font-bold text-white/80 hover:text-white transition-all duration-200 scale-95 active:scale-90"
+              href="#"
+              >Experience</a
+            >
+            <a
+              class="font-['Be_Vietnam_Pro'] uppercase tracking-[0.05rem] text-[0.6875rem] font-bold text-white/80 hover:text-white transition-all duration-200 scale-95 active:scale-90"
+              href="#"
+              >Loyalty</a
+            >
+          </div>
+        </div>
+        <div class="flex items-center gap-6">
+          <div class="relative group">
+            <span class="material-symbols-outlined text-[#ffdf9e] cursor-pointer">search</span>
+          </div>
+          <div class="flex items-center gap-4">
+            <button
+              class="font-['Be_Vietnam_Pro'] uppercase tracking-[0.05rem] text-[0.6875rem] font-bold text-white/80 hover:text-white transition-colors"
+            >
+              Sign In
+            </button>
+            <button
+              class="bg-white/10 px-4 py-2 rounded-lg font-['Be_Vietnam_Pro'] uppercase tracking-[0.05rem] text-[0.6875rem] font-bold text-[#ffdf9e] border border-[#ffdf9e]/30 hover:bg-white/20 transition-all"
+            >
+              Sign Up
+            </button>
+          </div>
+        </div>
+      </nav>
+    </header>
+    <main class="min-h-screen pt-20 gold-pattern-bg">
+      <!-- Content Container -->
+      <div class="max-w-[1440px] mx-auto flex flex-col md:flex-row gap-8 p-8">
+        <!-- Left Sidebar -->
+        <aside class="w-full md:w-72 flex flex-col gap-2">
+          <div class="bg-surface-container-lowest p-6 rounded-xl mb-6 shadow-sm">
+            <div class="flex items-center gap-4 mb-4">
+              <div class="w-12 h-12 rounded-full bg-primary-container overflow-hidden">
+                <img
+                  class="w-full h-full object-cover"
+                  data-alt="close-up portrait of a sophisticated man in a charcoal suit with soft office lighting"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuAChYgIS2ISTx2NPjsrrzjH6FYK-DyBKa6p8uLUUNL8LTnGjmCCk80EvaVtMcgrWOtuE0l7lcu3tPngfevfZ6O_wKKQ_1NonovkgNHIGAX42YzxxqYjM0YeG35EkHFe3oWP193dLaRXwFZACEJ8QY5gZ76O7R0_lAsWBTiOrfyfjCHprI_nmnX8I2yd3C5NHnNnmQoQYytZP8_brzZuzv_P-CBs6oG0x0ppnguUOGu7HVti6iKnptUFo4h0uyxhTyXNZrnmrmTQCU6Z"
+                />
+              </div>
+              <div>
+                <p class="font-headline font-bold text-on-surface">Minh Hoang</p>
+                <p class="text-xs text-secondary font-semibold uppercase tracking-wider">
+                  Sovereign Circle Gold
+                </p>
+              </div>
+            </div>
+          </div>
+          <nav class="flex flex-col gap-1">
+            <a
+              class="flex items-center gap-3 px-6 py-4 rounded-lg bg-primary-container text-on-primary font-bold transition-all shadow-md"
+              href="#"
+            >
+              <span class="material-symbols-outlined">person</span>
+              <span class="font-headline text-sm uppercase tracking-wider">Hồ sơ</span>
+            </a>
+            <a
+              class="flex items-center gap-3 px-6 py-4 rounded-lg text-on-surface-variant hover:bg-surface-container-low transition-all"
+              href="#"
+            >
+              <span class="material-symbols-outlined">flight_takeoff</span>
+              <span class="font-headline text-sm uppercase tracking-wider">Chuyến bay của tôi</span>
+            </a>
+            <a
+              class="flex items-center gap-3 px-6 py-4 rounded-lg text-on-surface-variant hover:bg-surface-container-low transition-all"
+              href="#"
+            >
+              <span class="material-symbols-outlined">workspace_premium</span>
+              <span class="font-headline text-sm uppercase tracking-wider">Sovereign Circle</span>
+            </a>
+            <a
+              class="flex items-center gap-3 px-6 py-4 rounded-lg text-on-surface-variant hover:bg-surface-container-low transition-all"
+              href="#"
+            >
+              <span class="material-symbols-outlined">settings</span>
+              <span class="font-headline text-sm uppercase tracking-wider">Cài đặt</span>
+            </a>
+          </nav>
+        </aside>
+        <!-- Main Content Area -->
+        <div class="flex-1 space-y-8">
+          <!-- Header Title Section -->
+          <div class="mb-10">
+            <h1 class="font-headline text-4xl font-black text-primary tracking-tight mb-2">
+              Quản Lý Tài Khoản - Midnight Luxury
+            </h1>
+            <div class="h-1 w-24 bg-secondary"></div>
+          </div>
+          <!-- Personal Information Bento Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Profile Header Card -->
+            <div
+              class="lg:col-span-2 bg-surface-container-lowest p-8 rounded-xl shadow-sm relative overflow-hidden"
+            >
+              <div
+                class="absolute top-0 right-0 w-32 h-32 bg-secondary/5 rounded-bl-full -mr-10 -mt-10"
+              ></div>
+              <h2
+                class="font-headline text-xl font-bold mb-6 text-on-surface-variant flex items-center gap-2"
+              >
+                <span class="material-symbols-outlined text-primary">account_circle</span>
+                Thông tin cá nhân
+              </h2>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+                <div class="space-y-1">
+                  <label
+                    class="font-label text-[0.6875rem] uppercase tracking-widest text-secondary font-bold"
+                    >Họ và tên</label
+                  >
+                  <p class="font-headline text-lg text-on-surface">NGUYEN MINH HOANG</p>
+                </div>
+                <div class="space-y-1">
+                  <label
+                    class="font-label text-[0.6875rem] uppercase tracking-widest text-secondary font-bold"
+                    >Ngày sinh</label
+                  >
+                  <p class="font-headline text-lg text-on-surface">15 / 08 / 1988</p>
+                </div>
+                <div class="space-y-1">
+                  <label
+                    class="font-label text-[0.6875rem] uppercase tracking-widest text-secondary font-bold"
+                    >Quốc tịch</label
+                  >
+                  <p class="font-headline text-lg text-on-surface">Vietnam</p>
+                </div>
+                <div class="space-y-1">
+                  <label
+                    class="font-label text-[0.6875rem] uppercase tracking-widest text-secondary font-bold"
+                    >Số hộ chiếu</label
+                  >
+                  <p class="font-headline text-lg text-on-surface">B12345678</p>
+                </div>
+              </div>
+              <button
+                class="mt-8 text-primary font-bold text-sm flex items-center gap-2 hover:translate-x-1 transition-transform"
+              >
+                Chỉnh sửa thông tin
+                <span class="material-symbols-outlined text-sm">arrow_forward</span>
+              </button>
+            </div>
+            <!-- Membership Status Card -->
+            <div
+              class="bg-stone-900 rounded-xl p-8 text-white relative flex flex-col justify-between overflow-hidden shadow-xl"
+            >
+              <div
+                class="absolute -right-8 -bottom-8 w-40 h-40 border-4 border-[#ffdf9e]/10 rounded-full"
+              ></div>
+              <div>
+                <span
+                  class="font-label text-[0.6rem] uppercase tracking-[0.2em] text-[#ffdf9e] mb-1 block"
+                  >Tư cách hội viên</span
+                >
+                <h3 class="font-headline text-2xl font-black mb-4 tracking-tight">
+                  SOVEREIGN GOLD
+                </h3>
+                <div class="flex items-end gap-2 mb-6">
+                  <span class="text-4xl font-black text-[#ffdf9e]">42,500</span>
+                  <span class="text-xs uppercase tracking-widest text-white/60 mb-1">Miles</span>
+                </div>
+              </div>
+              <div class="space-y-4">
+                <div class="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-[#ffdf9e] h-full w-3/4"></div>
+                </div>
+                <p class="text-[0.6875rem] text-white/60">
+                  Còn 7,500 Miles để lên hạng <strong>PLATINUM</strong>
+                </p>
+              </div>
+            </div>
+          </div>
+          <!-- Secondary Info Section -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Contact Details -->
+            <div
+              class="bg-surface-container-lowest p-8 rounded-xl shadow-sm border-l-4 border-primary/20"
+            >
+              <h2
+                class="font-headline text-xl font-bold mb-6 text-on-surface-variant flex items-center gap-2"
+              >
+                <span class="material-symbols-outlined text-primary">contact_mail</span>
+                Chi tiết liên hệ
+              </h2>
+              <div class="space-y-6">
+                <div class="flex items-center gap-4">
+                  <div
+                    class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center"
+                  >
+                    <span class="material-symbols-outlined text-secondary text-sm">mail</span>
+                  </div>
+                  <div>
+                    <label
+                      class="font-label text-[0.6rem] uppercase tracking-widest text-on-surface-variant opacity-60"
+                      >Email</label
+                    >
+                    <p class="text-on-surface font-medium">hoang.minh@thesovereign.vip</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-4">
+                  <div
+                    class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center"
+                  >
+                    <span class="material-symbols-outlined text-secondary text-sm">call</span>
+                  </div>
+                  <div>
+                    <label
+                      class="font-label text-[0.6rem] uppercase tracking-widest text-on-surface-variant opacity-60"
+                      >Số điện thoại</label
+                    >
+                    <p class="text-on-surface font-medium">+84 (0) 90 1234 567</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-4">
+                  <div
+                    class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center"
+                  >
+                    <span class="material-symbols-outlined text-secondary text-sm">home</span>
+                  </div>
+                  <div>
+                    <label
+                      class="font-label text-[0.6rem] uppercase tracking-widest text-on-surface-variant opacity-60"
+                      >Địa chỉ</label
+                    >
+                    <p class="text-on-surface font-medium">Tòa nhà Sovereign, Quận 1, TP. HCM</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Travel Preferences -->
+            <div class="bg-surface-container-lowest p-8 rounded-xl shadow-sm">
+              <h2
+                class="font-headline text-xl font-bold mb-6 text-on-surface-variant flex items-center gap-2"
+              >
+                <span class="material-symbols-outlined text-primary">award_star</span>
+                Sở thích du lịch
+              </h2>
+              <div class="space-y-6">
+                <div
+                  class="bg-surface p-4 rounded-lg flex justify-between items-center group hover:bg-surface-container transition-colors"
+                >
+                  <div class="flex items-center gap-4">
+                    <span class="material-symbols-outlined text-secondary">restaurant</span>
+                    <div>
+                      <p class="font-headline text-sm font-bold text-on-surface">Chế độ ăn uống</p>
+                      <p class="text-xs text-on-surface-variant">Low Sodium / Seafood Meal</p>
+                    </div>
+                  </div>
+                  <span
+                    class="material-symbols-outlined text-on-surface-variant/30 group-hover:text-primary transition-colors cursor-pointer"
+                    >edit_note</span
+                  >
+                </div>
+                <div
+                  class="bg-surface p-4 rounded-lg flex justify-between items-center group hover:bg-surface-container transition-colors"
+                >
+                  <div class="flex items-center gap-4">
+                    <span class="material-symbols-outlined text-secondary">event_seat</span>
+                    <div>
+                      <p class="font-headline text-sm font-bold text-on-surface">Vị trí ghế ngồi</p>
+                      <p class="text-xs text-on-surface-variant">Cạnh cửa sổ (Window Seat)</p>
+                    </div>
+                  </div>
+                  <span
+                    class="material-symbols-outlined text-on-surface-variant/30 group-hover:text-primary transition-colors cursor-pointer"
+                    >edit_note</span
+                  >
+                </div>
+                <div
+                  class="bg-surface p-4 rounded-lg flex justify-between items-center group hover:bg-surface-container transition-colors"
+                >
+                  <div class="flex items-center gap-4">
+                    <span class="material-symbols-outlined text-secondary">wine_bar</span>
+                    <div>
+                      <p class="font-headline text-sm font-bold text-on-surface">
+                        Đồ uống yêu thích
+                      </p>
+                      <p class="text-xs text-on-surface-variant">Vintage Champagne / Espresso</p>
+                    </div>
+                  </div>
+                  <span
+                    class="material-symbols-outlined text-on-surface-variant/30 group-hover:text-primary transition-colors cursor-pointer"
+                    >edit_note</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Recent Activity / Banner -->
+          <div class="relative rounded-xl overflow-hidden h-48 group shadow-xl">
+            <img
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+              data-alt="ultra-modern first class airplane cabin with ambient mood lighting and luxury leather seating"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBtfnZgC67PVlrPVvph9bQROAefDPJ8BJKE4i4NX5Dy_sWgpcSymum2JCNJhfE9mwkQ05V-3eOPLDkQYAzn_QOk5adU6oN8QMmqID3rPy7fo_RH-XYTCqFMzvMwIsfeuX-5QNVTI3Ipvt0Za6Z1CqJ8zGqB-TIhxU9DIWwzRkmfC-upIYQjSXfmwbt6uWUyZMCIYWXcRLC4XnY8SaYMcjOJFzqUHtjMid-RQWxChNyp_p0E8ESY7tgMTIm1eR1FFX4GOI6QhyYDyYaf"
+            />
+            <div
+              class="absolute inset-0 bg-gradient-to-r from-stone-900 via-stone-900/40 to-transparent flex flex-col justify-center px-12"
+            >
+              <span class="font-label text-[0.6rem] uppercase tracking-[0.3em] text-[#ffdf9e] mb-2"
+                >Đặc quyền dành riêng</span
+              >
+              <h3 class="font-headline text-2xl font-black text-white mb-4">
+                Dịch vụ đưa đón Limousine <br />tại sân bay quốc tế.
+              </h3>
+              <a
+                class="text-white font-bold text-sm underline underline-offset-4 decoration-secondary"
+                href="#"
+                >Tìm hiểu thêm</a
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    <!-- Footer -->
+    <footer class="bg-stone-900 dark:bg-black py-12 border-t border-white/5 full-width mt-20">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8 px-12 max-w-7xl mx-auto">
+        <div class="col-span-1 md:col-span-1">
+          <span
+            class="text-xl font-bold text-[#ffdf9e] uppercase tracking-widest font-headline block mb-6"
+            >The Sovereign</span
+          >
+          <p class="font-['Manrope'] text-sm leading-relaxed text-stone-400">
+            Trải nghiệm hàng không hạng nhất, nơi sự sang trọng gặp gỡ sự tận tâm không giới hạn.
+          </p>
+        </div>
+        <div>
+          <h4 class="text-[#ffdf9e] font-headline text-xs uppercase tracking-[0.2em] mb-6">
+            Khám phá
+          </h4>
+          <ul class="space-y-4">
+            <li>
+              <a
+                class="font-['Manrope'] text-sm text-stone-400 hover:text-white transition-colors duration-200"
+                href="#"
+                >Điểm đến</a
+              >
+            </li>
+            <li>
+              <a
+                class="font-['Manrope'] text-sm text-stone-400 hover:text-white transition-colors duration-200"
+                href="#"
+                >Dịch vụ khoang khách</a
+              >
+            </li>
+            <li>
+              <a
+                class="font-['Manrope'] text-sm text-stone-400 hover:text-white transition-colors duration-200"
+                href="#"
+                >Trải nghiệm mặt đất</a
+              >
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-[#ffdf9e] font-headline text-xs uppercase tracking-[0.2em] mb-6">
+            Liên kết
+          </h4>
+          <ul class="space-y-4">
+            <li>
+              <a
+                class="font-['Manrope'] text-sm text-stone-400 hover:text-white transition-colors duration-200"
+                href="#"
+                >Privacy Policy</a
+              >
+            </li>
+            <li>
+              <a
+                class="font-['Manrope'] text-sm text-stone-400 hover:text-white transition-colors duration-200"
+                href="#"
+                >Terms of Service</a
+              >
+            </li>
+            <li>
+              <a
+                class="font-['Manrope'] text-sm text-stone-400 hover:text-white transition-colors duration-200"
+                href="#"
+                >Accessibility</a
+              >
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-[#ffdf9e] font-headline text-xs uppercase tracking-[0.2em] mb-6">
+            Kết nối
+          </h4>
+          <div class="flex gap-4 mb-6">
+            <span class="material-symbols-outlined text-[#ffdf9e] cursor-pointer hover:opacity-80"
+              >public</span
+            >
+            <span class="material-symbols-outlined text-[#ffdf9e] cursor-pointer hover:opacity-80"
+              >mail</span
+            >
+            <span class="material-symbols-outlined text-[#ffdf9e] cursor-pointer hover:opacity-80"
+              >share</span
+            >
+          </div>
+          <p class="font-['Manrope'] text-xs text-stone-500">
+            © 2024 The Sovereign. All rights reserved.
+          </p>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

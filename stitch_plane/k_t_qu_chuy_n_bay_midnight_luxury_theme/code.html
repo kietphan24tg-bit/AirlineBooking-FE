@@ -1,0 +1,1199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Flight Search Results | The Sovereign</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@700;800;900&amp;family=Manrope:wght@400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'tertiary-fixed-dim': '#ecbf7c',
+              'on-secondary': '#ffffff',
+              'surface-container': '#eeeeee',
+              'inverse-on-surface': '#f1f1f1',
+              'primary-container': '#c33d3d',
+              error: '#ba1a1a',
+              'secondary-container': '#fed888',
+              'surface-dim': '#dadada',
+              'error-container': '#ffdad6',
+              'inverse-primary': '#ffb3ae',
+              'inverse-surface': '#2f3131',
+              'on-tertiary-fixed': '#281800',
+              'secondary-fixed': '#ffdf9e',
+              'on-secondary-fixed': '#261a00',
+              'surface-container-low': '#f3f3f3',
+              'on-tertiary': '#ffffff',
+              'on-surface': '#1a1c1c',
+              'on-primary-fixed-variant': '#8d131c',
+              'on-secondary-container': '#785d19',
+              'tertiary-fixed': '#ffddaf',
+              'secondary-fixed-dim': '#e6c275',
+              'primary-fixed-dim': '#ffb3ae',
+              'on-error': '#ffffff',
+              'surface-container-high': '#e8e8e8',
+              'on-primary-container': '#ffecea',
+              'on-primary': '#ffffff',
+              'surface-container-lowest': '#ffffff',
+              'on-surface-variant': '#5d3f3c',
+              'surface-variant': '#e2e2e2',
+              'on-primary-fixed': '#410005',
+              'surface-container-highest': '#e2e2e2',
+              'on-tertiary-fixed-variant': '#5f4108',
+              secondary: '#765a17',
+              background: '#f9f9f9',
+              'on-tertiary-container': '#ffeed9',
+              'primary-fixed': '#ffdad7',
+              surface: '#f9f9f9',
+              tertiary: '#6f4f16',
+              'on-error-container': '#93000a',
+              outline: '#926f6b',
+              'surface-bright': '#f9f9f9',
+              primary: '#a12428',
+              'on-background': '#1a1c1c',
+              'outline-variant': '#e6bdb8',
+              'surface-tint': '#af2e30',
+              'tertiary-container': '#8b672c',
+              'on-secondary-fixed-variant': '#5b4300',
+              'class-bronze': '#CD7F32',
+              'class-silver': '#C0C0C0',
+              'class-burgundy': '#800020',
+              'class-gold': '#D4AF37',
+              'midnight-burgundy': '#7D0633',
+              'luxury-gold': '#D4AF37',
+              'dark-charcoal': '#1A1A1A',
+            },
+            fontFamily: {
+              headline: ['Be Vietnam Pro'],
+              body: ['Manrope'],
+              label: ['Manrope'],
+            },
+            borderRadius: { DEFAULT: '0.125rem', lg: '0.25rem', xl: '0.5rem', full: '0.75rem' },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          'FILL' 0,
+          'wght' 400,
+          'GRAD' 0,
+          'opsz' 24;
+      }
+      .tonal-shift-bg {
+        background-color: #f3f3f3;
+      }
+      body {
+        font-family: 'Manrope', sans-serif;
+      }
+      h1,
+      h2,
+      h3,
+      h4,
+      h5 {
+        font-family: 'Be Vietnam Pro', sans-serif;
+      }
+
+      .benefits-expansion {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .benefits-expansion.active {
+        max-height: 1200px;
+      }
+      .rotate-icon {
+        transition: transform 0.3s ease;
+      }
+      .active .rotate-icon {
+        transform: rotate(180deg);
+      }
+      .gold-divider {
+        background: linear-gradient(to bottom, transparent, #d4af3740, transparent);
+      }
+
+      /* Ambient background sweep */
+      .ambient-sweep {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      .sweep-line {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        stroke: #d4af37;
+        stroke-width: 0.75;
+        fill: none;
+        opacity: 0.3;
+        filter: drop-shadow(0 0 2px rgba(212, 175, 55, 0.2));
+      }
+    </style>
+  </head>
+  <body class="bg-surface text-on-surface antialiased relative">
+    <!-- Background Decor -->
+    <div class="ambient-sweep">
+      <svg class="sweep-line" preserveAspectRatio="none" viewBox="0 0 1000 1000">
+        <!-- A single, elegant continuous stroke mimicking a flight path / tail fin curve -->
+        <path d="M-50,950 C200,850 400,900 600,600 C800,300 900,100 1100,50"></path>
+      </svg>
+    </div>
+    <!-- Top Navigation Bar - Midnight Luxury Theme -->
+    <nav
+      class="fixed top-0 w-full z-50 bg-midnight-burgundy shadow-xl border-b border-luxury-gold/20"
+    >
+      <div class="flex justify-between items-center px-8 h-20 w-full max-w-[1920px] mx-auto">
+        <div class="flex items-center gap-12">
+          <span class="text-2xl font-black text-luxury-gold tracking-tighter uppercase" style=""
+            >The Sovereign</span
+          >
+          <div class="hidden md:flex gap-8 items-center">
+            <a
+              class="text-luxury-gold/80 font-medium hover:text-white transition-all duration-300"
+              href="#"
+              style=""
+              >Book</a
+            >
+            <a class="text-white border-b-2 border-luxury-gold pb-1 font-semibold" href="#" style=""
+              >Explore</a
+            >
+            <a
+              class="text-luxury-gold/80 font-medium hover:text-white transition-all duration-300"
+              href="#"
+              style=""
+              >Experience</a
+            >
+            <a
+              class="text-luxury-gold/80 font-medium hover:text-white transition-all duration-300"
+              href="#"
+              style=""
+              >Loyalty</a
+            >
+          </div>
+        </div>
+        <div class="flex items-center gap-6">
+          <button class="text-luxury-gold/80 font-medium hover:text-white transition-all" style="">
+            My Trips
+          </button>
+          <button
+            class="bg-luxury-gold text-midnight-burgundy px-6 py-2.5 rounded-lg font-bold tracking-tight hover:brightness-110 active:scale-95 duration-150"
+            style=""
+          >
+            Sign In
+          </button>
+        </div>
+      </div>
+    </nav>
+    <!-- Main Content Area -->
+    <main class="pt-28 pb-20 px-4 md:px-12 max-w-[1920px] mx-auto relative z-10">
+      <!-- Progress Stepper -->
+      <div class="flex justify-center mb-12">
+        <div class="flex items-center w-full max-w-3xl">
+          <div class="flex flex-col items-center flex-1">
+            <div
+              class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold mb-2 shadow-lg"
+              style=""
+            >
+              1
+            </div>
+            <span class="text-[10px] uppercase font-bold tracking-widest text-primary" style=""
+              >Search</span
+            >
+          </div>
+          <div class="h-[2px] w-24 bg-primary mx-[-20px] mb-6 opacity-30"></div>
+          <div class="flex flex-col items-center flex-1">
+            <div
+              class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold mb-2 shadow-lg ring-4 ring-primary-fixed"
+              style=""
+            >
+              2
+            </div>
+            <span class="text-[10px] uppercase font-bold tracking-widest text-primary" style=""
+              >Select</span
+            >
+          </div>
+          <div class="h-[2px] w-24 bg-surface-container-highest mx-[-20px] mb-6"></div>
+          <div class="flex flex-col items-center flex-1">
+            <div
+              class="w-10 h-10 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center font-bold mb-2"
+              style=""
+            >
+              3
+            </div>
+            <span
+              class="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant"
+              style=""
+              >Details</span
+            >
+          </div>
+          <div class="h-[2px] w-24 bg-surface-container-highest mx-[-20px] mb-6"></div>
+          <div class="flex flex-col items-center flex-1">
+            <div
+              class="w-10 h-10 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center font-bold mb-2"
+              style=""
+            >
+              4
+            </div>
+            <span
+              class="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant"
+              style=""
+              >Pay</span
+            >
+          </div>
+        </div>
+      </div>
+      <!-- Search Summary & Sorting -->
+      <div class="flex flex-col md:flex-row justify-between items-end mb-8 gap-6">
+        <div>
+          <h1 class="text-4xl font-black text-on-surface tracking-tight mb-2 uppercase" style="">
+            London (LHR) to Dubai (DXB)
+          </h1>
+          <p class="text-on-surface-variant font-medium" style="">
+            12 Oct 2024 • 1 Adult • All Cabin Classes
+          </p>
+        </div>
+        <div class="flex items-center gap-4">
+          <span
+            class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
+            style=""
+            >Sort by:</span
+          >
+          <div class="relative">
+            <select
+              class="appearance-none bg-surface-container-lowest border-none px-6 py-3 pr-10 rounded-xl text-sm font-bold text-on-surface shadow-sm focus:ring-2 focus:ring-secondary-fixed outline-none cursor-pointer"
+            >
+              <option>Recommended</option>
+              <option>Cheapest</option>
+              <option>Fastest</option>
+              <option>Best Experience</option>
+            </select>
+            <span
+              class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant"
+              style=""
+              >expand_more</span
+            >
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <!-- Sidebar Filters -->
+        <aside class="lg:col-span-3 space-y-8">
+          <div
+            class="bg-surface-container-low rounded-xl p-8 sticky top-28 backdrop-blur-sm bg-surface-container-low/90 border border-surface-variant/30"
+          >
+            <h3 class="text-sm font-black uppercase tracking-widest text-on-surface mb-6" style="">
+              Refine Selection
+            </h3>
+            <!-- Stops -->
+            <div class="mb-8">
+              <span
+                class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant block mb-4"
+                style=""
+                >Stops</span
+              >
+              <div class="space-y-3">
+                <label class="flex items-center gap-3 cursor-pointer group" style="">
+                  <input
+                    checked=""
+                    class="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary"
+                    type="checkbox"
+                  />
+                  <span
+                    class="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors"
+                    style=""
+                    >Direct only</span
+                  >
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer group" style="">
+                  <input
+                    class="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary"
+                    type="checkbox"
+                  />
+                  <span
+                    class="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors"
+                    style=""
+                    >1 Stop</span
+                  >
+                </label>
+              </div>
+            </div>
+            <!-- Price Range -->
+            <div class="mb-8">
+              <div class="flex justify-between items-center mb-4">
+                <span
+                  class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant block"
+                  style=""
+                  >Price Range</span
+                >
+                <span class="text-xs font-bold text-secondary" style="">Up to £4,850</span>
+              </div>
+              <input
+                class="w-full h-1.5 bg-surface-container-highest rounded-full appearance-none accent-primary cursor-pointer"
+                max="6000"
+                min="400"
+                type="range"
+                value="4850"
+              />
+            </div>
+            <!-- Departure Time -->
+            <div class="mb-8">
+              <span
+                class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant block mb-4"
+                style=""
+                >Departure Time</span
+              >
+              <div class="grid grid-cols-2 gap-2">
+                <button
+                  class="py-3 px-2 rounded-lg bg-surface-container-lowest text-[10px] font-bold uppercase tracking-tighter text-on-surface border border-transparent hover:border-secondary transition-all"
+                  style=""
+                >
+                  00:00 - 06:00
+                </button>
+                <button
+                  class="py-3 px-2 rounded-lg bg-primary text-on-primary text-[10px] font-bold uppercase tracking-tighter shadow-md"
+                  style=""
+                >
+                  06:00 - 12:00
+                </button>
+                <button
+                  class="py-3 px-2 rounded-lg bg-surface-container-lowest text-[10px] font-bold uppercase tracking-tighter text-on-surface border border-transparent hover:border-secondary transition-all"
+                  style=""
+                >
+                  12:00 - 18:00
+                </button>
+                <button
+                  class="py-3 px-2 rounded-lg bg-surface-container-lowest text-[10px] font-bold uppercase tracking-tighter text-on-surface border border-transparent hover:border-secondary transition-all"
+                  style=""
+                >
+                  18:00 - 00:00
+                </button>
+              </div>
+            </div>
+            <!-- Cabin Class -->
+            <div>
+              <span
+                class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant block mb-4"
+                style=""
+                >Cabin Class</span
+              >
+              <div class="space-y-2">
+                <button
+                  class="w-full text-left px-4 py-3 rounded-lg hover:bg-surface-container-highest text-sm font-bold text-on-surface transition-colors flex justify-between items-center"
+                  style=""
+                >
+                  Economy
+                  <span class="material-symbols-outlined text-xs text-outline" style=""
+                    >chevron_right</span
+                  >
+                </button>
+                <button
+                  class="w-full text-left px-4 py-3 rounded-lg hover:bg-surface-container-highest text-sm font-bold text-on-surface transition-colors flex justify-between items-center"
+                  style=""
+                >
+                  Premium Economy
+                  <span class="material-symbols-outlined text-xs text-outline" style=""
+                    >chevron_right</span
+                  >
+                </button>
+                <button
+                  class="w-full text-left px-4 py-3 rounded-lg bg-secondary/10 text-secondary text-sm font-bold transition-colors flex justify-between items-center ring-1 ring-secondary/20"
+                  style=""
+                >
+                  Business
+                  <span class="material-symbols-outlined text-xs" style="">check</span>
+                </button>
+                <button
+                  class="w-full text-left px-4 py-3 rounded-lg hover:bg-surface-container-highest text-sm font-bold text-on-surface transition-colors flex justify-between items-center"
+                  style=""
+                >
+                  First Class
+                  <span class="material-symbols-outlined text-xs text-outline" style=""
+                    >chevron_right</span
+                  >
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
+        <!-- Flight Cards Container -->
+        <div class="lg:col-span-9 space-y-8">
+          <!-- Flight Card 1 (Direct - Full Availability) -->
+          <div
+            class="bg-surface-container-lowest/90 backdrop-blur-sm rounded-xl shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden flex flex-col border border-surface-container-high group/card"
+          >
+            <div class="p-8 pb-4">
+              <div class="flex flex-col md:flex-row items-center gap-12">
+                <div class="flex-1 w-full">
+                  <div class="flex items-center justify-between mb-8">
+                    <div class="flex items-center gap-4">
+                      <div
+                        class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary"
+                      >
+                        <span class="material-symbols-outlined" data-weight="fill" style=""
+                          >flight_takeoff</span
+                        >
+                      </div>
+                      <div>
+                        <span
+                          class="text-[10px] font-black uppercase tracking-widest text-primary"
+                          style=""
+                          >Sovereign Direct</span
+                        >
+                        <h4
+                          class="font-bold text-lg leading-tight uppercase tracking-tight"
+                          style=""
+                        >
+                          SV-204 • Airbus A350-1000
+                        </h4>
+                      </div>
+                    </div>
+                    <span
+                      class="bg-secondary-fixed text-on-secondary-fixed px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest"
+                      style=""
+                      >Most Popular</span
+                    >
+                  </div>
+                  <div class="flex items-center justify-between gap-4">
+                    <div class="text-center md:text-left">
+                      <span class="text-3xl font-black text-on-surface" style="">08:45</span>
+                      <span
+                        class="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
+                        style=""
+                        >LHR London</span
+                      >
+                    </div>
+                    <div class="flex-1 flex flex-col items-center px-4 relative">
+                      <span
+                        class="text-[10px] font-bold text-on-surface-variant mb-1 uppercase tracking-tighter"
+                        style=""
+                        >7h 15m Direct</span
+                      >
+                      <div class="w-full h-[1px] bg-outline-variant relative">
+                        <div
+                          class="absolute -top-1 left-0 w-2 h-2 rounded-full border-2 border-outline-variant bg-surface-container-lowest"
+                        ></div>
+                        <div
+                          class="absolute -top-1 right-0 w-2 h-2 rounded-full border-2 border-outline-variant bg-surface-container-lowest"
+                        ></div>
+                        <span
+                          class="material-symbols-outlined absolute left-1/2 -translate-x-1/2 -top-3 text-secondary bg-surface-container-lowest px-2"
+                          style=""
+                          >flight</span
+                        >
+                      </div>
+                    </div>
+                    <div class="text-center md:text-right">
+                      <span class="text-3xl font-black text-on-surface" style="">19:00</span>
+                      <span
+                        class="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
+                        style=""
+                        >DXB Dubai</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Horizontal Cabin Selection - Full Classes -->
+            <div class="px-8 pt-4 pb-2">
+              <div
+                class="grid grid-cols-1 md:grid-cols-4 gap-0 divide-x-0 md:divide-x divide-transparent relative"
+              >
+                <!-- Economy -->
+                <div
+                  class="p-4 flex flex-col justify-between group/cabin hover:bg-surface-container-low/30 transition-colors border-t-2 border-class-bronze/40 rounded-t-lg mx-1 first:ml-0"
+                >
+                  <div class="mb-4">
+                    <span
+                      class="text-[11px] font-black uppercase tracking-[0.15em] text-class-bronze"
+                      style=""
+                      >Economy</span
+                    >
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="text-xl font-black text-on-surface" style="">£482</span>
+                    </div>
+                  </div>
+                  <button
+                    class="w-full py-2 bg-surface-container-highest rounded font-black text-[9px] uppercase tracking-widest hover:bg-surface-variant transition-colors"
+                    style=""
+                  >
+                    Select
+                  </button>
+                </div>
+                <!-- Premium Economy -->
+                <div
+                  class="p-4 flex flex-col justify-between group/cabin hover:bg-surface-container-low/30 transition-colors border-t-2 border-class-silver rounded-t-lg mx-1"
+                >
+                  <div class="mb-4">
+                    <span
+                      class="text-[11px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70"
+                      style=""
+                      >Premium</span
+                    >
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="text-xl font-black text-on-surface" style="">£1,150</span>
+                      <span class="material-symbols-outlined text-sm text-class-silver" style=""
+                        >airline_seat_recline_extra</span
+                      >
+                    </div>
+                  </div>
+                  <button
+                    class="w-full py-2 bg-surface-container-highest rounded font-black text-[9px] uppercase tracking-widest hover:bg-surface-variant transition-colors"
+                    style=""
+                  >
+                    Select
+                  </button>
+                </div>
+                <!-- Business -->
+                <div
+                  class="p-4 flex flex-col justify-between group/cabin bg-primary/5 hover:bg-primary/10 transition-colors border-t-2 border-class-burgundy rounded-t-lg mx-1 ring-1 ring-class-burgundy/10"
+                >
+                  <div class="mb-4">
+                    <span
+                      class="text-[11px] font-black uppercase tracking-[0.15em] text-class-burgundy"
+                      style=""
+                      >Business</span
+                    >
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="text-xl font-black text-on-surface" style="">£2,140</span>
+                      <span
+                        class="material-symbols-outlined text-sm text-class-burgundy"
+                        style="font-variation-settings: 'FILL' 1"
+                        >king_bed</span
+                      >
+                    </div>
+                  </div>
+                  <button
+                    class="w-full py-2 bg-class-burgundy text-white rounded font-black text-[9px] uppercase tracking-widest hover:brightness-110 shadow-lg shadow-class-burgundy/20 transition-all"
+                    style=""
+                  >
+                    Select
+                  </button>
+                </div>
+                <!-- First -->
+                <div
+                  class="p-4 flex flex-col justify-between group/cabin hover:bg-class-gold/5 transition-colors border-t-2 border-class-gold rounded-t-lg mx-1 last:mr-0"
+                >
+                  <div class="mb-4">
+                    <span
+                      class="text-[11px] font-black uppercase tracking-[0.15em] text-class-gold"
+                      style=""
+                      >First Class</span
+                    >
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="text-xl font-black text-on-surface" style="">£4,850</span>
+                      <span
+                        class="material-symbols-outlined text-sm text-class-gold"
+                        style="font-variation-settings: 'FILL' 1"
+                        >diamond</span
+                      >
+                    </div>
+                  </div>
+                  <button
+                    class="w-full py-2 bg-class-gold/10 text-class-gold border border-class-gold/20 rounded font-black text-[9px] uppercase tracking-widest hover:bg-class-gold/20 transition-colors"
+                    style=""
+                  >
+                    Select
+                  </button>
+                </div>
+              </div>
+            </div>
+            <!-- Shared More/View Benefits Button -->
+            <div class="flex justify-center p-6 border-t border-surface-variant/20">
+              <button
+                class="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-secondary hover:text-primary transition-colors group/btn"
+                onclick="
+                  const expansion =
+                    this.closest('.group\\/card').querySelector('.benefits-expansion');
+                  expansion.classList.toggle('active');
+                  this.classList.toggle('active');
+                "
+                style=""
+              >
+                <span class="" style="">Compare Cabin Features</span>
+                <span class="material-symbols-outlined text-sm rotate-icon" style=""
+                  >expand_more</span
+                >
+              </button>
+            </div>
+            <!-- Expanded Benefits Area -->
+            <div
+              class="benefits-expansion bg-surface-container-lowest border-t border-surface-variant/30"
+            >
+              <div class="p-8 grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="relative">
+                  <h5
+                    class="text-[10px] font-black uppercase tracking-widest text-class-bronze mb-4 pb-2 border-b border-class-bronze/20"
+                    style=""
+                  >
+                    Economy
+                  </h5>
+                  <ul class="space-y-3">
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface-variant uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px] text-secondary" style=""
+                        >check</span
+                      >
+                      23kg Check-in
+                    </li>
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface-variant uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px] text-secondary" style=""
+                        >check</span
+                      >
+                      Hot Meal Service
+                    </li>
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface-variant uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px] text-secondary" style=""
+                        >check</span
+                      >
+                      HD Screen
+                    </li>
+                  </ul>
+                </div>
+                <div class="relative">
+                  <h5
+                    class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-4 pb-2 border-b border-surface-variant/30"
+                    style=""
+                  >
+                    Premium Economy
+                  </h5>
+                  <ul class="space-y-3">
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface-variant uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px] text-secondary" style=""
+                        >add</span
+                      >
+                      Extra Legroom
+                    </li>
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface-variant uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px] text-secondary" style=""
+                        >check</span
+                      >
+                      Priority Check-in
+                    </li>
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface-variant uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px] text-secondary" style=""
+                        >check</span
+                      >
+                      Sparkling Wine
+                    </li>
+                  </ul>
+                </div>
+                <div class="relative">
+                  <h5
+                    class="text-[10px] font-black uppercase tracking-widest text-class-burgundy mb-4 pb-2 border-b border-class-burgundy/20"
+                    style=""
+                  >
+                    Business
+                  </h5>
+                  <ul class="space-y-3">
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px] text-secondary" style=""
+                        >star</span
+                      >
+                      Lie-Flat Suite
+                    </li>
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px] text-secondary" style=""
+                        >star</span
+                      >
+                      Lounge Access
+                    </li>
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px] text-secondary" style=""
+                        >star</span
+                      >
+                      Gourmet Dining
+                    </li>
+                  </ul>
+                </div>
+                <div class="relative">
+                  <h5
+                    class="text-[10px] font-black uppercase tracking-widest text-class-gold mb-4 pb-2 border-b border-class-gold/20"
+                    style=""
+                  >
+                    First Class
+                  </h5>
+                  <ul class="space-y-3">
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface uppercase"
+                      style=""
+                    >
+                      <span
+                        class="material-symbols-outlined text-[14px] text-class-gold"
+                        style="font-variation-settings: 'FILL' 1"
+                        >diamond</span
+                      >
+                      Private Cabin
+                    </li>
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface uppercase"
+                      style=""
+                    >
+                      <span
+                        class="material-symbols-outlined text-[14px] text-class-gold"
+                        style="font-variation-settings: 'FILL' 1"
+                        >diamond</span
+                      >
+                      Chauffeur
+                    </li>
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface uppercase"
+                      style=""
+                    >
+                      <span
+                        class="material-symbols-outlined text-[14px] text-class-gold"
+                        style="font-variation-settings: 'FILL' 1"
+                        >diamond</span
+                      >
+                      Spa Access
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Flight Card 2 (Connect - With Sold Out state) -->
+          <div
+            class="bg-surface-container-lowest/90 backdrop-blur-sm rounded-xl shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden flex flex-col border border-surface-container-high group/card"
+          >
+            <div class="p-8 pb-4">
+              <div class="flex flex-col md:flex-row items-center gap-12">
+                <div class="flex-1 w-full">
+                  <div class="flex items-center justify-between mb-8">
+                    <div class="flex items-center gap-4">
+                      <div
+                        class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-outline"
+                      >
+                        <span class="material-symbols-outlined" data-weight="fill" style=""
+                          >flight_takeoff</span
+                        >
+                      </div>
+                      <div>
+                        <span
+                          class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
+                          style=""
+                          >Sovereign Connect</span
+                        >
+                        <h4
+                          class="font-bold text-lg leading-tight uppercase tracking-tight"
+                          style=""
+                        >
+                          SV-882 • Boeing 787 Dreamliner
+                        </h4>
+                      </div>
+                    </div>
+                    <span
+                      class="bg-surface-container text-on-surface-variant px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest"
+                      style=""
+                      >Best Value</span
+                    >
+                  </div>
+                  <div class="flex items-center justify-between gap-4">
+                    <div class="text-center md:text-left">
+                      <span class="text-3xl font-black text-on-surface" style="">11:30</span>
+                      <span
+                        class="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
+                        style=""
+                        >LHR London</span
+                      >
+                    </div>
+                    <div class="flex-1 flex flex-col items-center px-4 relative">
+                      <span
+                        class="text-[10px] font-bold text-on-surface-variant mb-1 uppercase tracking-tighter"
+                        style=""
+                        >7h 05m Direct</span
+                      >
+                      <div class="w-full h-[1px] bg-outline-variant relative">
+                        <div
+                          class="absolute -top-1 left-0 w-2 h-2 rounded-full border-2 border-outline-variant bg-surface-container-lowest"
+                        ></div>
+                        <div
+                          class="absolute -top-1 right-0 w-2 h-2 rounded-full border-2 border-outline-variant bg-surface-container-lowest"
+                        ></div>
+                        <span
+                          class="material-symbols-outlined absolute left-1/2 -translate-x-1/2 -top-3 text-outline bg-surface-container-lowest px-2"
+                          style=""
+                          >flight</span
+                        >
+                      </div>
+                    </div>
+                    <div class="text-center md:text-right">
+                      <span class="text-3xl font-black text-on-surface" style="">21:35</span>
+                      <span
+                        class="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
+                        style=""
+                        >DXB Dubai</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Horizontal Cabin Selection - With Sold Out -->
+            <div class="px-8 pt-4 pb-2">
+              <div
+                class="grid grid-cols-1 md:grid-cols-4 gap-0 divide-x-0 md:divide-x divide-transparent relative"
+              >
+                <!-- Economy -->
+                <div
+                  class="p-4 flex flex-col justify-between group/cabin hover:bg-surface-container-low/30 transition-colors border-t-2 border-class-bronze/40 rounded-t-lg mx-1 first:ml-0"
+                >
+                  <div class="mb-4">
+                    <span
+                      class="text-[11px] font-black uppercase tracking-[0.15em] text-class-bronze"
+                      style=""
+                      >Economy</span
+                    >
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="text-xl font-black text-on-surface" style="">£440</span>
+                    </div>
+                  </div>
+                  <button
+                    class="w-full py-2 bg-surface-container-highest rounded font-black text-[9px] uppercase tracking-widest hover:bg-surface-variant transition-colors"
+                    style=""
+                  >
+                    Select
+                  </button>
+                </div>
+                <!-- Premium Economy (SOLD OUT) -->
+                <div
+                  class="p-4 flex flex-col justify-between bg-surface-container-low/20 border-t-2 border-outline/20 grayscale rounded-t-lg mx-1 opacity-60"
+                >
+                  <div class="mb-4">
+                    <span
+                      class="text-[11px] font-black uppercase tracking-[0.15em] text-outline"
+                      style=""
+                      >Premium</span
+                    >
+                    <div class="mt-1">
+                      <span
+                        class="text-[10px] font-black text-outline uppercase tracking-widest bg-outline/10 px-2 py-0.5 rounded"
+                        style=""
+                        >Fully Booked</span
+                      >
+                    </div>
+                  </div>
+                  <button
+                    class="w-full py-2 bg-surface-container text-outline/50 rounded font-black text-[9px] uppercase tracking-widest cursor-not-allowed"
+                    disabled=""
+                    style=""
+                  >
+                    Sold Out
+                  </button>
+                </div>
+                <!-- Business -->
+                <div
+                  class="p-4 flex flex-col justify-between group/cabin hover:bg-primary/5 transition-colors border-t-2 border-class-burgundy/40 rounded-t-lg mx-1"
+                >
+                  <div class="mb-4">
+                    <span
+                      class="text-[11px] font-black uppercase tracking-[0.15em] text-class-burgundy"
+                      style=""
+                      >Business</span
+                    >
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="text-xl font-black text-on-surface" style="">£1,890</span>
+                      <span
+                        class="material-symbols-outlined text-sm text-class-burgundy"
+                        style="font-variation-settings: 'FILL' 1"
+                        >king_bed</span
+                      >
+                    </div>
+                  </div>
+                  <button
+                    class="w-full py-2 bg-primary text-white rounded font-black text-[9px] uppercase tracking-widest hover:brightness-110 shadow-md transition-all"
+                    style=""
+                  >
+                    Select
+                  </button>
+                </div>
+                <!-- First (SOLD OUT) -->
+                <div
+                  class="p-4 flex flex-col justify-between bg-surface-container-low/20 border-t-2 border-outline/20 grayscale rounded-t-lg mx-1 last:mr-0 opacity-60"
+                >
+                  <div class="mb-4">
+                    <span
+                      class="text-[11px] font-black uppercase tracking-[0.15em] text-outline"
+                      style=""
+                      >First Class</span
+                    >
+                    <div class="mt-1">
+                      <span
+                        class="text-[10px] font-black text-outline uppercase tracking-widest bg-outline/10 px-2 py-0.5 rounded"
+                        style=""
+                        >Not Available</span
+                      >
+                    </div>
+                  </div>
+                  <button
+                    class="w-full py-2 bg-surface-container text-outline/50 rounded font-black text-[9px] uppercase tracking-widest cursor-not-allowed"
+                    disabled=""
+                    style=""
+                  >
+                    Sold Out
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="flex justify-center p-6 border-t border-surface-variant/20">
+              <button
+                class="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-secondary hover:text-primary transition-colors group/btn"
+                onclick="
+                  const expansion =
+                    this.closest('.group\\/card').querySelector('.benefits-expansion');
+                  expansion.classList.toggle('active');
+                  this.classList.toggle('active');
+                "
+                style=""
+              >
+                <span class="" style="">View Flight Details</span>
+                <span class="material-symbols-outlined text-sm rotate-icon" style=""
+                  >expand_more</span
+                >
+              </button>
+            </div>
+            <!-- Expanded Benefits Area (Consistent grid even with sold out) -->
+            <div
+              class="benefits-expansion bg-surface-container-lowest border-t border-surface-variant/30"
+            >
+              <div class="p-8 grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div>
+                  <h5
+                    class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-4 pb-2 border-b border-surface-variant/30"
+                    style=""
+                  >
+                    Economy Experience
+                  </h5>
+                  <ul class="space-y-3">
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface-variant uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px] text-secondary" style=""
+                        >check</span
+                      >
+                      In-flight Ent.
+                    </li>
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface-variant uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px] text-secondary" style=""
+                        >check</span
+                      >
+                      20kg Bag
+                    </li>
+                  </ul>
+                </div>
+                <div class="opacity-50">
+                  <h5
+                    class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-4 pb-2 border-b border-surface-variant/30"
+                    style=""
+                  >
+                    Premium Experience
+                  </h5>
+                  <ul class="space-y-3">
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface-variant uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px]" style="">close</span> No
+                      Seats Left
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <h5
+                    class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-4 pb-2 border-b border-surface-variant/30"
+                    style=""
+                  >
+                    Business Experience
+                  </h5>
+                  <ul class="space-y-3">
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px] text-secondary" style=""
+                        >star</span
+                      >
+                      Lie-flat seat
+                    </li>
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px] text-secondary" style=""
+                        >star</span
+                      >
+                      Priority Bag
+                    </li>
+                  </ul>
+                </div>
+                <div class="opacity-50">
+                  <h5
+                    class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-4 pb-2 border-b border-surface-variant/30"
+                    style=""
+                  >
+                    First Experience
+                  </h5>
+                  <ul class="space-y-3">
+                    <li
+                      class="flex items-center gap-2 text-[9px] font-bold text-on-surface-variant uppercase"
+                      style=""
+                    >
+                      <span class="material-symbols-outlined text-[14px]" style="">close</span> Not
+                      Available
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Bento Info Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
+            <div class="relative h-64 rounded-xl overflow-hidden group">
+              <img
+                alt="ultra-modern airline lounge with sleek wood panels and soft golden lighting and views of the runway"
+                class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1BdMwUWwuCYDOhdELi5hivumuMQtz2jSSZc6Zhf1S09T9x0kIviaVelDe_JN3EBK4ziJEvfswaUnUmZ4EgiZbfZqpyau74kKupZ4LLuO0BssCPBKbKIr1CJMDKuNH92tNJov6gQsev842dD7mgRYZbQYj1YCvrOlhNlcpVAL1THpX6srfOWQJ9DVZukWb3mlcPEpNZim_y2Fd0nXAWCCEOpgmVIc7SVqOv2KqpmMiUMzZ05C-lUcgsBV5D0uIHaMLu4KS88DyXQi5"
+                style=""
+              />
+              <div
+                class="absolute inset-0 bg-gradient-to-t from-on-surface via-transparent to-transparent"
+              ></div>
+              <div class="absolute bottom-6 left-6 text-on-primary">
+                <span class="text-[10px] font-black uppercase tracking-widest mb-1 block" style=""
+                  >Lounge Spotlight</span
+                >
+                <h3 class="text-2xl font-black uppercase tracking-tight" style="">
+                  The Zenith Suite (LHR)
+                </h3>
+                <p class="text-sm opacity-80 mt-1 max-w-xs" style="">
+                  Complimentary access for all Business and First class travelers.
+                </p>
+              </div>
+            </div>
+            <div
+              class="bg-secondary-container/90 backdrop-blur-sm rounded-xl p-8 flex flex-col justify-between border border-secondary-fixed/50"
+            >
+              <div>
+                <span
+                  class="material-symbols-outlined text-4xl text-on-secondary-container mb-4"
+                  style=""
+                  >stars</span
+                >
+                <h3
+                  class="text-2xl font-black text-on-secondary-container uppercase tracking-tight leading-none mb-2"
+                  style=""
+                >
+                  Join Sovereign Gold
+                </h3>
+                <p class="text-on-secondary-container font-medium text-sm" style="">
+                  Earn up to 12,400 miles on this trip and unlock immediate priority boarding.
+                </p>
+              </div>
+              <button
+                class="bg-on-secondary-container text-white w-fit px-8 py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-95 transition-all"
+                style=""
+              >
+                Enroll Now
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    <!-- Footer - Midnight Luxury Theme -->
+    <footer class="w-full border-t border-luxury-gold/30 bg-dark-charcoal relative z-10">
+      <div
+        class="flex flex-col md:flex-row justify-between items-center px-12 py-12 w-full max-w-[1920px] mx-auto"
+      >
+        <div class="mb-6 md:mb-0">
+          <span class="text-xl font-black text-luxury-gold uppercase tracking-tighter" style=""
+            >The Sovereign</span
+          >
+          <p
+            class="font-['Manrope'] text-[10px] tracking-widest uppercase font-bold text-luxury-gold/60 mt-3"
+            style=""
+          >
+            © 2024 The Sovereign Experience. All rights reserved.
+          </p>
+        </div>
+        <div class="flex flex-wrap justify-center gap-10">
+          <a
+            class="font-['Manrope'] text-xs tracking-[0.15em] uppercase font-bold text-luxury-gold/80 hover:text-white transition-colors"
+            href="#"
+            style=""
+            >Privacy Policy</a
+          >
+          <a
+            class="font-['Manrope'] text-xs tracking-[0.15em] uppercase font-bold text-luxury-gold/80 hover:text-white transition-colors"
+            href="#"
+            style=""
+            >Terms of Service</a
+          >
+          <a
+            class="font-['Manrope'] text-xs tracking-[0.15em] uppercase font-bold text-luxury-gold/80 hover:text-white transition-colors"
+            href="#"
+            style=""
+            >Help Center</a
+          >
+          <a
+            class="font-['Manrope'] text-xs tracking-[0.15em] uppercase font-bold text-luxury-gold/80 hover:text-white transition-colors"
+            href="#"
+            style=""
+            >Contact Us</a
+          >
+        </div>
+      </div>
+      <!-- Decorative gold accent line -->
+      <div
+        class="w-full h-1 bg-gradient-to-r from-transparent via-luxury-gold/40 to-transparent"
+      ></div>
+    </footer>
+  </body>
+</html>

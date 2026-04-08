@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>The Sovereign | Elevated Travel</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800;900&amp;family=Manrope:wght@400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'tertiary-fixed-dim': '#ecbf7c',
+              'on-secondary': '#ffffff',
+              'surface-container': '#eeeeee',
+              'inverse-on-surface': '#f1f1f1',
+              'primary-container': '#c33d3d',
+              error: '#ba1a1a',
+              'secondary-container': '#fed888',
+              'surface-dim': '#dadada',
+              'error-container': '#ffdad6',
+              'inverse-primary': '#ffb3ae',
+              'inverse-surface': '#2f3131',
+              'on-tertiary-fixed': '#281800',
+              'secondary-fixed': '#ffdf9e',
+              'on-secondary-fixed': '#261a00',
+              'surface-container-low': '#f3f3f3',
+              'on-tertiary': '#ffffff',
+              'on-surface': '#1a1c1c',
+              'on-primary-fixed-variant': '#8d131c',
+              'on-secondary-container': '#785d19',
+              'tertiary-fixed': '#ffddaf',
+              'secondary-fixed-dim': '#e6c275',
+              'primary-fixed-dim': '#ffb3ae',
+              'on-error': '#ffffff',
+              'surface-container-high': '#e8e8e8',
+              'on-primary-container': '#ffecea',
+              'on-primary': '#ffffff',
+              'surface-container-lowest': '#ffffff',
+              'on-surface-variant': '#5d3f3c',
+              'surface-variant': '#e2e2e2',
+              'on-primary-fixed': '#410005',
+              'surface-container-highest': '#e2e2e2',
+              'on-tertiary-fixed-variant': '#5f4108',
+              secondary: '#765a17',
+              background: '#f9f9f9',
+              'on-tertiary-container': '#ffeed9',
+              'primary-fixed': '#ffdad7',
+              surface: '#f9f9f9',
+              tertiary: '#6f4f16',
+              'on-error-container': '#93000a',
+              outline: '#926f6b',
+              'surface-bright': '#f9f9f9',
+              primary: '#a12428',
+              'on-background': '#1a1c1c',
+              'outline-variant': '#e6bdb8',
+              'surface-tint': '#af2e30',
+              'tertiary-container': '#8b672c',
+              'on-secondary-fixed-variant': '#5b4300',
+              'midnight-burgundy': '#7D0633',
+              'luxury-gold': '#D4AF37',
+              'dark-charcoal': '#1A1A1A',
+            },
+            fontFamily: {
+              headline: ['Be Vietnam Pro'],
+              body: ['Manrope'],
+              label: ['Manrope'],
+            },
+            borderRadius: { DEFAULT: '0.125rem', lg: '0.25rem', xl: '0.5rem', full: '0.75rem' },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          'FILL' 0,
+          'wght' 400,
+          'GRAD' 0,
+          'opsz' 24;
+      }
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+      }
+      .destination-overlay {
+        background: linear-gradient(to top, rgba(26, 26, 26, 0.9) 0%, rgba(26, 26, 26, 0) 50%);
+      }
+      .ambient-sweep {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      .sweep-line {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        stroke: #d4af37;
+        stroke-width: 0.75;
+        fill: none;
+        opacity: 0.2;
+        filter: drop-shadow(0 0 2px rgba(212, 175, 55, 0.2));
+      }
+    </style>
+  </head>
+  <body class="bg-surface font-body text-on-surface antialiased">
+    <!-- Top Navigation Shell - Updated to Midnight Luxury Theme -->
+    <nav
+      class="fixed top-0 w-full z-50 bg-midnight-burgundy shadow-xl border-b border-luxury-gold/20"
+    >
+      <div class="flex justify-between items-center px-8 h-20 w-full max-w-[1920px] mx-auto">
+        <div class="flex items-center gap-12">
+          <a
+            class="text-2xl font-black text-luxury-gold tracking-tighter uppercase font-headline italic"
+            href="#"
+            style=""
+            ><span style="font-style: normal" class="">The Sovereign</span></a
+          >
+          <div class="hidden md:flex items-center gap-8">
+            <a
+              class="text-white border-b-2 border-luxury-gold pb-1 font-bold font-body"
+              href="#"
+              style=""
+              >Book</a
+            >
+            <a
+              class="text-white/80 font-medium hover:text-white transition-all duration-300 font-body"
+              href="#"
+              style=""
+              >Explore</a
+            >
+            <a
+              class="text-white/80 font-medium hover:text-white transition-all duration-300 font-body"
+              href="#"
+              style=""
+              >Experience</a
+            >
+            <a
+              class="text-white/80 font-medium hover:text-white transition-all duration-300 font-body"
+              href="#"
+              style=""
+              >Loyalty</a
+            >
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <button
+            class="px-6 py-2 text-white/80 font-medium hover:text-white transition-all duration-300 rounded-lg font-body"
+            style=""
+          >
+            My Trips
+          </button>
+          <button
+            class="px-6 py-2 bg-luxury-gold text-midnight-burgundy font-bold rounded-lg shadow-lg hover:brightness-110 active:scale-95 transition-all"
+            style=""
+          >
+            Sign In
+          </button>
+        </div>
+      </div>
+    </nav>
+    <main class="pt-20">
+      <!-- Hero Section -->
+      <section class="relative h-[870px] min-h-[700px] w-full flex items-center overflow-hidden">
+        <div class="absolute inset-0 z-0">
+          <img
+            class="w-full h-full object-cover"
+            data-alt="Luxurious airplane wing detail soaring above a thick sea of golden clouds during a vivid sunrise with soft warm light reflecting on the fuselage"
+            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDhbnWHSXyZEIc2WLBnhOd8qPY45Y8JYORsa-L0oq7JPRn9I4oA9_W7OkkNhMz9zF8JD3bicGF4GrcM506MBeGkuKj4o9A6fHVkHaAMgcqxRr2xqWTzrWEdOFtljcl0_8qdOxagUmxX_oTMFP_3N2YaRyH0RGeVAXtvJvdRu6KhMFIrrcWTVzmVFSeaeNi7vqxkms17m4cZWkdLwWtdz1zZ17qMDCUZ_3_1otxOuya4kNUb_BN5Wc7E4sM56D5JgO3fZytmZtSOOyJU"
+            style=""
+          />
+          <div class="absolute inset-0 bg-black/40"></div>
+        </div>
+        <div class="relative z-10 w-full max-w-[1920px] mx-auto px-8 md:px-20">
+          <div class="max-w-4xl mb-12">
+            <h1
+              class="font-headline text-white text-6xl md:text-8xl font-black tracking-tighter mb-6 leading-[0.9]"
+              style=""
+            >
+              REDEFINING <br />THE <span class="text-luxury-gold" style="">EXCEPTIONAL</span>
+            </h1>
+            <p class="text-white/90 text-xl max-w-xl font-medium tracking-wide" style="">
+              Journey beyond expectation. Experience the pinnacle of international travel with
+              bespoke service and uncompromised luxury.
+            </p>
+          </div>
+          <!-- Flight Search Widget -->
+          <div class="glass-panel p-1 rounded-xl shadow-2xl max-w-6xl border border-luxury-gold/20">
+            <div
+              class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 divide-y md:divide-y-0 md:divide-x divide-luxury-gold/10 p-4"
+            >
+              <div class="p-4 space-y-1">
+                <label
+                  class="block font-label text-[0.6875rem] font-bold tracking-widest text-midnight-burgundy/60 uppercase"
+                  style=""
+                  >From</label
+                >
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-midnight-burgundy" style=""
+                    >flight_takeoff</span
+                  >
+                  <input
+                    class="bg-transparent border-none focus:ring-0 w-full font-headline font-bold text-lg text-midnight-burgundy p-0 placeholder-midnight-burgundy/40"
+                    placeholder="London LHR"
+                    type="text"
+                  />
+                </div>
+              </div>
+              <div class="p-4 space-y-1">
+                <label
+                  class="block font-label text-[0.6875rem] font-bold tracking-widest text-midnight-burgundy/60 uppercase"
+                  style=""
+                  >To</label
+                >
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-midnight-burgundy" style=""
+                    >flight_land</span
+                  >
+                  <input
+                    class="bg-transparent border-none focus:ring-0 w-full font-headline font-bold text-lg text-midnight-burgundy p-0 placeholder-midnight-burgundy/40"
+                    placeholder="Dubai DXB"
+                    type="text"
+                  />
+                </div>
+              </div>
+              <div class="p-4 space-y-1">
+                <label
+                  class="block font-label text-[0.6875rem] font-bold tracking-widest text-midnight-burgundy/60 uppercase"
+                  style=""
+                  >Dates</label
+                >
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-midnight-burgundy" style=""
+                    >calendar_today</span
+                  >
+                  <input
+                    class="bg-transparent border-none focus:ring-0 w-full font-headline font-bold text-lg text-midnight-burgundy p-0 placeholder-midnight-burgundy/40"
+                    placeholder="24 Oct - 01 Nov"
+                    type="text"
+                  />
+                </div>
+              </div>
+              <div class="p-4 space-y-1">
+                <label
+                  class="block font-label text-[0.6875rem] font-bold tracking-widest text-midnight-burgundy/60 uppercase"
+                  style=""
+                  >Travelers</label
+                >
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-midnight-burgundy" style=""
+                    >person</span
+                  >
+                  <input
+                    class="bg-transparent border-none focus:ring-0 w-full font-headline font-bold text-lg text-midnight-burgundy p-0 placeholder-midnight-burgundy/40"
+                    placeholder="2 Adults, First"
+                    type="text"
+                  />
+                </div>
+              </div>
+              <div class="p-2 md:p-1 flex items-center">
+                <button
+                  class="w-full h-full bg-midnight-burgundy text-luxury-gold font-headline font-bold py-4 rounded-lg flex items-center justify-center gap-2 hover:brightness-110 transition-all active:scale-95"
+                  style=""
+                >
+                  SEARCH FLIGHTS
+                  <span class="material-symbols-outlined" style="">arrow_forward</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <!-- Featured Destinations -->
+      <section class="py-24 px-8 md:px-20 max-w-[1920px] mx-auto relative">
+        <!-- Ambient Decor -->
+        <div class="ambient-sweep">
+          <svg class="sweep-line" preserveAspectRatio="none" viewBox="0 0 1000 1000">
+            <path d="M-50,950 C200,850 400,900 600,600 C800,300 900,100 1100,50"></path>
+          </svg>
+        </div>
+        <div class="relative z-10">
+          <div class="flex justify-between items-end mb-16">
+            <div>
+              <label
+                class="font-label text-midnight-burgundy font-extrabold tracking-[0.2em] mb-4 block"
+                style=""
+                >CURATED COLLECTIONS</label
+              >
+              <h2
+                class="font-headline text-5xl font-black text-on-surface tracking-tighter"
+                style=""
+              >
+                Bespoke Destinations
+              </h2>
+            </div>
+            <button
+              class="flex items-center gap-2 font-headline font-bold text-midnight-burgundy group"
+              style=""
+            >
+              VIEW ALL DESTINATIONS
+              <span
+                class="material-symbols-outlined group-hover:translate-x-1 transition-transform"
+                style=""
+                >trending_flat</span
+              >
+            </button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+            <!-- Card 1 -->
+            <div
+              class="group relative aspect-[3/4] overflow-hidden rounded-xl bg-surface-container-low shadow-sm border border-luxury-gold/10"
+            >
+              <img
+                class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                data-alt="The modern skyline of Dubai at dusk with the Burj Khalifa towering over glowing skyscrapers and the Arabian Gulf in the distance"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzQoRszQ9DoYWqrmkICRM_5R6URZXKVjMsaosolUgHNilP8s5srYmEPnNXXBAPikFHweburezdnp1Z94bpBFM7TBcfeHKjeMNUfdqUgpD250iLKxHouuXEHRH5vSdk9MmR-99-COmPExlTcMfWiym3-b9z9mEYntXklDSt265R2qmcYwluquIBakeFin-WyilQvHpz9tTZUNCw83Br2bsGIq3_63Rj_g1H9xulMmpBe6chtogNz7g4N77Q2YM6Q_4lgDb6Ppp36bop"
+                style=""
+              />
+              <div class="absolute inset-0 destination-overlay"></div>
+              <div class="absolute bottom-0 left-0 p-8 w-full">
+                <span
+                  class="bg-midnight-burgundy text-luxury-gold px-3 py-1 text-[0.65rem] font-bold tracking-widest mb-3 inline-block"
+                  style=""
+                  >TRENDING</span
+                >
+                <h3 class="font-headline text-3xl font-black text-white mb-2" style="">Dubai</h3>
+                <p class="text-white/70 mb-6 font-medium" style="">
+                  From $1,240 | First Class Experience
+                </p>
+                <button
+                  class="w-12 h-12 bg-luxury-gold text-midnight-burgundy rounded-full flex items-center justify-center shadow-lg hover:brightness-110 transition-colors"
+                  style=""
+                >
+                  <span class="material-symbols-outlined" style="">add</span>
+                </button>
+              </div>
+            </div>
+            <!-- Card 2 -->
+            <div
+              class="group relative aspect-[3/4] overflow-hidden rounded-xl bg-surface-container-low shadow-sm md:-translate-y-8 border border-luxury-gold/10"
+            >
+              <img
+                class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                data-alt="The Eiffel Tower in Paris seen through classic Haussmann-style architecture with warm spring sunlight and blooming trees"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGJCt58g5Q3lJDwA8yHseLk4ECQqDj8JwZtvA3ub7MIh3sFCnqMKvFmEU93nt0fnkqRlGTMXucg2alHD-bssfl3pnBJGsLUvSJf2ziz1xk5QXAnFzjFd_I2sTyQAIDsUKSL0J8D3Rr9pm4M717Ts3krl_V_cdhkB2xarlNhsjRpwtXWs5fhZoVv8PD7mpgGhUNohZ1oX67E5we99w4MdsvY73zBGUl2bXjj9N9bPse7uDjM_scP87xFnl7YyQnYexRjC8U5WUz37FD"
+                style=""
+              />
+              <div class="absolute inset-0 destination-overlay"></div>
+              <div class="absolute bottom-0 left-0 p-8 w-full">
+                <span
+                  class="bg-luxury-gold text-midnight-burgundy px-3 py-1 text-[0.65rem] font-bold tracking-widest mb-3 inline-block"
+                  style=""
+                  >FEATURED</span
+                >
+                <h3 class="font-headline text-3xl font-black text-white mb-2" style="">Paris</h3>
+                <p class="text-white/70 mb-6 font-medium" style="">From $980 | Cultural Elegance</p>
+                <button
+                  class="w-12 h-12 bg-luxury-gold text-midnight-burgundy rounded-full flex items-center justify-center shadow-lg hover:brightness-110 transition-colors"
+                  style=""
+                >
+                  <span class="material-symbols-outlined" style="">add</span>
+                </button>
+              </div>
+            </div>
+            <!-- Card 3 -->
+            <div
+              class="group relative aspect-[3/4] overflow-hidden rounded-xl bg-surface-container-low shadow-sm border border-luxury-gold/10"
+            >
+              <img
+                class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                data-alt="Vibrant neon lights of Shinjuku, Tokyo at night with rain-slicked streets reflecting the colorful city glow and bustling crowds"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmSdCW-K2plV9pnsU7pJS-1INqVfmROXBQGkU-LLL4aOhQ62VnWMUqAVXilhgQSAI6DWZuvDZ3PjI32_XeWOLCy9HihdXoNGpiFrKPWlMm6cWeA_k_HICKIc18PkmRNABDcoHhwo3n8SQVqSU1NfcHNZxUiXtuj07yPsrh2tpJW1UashVTXXjXe-JoOVjehMnKISgiVO87usxTH_G4XxEFalM59OaESVoGglNSj4FroDwEfMBsq0TTOZf3UmbB-S3anh2EFDBbAw6U"
+                style=""
+              />
+              <div class="absolute inset-0 destination-overlay"></div>
+              <div class="absolute bottom-0 left-0 p-8 w-full">
+                <span
+                  class="bg-midnight-burgundy text-luxury-gold px-3 py-1 text-[0.65rem] font-bold tracking-widest mb-3 inline-block"
+                  style=""
+                  >LIMITED</span
+                >
+                <h3 class="font-headline text-3xl font-black text-white mb-2" style="">Tokyo</h3>
+                <p class="text-white/70 mb-6 font-medium" style="">
+                  From $1,560 | Urban Sophistication
+                </p>
+                <button
+                  class="w-12 h-12 bg-luxury-gold text-midnight-burgundy rounded-full flex items-center justify-center shadow-lg hover:brightness-110 transition-colors"
+                  style=""
+                >
+                  <span class="material-symbols-outlined" style="">add</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <!-- Promotional Banners - Bento Style -->
+      <section class="py-12 px-8 md:px-20 max-w-[1920px] mx-auto">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-auto lg:h-[500px]">
+          <!-- Business Class Banner -->
+          <div
+            class="lg:col-span-8 relative rounded-xl overflow-hidden group border border-luxury-gold/10 shadow-lg"
+          >
+            <img
+              class="w-full h-full object-cover"
+              data-alt="Close-up of a luxurious modern business class airplane seat with fine leather texture, ambient mood lighting, and a welcome champagne glass"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuA3PIrZqKqBOtsY76vWhimpUUlYthHM4y8zXe5e86W9R3JOSoVuyVdG5jLy-9XzNeh0csUNmMGRt1W3uyTrrHXnUScKQQrmKEmgj82-slcm4Y9RGYse7U7bbQ_aA4EVIr_x6_tDglJHOhU1KWXQpJcEKBRX5QN7c5ch24nFs2RNda4O47SK-NcJyuLklQzGsa-oubeIJxP8ElytxX1ZV1EHUCS_FJgUg8Q0I5oe88Zt91sZNupuXXqReEwWT5-Zxjs10dEIYXsmWOAG"
+              style=""
+            />
+            <div
+              class="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent flex flex-col justify-center p-12"
+            >
+              <label class="font-label text-luxury-gold font-black tracking-widest mb-4" style=""
+                >THE BUSINESS CLASS REDEFINED</label
+              >
+              <h3
+                class="font-headline text-white text-5xl font-black mb-6 leading-tight max-w-lg"
+                style=""
+              >
+                Work, Relax, <br />And Arrive Inspired.
+              </h3>
+              <p class="text-white/80 max-w-md mb-8 font-medium" style="">
+                Experience our new suites with fully flat beds, artisanal dining, and exclusive
+                onboard connectivity.
+              </p>
+              <div>
+                <button
+                  class="bg-luxury-gold text-midnight-burgundy font-headline font-bold px-8 py-4 rounded-lg hover:brightness-110 transition-all"
+                  style=""
+                >
+                  DISCOVER THE SUITE
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- Lounge Access Banner -->
+          <div
+            class="lg:col-span-4 bg-midnight-burgundy rounded-xl overflow-hidden relative group shadow-lg border border-luxury-gold/20"
+          >
+            <div class="absolute inset-0 opacity-20">
+              <img
+                class="w-full h-full object-cover"
+                data-alt="Interior of a luxury airport lounge with plush velvet seating, a gold-accented bar, and large windows overlooking the runway"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCsUmrFTguffDPAip5caMzo-6w8SGik8CYxr5xZYpSrT0PGYy3FAlhkZYgdVbEZgWk1ylqMlVK3-kJcsIfyfzmLA7GAs3d_n-bsMcPm9z2vK3uoPuIHuuQ3A8Is7GtSbD4Bmlwq3VF-lpp_b9fICXSL53eOcsfcIdUTtlQePXn6yQxK5nZm2wM_wymmKZShM72nVOyNqVUEfmszVbsI2XpJ4uHIZUUBa_ny2_oEKQlYCj29ck3vKmz9-TrlgFSLUHygfklssHwC-nW6"
+                style=""
+              />
+            </div>
+            <div class="relative z-10 p-12 h-full flex flex-col">
+              <span class="material-symbols-outlined text-luxury-gold text-5xl mb-6" style=""
+                >workspace_premium</span
+              >
+              <h3
+                class="font-headline text-white text-3xl font-black mb-4 uppercase tracking-tight"
+                style=""
+              >
+                The Sovereign Platinum Lounge
+              </h3>
+              <p class="text-white/80 mb-auto font-medium" style="">
+                Your journey starts long before takeoff. Enjoy sanctuary in our award-winning global
+                lounges.
+              </p>
+              <a
+                class="inline-flex items-center gap-2 text-luxury-gold font-bold tracking-wide mt-8 border-b-2 border-luxury-gold pb-1 w-fit group"
+                href="#"
+                style=""
+              >
+                EXPLORE BENEFITS
+                <span
+                  class="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform"
+                  style=""
+                  >open_in_new</span
+                >
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+      <!-- Experience Content -->
+      <section class="py-24 bg-surface-container-low mt-12 relative overflow-hidden">
+        <!-- Ambient Decor -->
+        <div class="ambient-sweep">
+          <svg class="sweep-line" preserveAspectRatio="none" viewBox="0 0 1000 1000">
+            <path
+              d="M1050,50 C800,150 600,100 400,400 C200,700 100,900 -100,950"
+              opacity="0.1"
+            ></path>
+          </svg>
+        </div>
+        <div
+          class="px-8 md:px-20 max-w-[1920px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-20 items-center relative z-10"
+        >
+          <div class="relative">
+            <div
+              class="aspect-square rounded-2xl overflow-hidden shadow-2xl border border-luxury-gold/10"
+            >
+              <img
+                class="w-full h-full object-cover"
+                data-alt="A Sovereign aircraft tail featuring the red and gold logo bleeding off the edge of the frame against a clear blue sky"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGid7JcZ9bpqlgE2oSAlcjguLckow2RBVAa_jYKWWVC7LecTproe0o3KrEwqVs4N_npAHgJH6IVIKYN6ZJuwdxjamXoIc4fkfrKvqSVLI3Vj3GKlrvPn2nWadx-BYGvODXykTTcwyYMZEVzp7EadmLX3WDFGGq91L0pBpjrH5P4dNjYup3fqJ3FR6kJ2d7bb-VL8_6kmEmVVh5CIZxhsUoOUxk5L-XjxXN8nMirmO4um3DE8TdCWge8R-zMOVVlsccuEk5-SSYakdh"
+                style=""
+              />
+            </div>
+            <!-- Overlapping element -->
+            <div
+              class="absolute -bottom-10 -right-10 bg-white p-8 rounded-xl shadow-xl max-w-xs hidden lg:block border-l-4 border-luxury-gold"
+            >
+              <p
+                class="font-headline font-bold text-2xl mb-2 italic text-midnight-burgundy"
+                style=""
+              >
+                "Unmatched service that feels entirely personal."
+              </p>
+              <p class="text-on-surface-variant font-medium" style="">— Condé Nast Traveler</p>
+            </div>
+          </div>
+          <div>
+            <label
+              class="font-label text-midnight-burgundy font-extrabold tracking-[0.2em] mb-4 block"
+              style=""
+              >THE SOVEREIGN DIFFERENCE</label
+            >
+            <h2
+              class="font-headline text-5xl font-black text-on-surface tracking-tighter mb-8"
+              style=""
+            >
+              Elevating Every <br />Altitude
+            </h2>
+            <p class="text-xl text-on-surface-variant mb-10 leading-relaxed font-medium" style="">
+              From the moment you arrive at the airport to your final destination, The Sovereign
+              provides a seamless flow of luxury. We don't just transport you; we curate an
+              environment of tranquility and excellence.
+            </p>
+            <div class="grid grid-cols-2 gap-8">
+              <div>
+                <h4
+                  class="font-headline font-bold text-lg mb-2 flex items-center gap-2 text-midnight-burgundy"
+                  style=""
+                >
+                  <span class="material-symbols-outlined" style="">restaurant</span>
+                  Gourmet Dining
+                </h4>
+                <p class="text-sm text-on-surface-variant" style="">
+                  Menus crafted by Michelin-starred chefs using seasonal ingredients.
+                </p>
+              </div>
+              <div>
+                <h4
+                  class="font-headline font-bold text-lg mb-2 flex items-center gap-2 text-midnight-burgundy"
+                  style=""
+                >
+                  <span class="material-symbols-outlined" style="">concierge</span>
+                  Concierge Service
+                </h4>
+                <p class="text-sm text-on-surface-variant" style="">
+                  Dedicated assistance for your every need throughout the journey.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <!-- Footer - Updated to Midnight Luxury Theme -->
+    <footer class="w-full border-t border-luxury-gold/30 bg-dark-charcoal">
+      <div
+        class="flex flex-col md:flex-row justify-between items-center px-12 py-12 w-full max-w-[1920px] mx-auto"
+      >
+        <div class="mb-8 md:mb-0">
+          <span
+            class="text-xl font-black text-luxury-gold uppercase tracking-tighter font-headline italic"
+            style=""
+            >The Sovereign</span
+          >
+          <p
+            class="text-luxury-gold/60 text-[0.6875rem] font-body uppercase font-bold tracking-widest mt-3"
+            style=""
+          >
+            © 2024 The Sovereign Airways. All rights reserved.
+          </p>
+        </div>
+        <div class="flex flex-wrap justify-center gap-10">
+          <a
+            class="text-white/80 hover:text-luxury-gold transition-colors text-xs font-bold uppercase tracking-[0.15em] font-body"
+            href="#"
+            style=""
+            >Privacy Policy</a
+          >
+          <a
+            class="text-white/80 hover:text-luxury-gold transition-colors text-xs font-bold uppercase tracking-[0.15em] font-body"
+            href="#"
+            style=""
+            >Terms of Carriage</a
+          >
+          <a
+            class="text-white/80 hover:text-luxury-gold transition-colors text-xs font-bold uppercase tracking-[0.15em] font-body"
+            href="#"
+            style=""
+            >Help Center</a
+          >
+          <a
+            class="text-white/80 hover:text-luxury-gold transition-colors text-xs font-bold uppercase tracking-[0.15em] font-body"
+            href="#"
+            style=""
+            >Contact Us</a
+          >
+          <a
+            class="text-white/80 hover:text-luxury-gold transition-colors text-xs font-bold uppercase tracking-[0.15em] font-body"
+            href="#"
+            style=""
+            >Cookie Settings</a
+          >
+        </div>
+        <div class="mt-8 md:mt-0 flex gap-4">
+          <button
+            class="w-10 h-10 rounded-full border border-luxury-gold/30 flex items-center justify-center text-luxury-gold/80 hover:text-luxury-gold hover:border-luxury-gold transition-all"
+            style=""
+          >
+            <span class="material-symbols-outlined text-sm" style="">public</span>
+          </button>
+          <button
+            class="w-10 h-10 rounded-full border border-luxury-gold/30 flex items-center justify-center text-luxury-gold/80 hover:text-luxury-gold hover:border-luxury-gold transition-all"
+            style=""
+          >
+            <span class="material-symbols-outlined text-sm" style="">flight</span>
+          </button>
+        </div>
+      </div>
+      <!-- Decorative gold accent line -->
+      <div
+        class="w-full h-1 bg-gradient-to-r from-transparent via-luxury-gold/40 to-transparent"
+      ></div>
+    </footer>
+  </body>
+</html>

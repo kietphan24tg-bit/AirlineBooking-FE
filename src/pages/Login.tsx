@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
+import { Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -151,17 +152,22 @@ export default function Login() {
           Tiếp tục hành trình
         </Button>
 
-        <div className="relative my-3 text-center">
-          <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-[rgba(230,189,184,0.18)]" />
-          <span className="relative bg-surface-lowest px-4 text-[0.6875rem] font-bold uppercase tracking-[0.1em] text-on-surface-variant/60">
-            Hoặc tiếp tục với
-          </span>
+        <div className="relative py-4 text-center">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-outline-variant/30" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase tracking-widest">
+            <span className="bg-surface-container-lowest px-4 text-on-surface-variant">
+              Hoặc tiếp tục với
+            </span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-2 gap-4">
           <Button
             type="button"
             variant="ghost"
+            className="!w-auto border border-outline-variant/30"
             icon={
               <img
                 alt="Google"
@@ -175,7 +181,8 @@ export default function Login() {
           <Button
             type="button"
             variant="ghost"
-            icon={<span className="material-symbols-outlined text-xl">ios</span>}
+            className="!w-auto border border-outline-variant/30"
+            icon={<Smartphone className="h-5 w-5 text-on-surface" aria-hidden strokeWidth={1.75} />}
           >
             Apple
           </Button>

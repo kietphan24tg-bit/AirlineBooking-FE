@@ -1,17 +1,21 @@
 import { createBrowserRouter } from 'react-router-dom';
-import { Navigate } from 'react-router-dom';
 import App from '../App';
-import Login from '../pages/Login';
-import Register from '../pages/Register';
+import AccountManagement from '../pages/AccountManagement';
+import FlightResults from '../pages/FlightResults';
 import Home from '../pages/Home';
+import Landing from '../pages/Landing';
+import Login from '../pages/Login';
+import PassengerInfo from '../pages/PassengerInfo';
 import PasswordResetConfirm from '../pages/PasswordResetConfirm';
+import Register from '../pages/Register';
+import SeatSelection from '../pages/SeatSelection';
+import TripHistory from '../pages/TripHistory';
 import ProtectedRoute from './ProtectedRoute';
 
 const AppRouter = createBrowserRouter([
-  //public route
   {
     path: '/',
-    element: <Navigate to="/login" replace />,
+    element: <Landing />,
   },
   {
     path: '/login',
@@ -22,10 +26,13 @@ const AppRouter = createBrowserRouter([
     element: <Register />,
   },
   {
+    path: '/flights',
+    element: <FlightResults />,
+  },
+  {
     path: '/password-reset/confirm',
     element: <PasswordResetConfirm />,
   },
-  //protected route
   {
     element: <ProtectedRoute />,
     children: [
@@ -36,6 +43,22 @@ const AppRouter = createBrowserRouter([
       {
         path: '/home',
         element: <Home />,
+      },
+      {
+        path: '/booking/passengers',
+        element: <PassengerInfo />,
+      },
+      {
+        path: '/booking/seats',
+        element: <SeatSelection />,
+      },
+      {
+        path: '/account',
+        element: <AccountManagement />,
+      },
+      {
+        path: '/trips',
+        element: <TripHistory />,
       },
     ],
   },

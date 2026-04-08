@@ -1,0 +1,552 @@
+<!doctype html>
+
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Lịch Sử Đặt Vé - Midnight Luxury</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700;900&amp;family=Manrope:wght@400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'on-tertiary': '#ffffff',
+              'tertiary-fixed': '#ffddaf',
+              'surface-container-lowest': '#ffffff',
+              'surface-container': '#eeeeee',
+              'secondary-fixed-dim': '#e6c275',
+              'on-error-container': '#93000a',
+              'on-primary': '#ffffff',
+              'outline-variant': '#e6bdb8',
+              'tertiary-fixed-dim': '#ecbf7c',
+              'on-tertiary-fixed-variant': '#5f4108',
+              'secondary-fixed': '#ffdf9e',
+              'on-secondary-fixed-variant': '#5b4300',
+              'inverse-primary': '#ffb3ae',
+              tertiary: '#6f4f16',
+              'on-primary-fixed-variant': '#8d131c',
+              'surface-container-highest': '#e2e2e2',
+              'primary-fixed': '#ffdad7',
+              'on-tertiary-fixed': '#281800',
+              'primary-container': '#c33d3d',
+              'secondary-container': '#fed888',
+              secondary: '#765a17',
+              'inverse-surface': '#2f3131',
+              'surface-bright': '#f9f9f9',
+              surface: '#f9f9f9',
+              'on-primary-container': '#ffecea',
+              'on-error': '#ffffff',
+              'on-tertiary-container': '#ffeed9',
+              'surface-variant': '#e2e2e2',
+              'on-secondary-fixed': '#261a00',
+              'on-primary-fixed': '#410005',
+              'surface-tint': '#af2e30',
+              error: '#ba1a1a',
+              background: '#f9f9f9',
+              'primary-fixed-dim': '#ffb3ae',
+              'on-surface': '#1a1c1c',
+              'on-secondary': '#ffffff',
+              'inverse-on-surface': '#f1f1f1',
+              primary: '#a12428',
+              'surface-dim': '#dadada',
+              'on-background': '#1a1c1c',
+              'surface-container-high': '#e8e8e8',
+              'surface-container-low': '#f3f3f3',
+              outline: '#926f6b',
+              'on-surface-variant': '#5d3f3c',
+              'on-secondary-container': '#785d19',
+              'error-container': '#ffdad6',
+              'tertiary-container': '#8b672c',
+            },
+            fontFamily: {
+              headline: ['Be Vietnam Pro'],
+              body: ['Manrope'],
+              label: ['Manrope'],
+            },
+            borderRadius: { DEFAULT: '0.125rem', lg: '0.25rem', xl: '0.5rem', full: '0.75rem' },
+          },
+        },
+      };
+    </script>
+    <style>
+      .gold-pattern {
+        background-image: radial-gradient(circle at 2px 2px, #ffdf9e 1px, transparent 0);
+        background-size: 40px 40px;
+        opacity: 0.15;
+      }
+      .material-symbols-outlined {
+        font-variation-settings:
+          'FILL' 0,
+          'wght' 400,
+          'GRAD' 0,
+          'opsz' 24;
+        vertical-align: middle;
+      }
+    </style>
+  </head>
+  <body class="bg-surface font-body text-on-surface">
+    <!-- TopNavBar -->
+    <nav
+      class="bg-[#D71920] dark:bg-[#a12428] docked full-width top-0 no-border tonal-transition using surface-container-low shadow-none transition-shadow duration-300 flex justify-between items-center w-full px-8 h-20 max-w-none ml-auto mr-auto z-50 fixed"
+    >
+      <div class="text-2xl font-black text-white tracking-tight font-headline">The Sovereign</div>
+      <div class="hidden md:flex items-center space-x-8">
+        <a
+          class="font-['Be_Vietnam_Pro'] uppercase tracking-[0.05rem] text-[0.6875rem] font-bold text-white border-b-2 border-[#ffdf9e] pb-1"
+          href="#"
+          >Book</a
+        >
+        <a
+          class="font-['Be_Vietnam_Pro'] uppercase tracking-[0.05rem] text-[0.6875rem] font-bold text-white/80 hover:text-white transition-colors"
+          href="#"
+          >Explore</a
+        >
+        <a
+          class="font-['Be_Vietnam_Pro'] uppercase tracking-[0.05rem] text-[0.6875rem] font-bold text-white/80 hover:text-white transition-colors"
+          href="#"
+          >Experience</a
+        >
+        <a
+          class="font-['Be_Vietnam_Pro'] uppercase tracking-[0.05rem] text-[0.6875rem] font-bold text-white/80 hover:text-white transition-colors"
+          href="#"
+          >Loyalty</a
+        >
+      </div>
+      <div class="flex items-center space-x-4">
+        <button
+          class="font-['Be_Vietnam_Pro'] uppercase tracking-[0.05rem] text-[0.6875rem] font-bold text-[#ffdf9e] hover:bg-white/10 px-4 py-2 transition-all duration-200"
+        >
+          Sign In
+        </button>
+        <button
+          class="font-['Be_Vietnam_Pro'] uppercase tracking-[0.05rem] text-[0.6875rem] font-bold bg-[#ffdf9e] text-[#a12428] px-6 py-2 rounded-lg scale-95 active:scale-90 transition-transform"
+        >
+          Sign Up
+        </button>
+      </div>
+    </nav>
+    <main class="relative pt-32 pb-20 min-h-screen overflow-hidden">
+      <!-- Gold Accent Pattern -->
+      <div class="absolute inset-0 gold-pattern pointer-events-none"></div>
+      <div class="max-w-6xl mx-auto px-6 relative z-10">
+        <!-- Header Section -->
+        <div class="mb-12">
+          <p
+            class="font-label text-secondary uppercase tracking-[0.2em] text-[0.6875rem] font-bold mb-2"
+          >
+            Member Dashboard
+          </p>
+          <h1
+            class="font-headline text-5xl md:text-6xl font-black text-primary tracking-tight mb-4"
+          >
+            Chuyến bay của tôi
+          </h1>
+          <div class="w-24 h-1 bg-secondary"></div>
+        </div>
+        <!-- Tabs/Filter -->
+        <div class="flex space-x-8 mb-10 border-b border-outline-variant/15 pb-4">
+          <button
+            class="font-headline font-bold text-lg text-primary border-b-2 border-primary pb-4 -mb-[1.125rem]"
+          >
+            Sắp tới (2)
+          </button>
+          <button
+            class="font-headline font-bold text-lg text-on-surface-variant hover:text-primary transition-colors pb-4 -mb-[1.125rem]"
+          >
+            Đã qua (12)
+          </button>
+          <button
+            class="font-headline font-bold text-lg text-on-surface-variant hover:text-primary transition-colors pb-4 -mb-[1.125rem]"
+          >
+            Đã hủy
+          </button>
+        </div>
+        <!-- Journeys List -->
+        <div class="space-y-8">
+          <!-- Journey Card 1: Upcoming -->
+          <div
+            class="bg-surface-container-lowest shadow-[0_12px_40px_rgba(26,28,28,0.06)] overflow-hidden group"
+          >
+            <div class="flex flex-col md:flex-row">
+              <!-- Left Status Bar -->
+              <div class="md:w-2 bg-secondary"></div>
+              <!-- Main Content -->
+              <div class="flex-grow p-8">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+                  <!-- Flight Info Cluster -->
+                  <div class="flex-grow grid grid-cols-1 md:grid-cols-3 items-center gap-8">
+                    <!-- Departure -->
+                    <div class="text-left">
+                      <p
+                        class="font-label text-[0.6875rem] uppercase tracking-wider text-on-surface-variant mb-1"
+                      >
+                        Hà Nội (HAN)
+                      </p>
+                      <h3 class="font-headline text-3xl font-bold">14:20</h3>
+                      <p class="text-sm font-medium text-on-surface">24 Th10, 2024</p>
+                    </div>
+                    <!-- Route Graphic -->
+                    <div class="flex flex-col items-center justify-center px-4 relative">
+                      <p
+                        class="text-[0.625rem] font-bold text-secondary uppercase tracking-[0.1em] mb-2"
+                      >
+                        Non-stop • 1h 45m
+                      </p>
+                      <div class="w-full flex items-center gap-2">
+                        <div class="h-[1px] flex-grow bg-outline-variant/30"></div>
+                        <span class="material-symbols-outlined text-secondary text-xl"
+                          >flight_takeoff</span
+                        >
+                        <div class="h-[1px] flex-grow bg-outline-variant/30"></div>
+                      </div>
+                      <p class="text-[0.6875rem] font-bold mt-2 text-on-surface-variant">VN 1284</p>
+                    </div>
+                    <!-- Arrival -->
+                    <div class="text-right">
+                      <p
+                        class="font-label text-[0.6875rem] uppercase tracking-wider text-on-surface-variant mb-1"
+                      >
+                        TP. Hồ Chí Minh (SGN)
+                      </p>
+                      <h3 class="font-headline text-3xl font-bold">16:05</h3>
+                      <p class="text-sm font-medium text-on-surface">24 Th10, 2024</p>
+                    </div>
+                  </div>
+                  <!-- Vertical Divider -->
+                  <div class="hidden lg:block w-[1px] h-16 bg-outline-variant/15"></div>
+                  <!-- Booking Details Cluster -->
+                  <div
+                    class="min-w-[200px] flex flex-row lg:flex-col justify-between items-center lg:items-start gap-4"
+                  >
+                    <div>
+                      <p
+                        class="font-label text-[0.625rem] uppercase tracking-widest text-on-surface-variant mb-1"
+                      >
+                        Mã đặt chỗ (PNR)
+                      </p>
+                      <p class="font-headline font-black text-xl tracking-widest text-primary">
+                        SV89XQ
+                      </p>
+                    </div>
+                    <div class="bg-secondary-container/30 px-3 py-1 rounded-full">
+                      <p
+                        class="text-[0.6875rem] font-bold text-on-secondary-container uppercase flex items-center gap-1"
+                      >
+                        <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                        Đã xác nhận
+                      </p>
+                    </div>
+                  </div>
+                  <!-- Actions -->
+                  <div class="flex flex-col gap-3 min-w-[160px]">
+                    <button
+                      class="w-full bg-gradient-to-br from-primary to-primary-container text-on-primary font-label text-[0.6875rem] font-bold uppercase py-3 px-6 rounded-md shadow-md hover:-translate-y-0.5 transition-all"
+                    >
+                      Làm thủ tục
+                    </button>
+                    <button
+                      class="w-full border border-outline-variant/30 text-secondary font-label text-[0.6875rem] font-bold uppercase py-3 px-6 rounded-md hover:bg-surface-container transition-colors"
+                    >
+                      Chi tiết
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Journey Card 2: Upcoming Luxury -->
+          <div
+            class="bg-surface-container-lowest shadow-[0_12px_40px_rgba(26,28,28,0.06)] overflow-hidden group"
+          >
+            <div class="flex flex-col md:flex-row">
+              <div class="md:w-2 bg-secondary"></div>
+              <div class="flex-grow p-8">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+                  <div class="flex-grow grid grid-cols-1 md:grid-cols-3 items-center gap-8">
+                    <div class="text-left">
+                      <p
+                        class="font-label text-[0.6875rem] uppercase tracking-wider text-on-surface-variant mb-1"
+                      >
+                        TP. Hồ Chí Minh (SGN)
+                      </p>
+                      <h3 class="font-headline text-3xl font-bold">08:15</h3>
+                      <p class="text-sm font-medium text-on-surface">15 Th11, 2024</p>
+                    </div>
+                    <div class="flex flex-col items-center justify-center px-4 relative">
+                      <p
+                        class="text-[0.625rem] font-bold text-secondary uppercase tracking-[0.1em] mb-2"
+                      >
+                        Non-stop • 12h 30m
+                      </p>
+                      <div class="w-full flex items-center gap-2">
+                        <div class="h-[1px] flex-grow bg-outline-variant/30"></div>
+                        <span class="material-symbols-outlined text-secondary text-xl">travel</span>
+                        <div class="h-[1px] flex-grow bg-outline-variant/30"></div>
+                      </div>
+                      <p class="text-[0.6875rem] font-bold mt-2 text-on-surface-variant">
+                        SV 001 • First Class
+                      </p>
+                    </div>
+                    <div class="text-right">
+                      <p
+                        class="font-label text-[0.6875rem] uppercase tracking-wider text-on-surface-variant mb-1"
+                      >
+                        Paris (CDG)
+                      </p>
+                      <h3 class="font-headline text-3xl font-bold">15:45</h3>
+                      <p class="text-sm font-medium text-on-surface">15 Th11, 2024</p>
+                    </div>
+                  </div>
+                  <div class="hidden lg:block w-[1px] h-16 bg-outline-variant/15"></div>
+                  <div
+                    class="min-w-[200px] flex flex-row lg:flex-col justify-between items-center lg:items-start gap-4"
+                  >
+                    <div>
+                      <p
+                        class="font-label text-[0.625rem] uppercase tracking-widest text-on-surface-variant mb-1"
+                      >
+                        Mã đặt chỗ (PNR)
+                      </p>
+                      <p class="font-headline font-black text-xl tracking-widest text-primary">
+                        SVLX99
+                      </p>
+                    </div>
+                    <div class="bg-secondary-container/30 px-3 py-1 rounded-full">
+                      <p
+                        class="text-[0.6875rem] font-bold text-on-secondary-container uppercase flex items-center gap-1"
+                      >
+                        <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                        Đã xác nhận
+                      </p>
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-3 min-w-[160px]">
+                    <button
+                      class="w-full bg-gradient-to-br from-primary to-primary-container text-on-primary font-label text-[0.6875rem] font-bold uppercase py-3 px-6 rounded-md shadow-md hover:-translate-y-0.5 transition-all"
+                    >
+                      Chọn chỗ ngồi
+                    </button>
+                    <button
+                      class="w-full border border-outline-variant/30 text-secondary font-label text-[0.6875rem] font-bold uppercase py-3 px-6 rounded-md hover:bg-surface-container transition-colors"
+                    >
+                      Chi tiết
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Section Header: Past -->
+          <div class="pt-8 pb-4">
+            <h2 class="font-headline text-2xl font-bold text-on-surface-variant">
+              Lịch sử hành trình
+            </h2>
+          </div>
+          <!-- Journey Card 3: Completed -->
+          <div
+            class="bg-surface-container-low/50 border-l-2 border-outline-variant/30 overflow-hidden group"
+          >
+            <div
+              class="flex-grow p-8 grayscale-[0.5] opacity-80 hover:grayscale-0 hover:opacity-100 transition-all duration-300"
+            >
+              <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+                <div class="flex-grow grid grid-cols-1 md:grid-cols-3 items-center gap-8">
+                  <div class="text-left">
+                    <p
+                      class="font-label text-[0.6875rem] uppercase tracking-wider text-on-surface-variant mb-1"
+                    >
+                      Đà Nẵng (DAD)
+                    </p>
+                    <h3 class="font-headline text-xl font-bold">09:00</h3>
+                    <p class="text-xs font-medium text-on-surface-variant">12 Th08, 2024</p>
+                  </div>
+                  <div class="flex flex-col items-center justify-center px-4 relative">
+                    <div class="w-full flex items-center gap-2">
+                      <div
+                        class="h-[1px] flex-grow bg-outline-variant/30 border-dashed border-t"
+                      ></div>
+                      <span class="material-symbols-outlined text-outline text-lg"
+                        >check_circle</span
+                      >
+                      <div
+                        class="h-[1px] flex-grow bg-outline-variant/30 border-dashed border-t"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <p
+                      class="font-label text-[0.6875rem] uppercase tracking-wider text-on-surface-variant mb-1"
+                    >
+                      Hà Nội (HAN)
+                    </p>
+                    <h3 class="font-headline text-xl font-bold">10:20</h3>
+                    <p class="text-xs font-medium text-on-surface-variant">12 Th08, 2024</p>
+                  </div>
+                </div>
+                <div
+                  class="min-w-[200px] flex flex-row lg:flex-col justify-between items-center lg:items-start gap-4"
+                >
+                  <div>
+                    <p
+                      class="font-label text-[0.625rem] uppercase tracking-widest text-on-surface-variant mb-1"
+                    >
+                      Mã đặt chỗ (PNR)
+                    </p>
+                    <p
+                      class="font-headline font-bold text-lg tracking-widest text-on-surface-variant"
+                    >
+                      SV42KM
+                    </p>
+                  </div>
+                  <div class="bg-surface-container-highest px-3 py-1 rounded-full">
+                    <p class="text-[0.6875rem] font-bold text-on-surface-variant uppercase">
+                      Hoàn thành
+                    </p>
+                  </div>
+                </div>
+                <div class="flex flex-col gap-3 min-w-[160px]">
+                  <button
+                    class="w-full border border-outline-variant/30 text-on-surface-variant font-label text-[0.6875rem] font-bold uppercase py-2 px-6 rounded-md hover:bg-white transition-colors"
+                  >
+                    Xem hóa đơn
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Bento Info Section -->
+        <div class="mt-20 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="md:col-span-2 bg-primary rounded-xl p-8 relative overflow-hidden group">
+            <img
+              alt=""
+              class="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:scale-110 transition-transform duration-700"
+              data-alt="Modern premium airport lounge with luxury seating and warm lighting at dusk seen through large glass windows"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDn5BtTomE7xdk7LJHt87_inBLA9ZmoasWKognwG9Z4d8VOdg-_4LHdmdmSK35DFefriNDCpA5aNt8iJA4ThUmGfIgK6azkOcnM7GES7VDTkE90FpPZgyMxKCGpCEP533YTLQCouBUOS8slRMnh5oePGn7mfSUmvdZ5zHMS68laXVHdPDqvqB1uHx5WJzNiWprPEgZjFgKlx-zoh8gG57aaZrV_ydmIHakQ310eHpozoPlDlGXRfuwnzN9OeSCA8U2u_Td-Y18NAJdd"
+            />
+            <div class="relative z-10 h-full flex flex-col justify-end">
+              <h3 class="font-headline text-2xl font-bold text-white mb-2">
+                Quyền lợi Hạng Thương Gia
+              </h3>
+              <p class="text-white/80 text-sm max-w-md">
+                Tận hưởng dịch vụ xe đưa đón riêng, quầy thủ tục ưu tiên và phòng chờ cao cấp cho
+                hành trình SVLX99 của bạn.
+              </p>
+              <button
+                class="mt-6 text-[#ffdf9e] font-bold text-sm flex items-center gap-2 hover:gap-4 transition-all"
+              >
+                KHÁM PHÁ NGAY <span class="material-symbols-outlined">arrow_forward</span>
+              </button>
+            </div>
+          </div>
+          <div class="bg-secondary-container rounded-xl p-8 flex flex-col justify-between">
+            <div>
+              <span class="material-symbols-outlined text-secondary text-4xl mb-4">stars</span>
+              <h3 class="font-headline text-xl font-bold text-on-secondary-container mb-2">
+                The Sovereign Rewards
+              </h3>
+              <p class="text-on-secondary-container/70 text-sm">
+                Bạn sẽ tích lũy thêm 2,450 điểm sau khi hoàn thành hành trình sắp tới.
+              </p>
+            </div>
+            <p class="text-2xl font-black text-secondary mt-8">42,800 pts</p>
+          </div>
+        </div>
+      </div>
+    </main>
+    <!-- Footer -->
+    <footer
+      class="bg-stone-900 dark:bg-black full-width py-12 border-t border-white/5 tonal-shift from surface to surface-container-low"
+    >
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8 px-12 max-w-7xl mx-auto">
+        <div class="md:col-span-1">
+          <div
+            class="text-xl font-bold text-[#ffdf9e] uppercase tracking-widest font-headline mb-6"
+          >
+            The Sovereign
+          </div>
+          <p class="font-['Manrope'] text-sm leading-relaxed text-stone-400">
+            Định nghĩa lại nghệ thuật bay thương gia với sự sang trọng vượt thời gian và dịch vụ cá
+            nhân hóa tuyệt đối.
+          </p>
+        </div>
+        <div>
+          <h4 class="text-[#ffdf9e] font-bold text-xs uppercase tracking-widest mb-6">
+            Quick Links
+          </h4>
+          <div class="flex flex-col space-y-4">
+            <a
+              class="text-stone-400 hover:text-white transition-colors duration-200 text-sm"
+              href="#"
+              >Hành trình của tôi</a
+            >
+            <a
+              class="text-stone-400 hover:text-white transition-colors duration-200 text-sm"
+              href="#"
+              >Điểm đến</a
+            >
+            <a
+              class="text-stone-400 hover:text-white transition-colors duration-200 text-sm"
+              href="#"
+              >Dịch vụ mặt đất</a
+            >
+          </div>
+        </div>
+        <div>
+          <h4 class="text-[#ffdf9e] font-bold text-xs uppercase tracking-widest mb-6">Hỗ trợ</h4>
+          <div class="flex flex-col space-y-4">
+            <a
+              class="text-stone-400 hover:text-white transition-colors duration-200 text-sm"
+              href="#"
+              >Trung tâm trợ giúp</a
+            >
+            <a
+              class="text-stone-400 hover:text-white transition-colors duration-200 text-sm"
+              href="#"
+              >Câu hỏi thường gặp</a
+            >
+            <a
+              class="text-stone-400 hover:text-white transition-colors duration-200 text-sm"
+              href="#"
+              >Liên hệ</a
+            >
+          </div>
+        </div>
+        <div>
+          <h4 class="text-[#ffdf9e] font-bold text-xs uppercase tracking-widest mb-6">Legal</h4>
+          <div class="flex flex-col space-y-4">
+            <a
+              class="text-stone-400 hover:text-white transition-colors duration-200 text-sm"
+              href="#"
+              >Privacy Policy</a
+            >
+            <a
+              class="text-stone-400 hover:text-white transition-colors duration-200 text-sm"
+              href="#"
+              >Terms of Service</a
+            >
+          </div>
+        </div>
+      </div>
+      <div class="max-w-7xl mx-auto px-12 mt-12 pt-8 border-t border-white/5">
+        <p class="font-['Manrope'] text-xs leading-relaxed text-stone-500">
+          © 2024 The Sovereign. All rights reserved.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

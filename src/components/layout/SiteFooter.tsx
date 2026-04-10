@@ -12,7 +12,7 @@ const footerLinks = [
 export default function SiteFooter() {
   return (
     <footer className="w-full border-t border-luxury-gold/30 bg-dark-charcoal">
-      <div className="mx-auto flex w-full max-w-[1920px] flex-col items-center justify-between gap-8 px-8 py-12 md:flex-row md:items-center">
+      <div className="mx-auto flex w-full max-w-480 flex-col items-center justify-between gap-8 px-8 py-12 md:flex-row md:items-center">
         <div className="text-center md:mb-0 md:text-left">
           <span className="font-headline text-xl font-black uppercase italic tracking-tighter text-luxury-gold">
             The Sovereign
@@ -49,7 +49,7 @@ export default function SiteFooter() {
           </button>
         </div>
       </div>
-      <div className="h-1 w-full bg-gradient-to-r from-transparent via-luxury-gold/40 to-transparent" />
+      <div className="h-1 w-full bg-linear-to-r from-transparent via-luxury-gold/40 to-transparent" />
     </footer>
   );
 }

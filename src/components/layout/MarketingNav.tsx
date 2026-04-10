@@ -1,6 +1,12 @@
 import { Link } from 'react-router-dom';
 
-export type MarketingNavLinkId = 'book' | 'explore' | 'experience' | 'loyalty' | 'manage';
+export type MarketingNavLinkId =
+  | 'book'
+  | 'explore'
+  | 'experience'
+  | 'loyalty'
+  | 'manage'
+  | 'mytrips';
 
 export interface MarketingNavProps {
   /** Which main nav item is visually active (underline). */
@@ -30,7 +36,7 @@ export default function MarketingNav({ active = 'book', showSignIn = true }: Mar
 
   return (
     <nav className="fixed top-0 z-50 w-full border-b border-luxury-gold/20 bg-midnight-burgundy shadow-xl">
-      <div className="mx-auto flex h-20 w-full max-w-[1920px] items-center justify-between px-6 md:px-8">
+      <div className="mx-auto flex h-20 w-full max-w-480 items-center justify-between px-6 md:px-8">
         <div className="flex items-center gap-8 md:gap-12">
           <Link
             to="/"
@@ -47,12 +53,7 @@ export default function MarketingNav({ active = 'book', showSignIn = true }: Mar
           </div>
         </div>
         <div className="flex items-center gap-3 md:gap-4">
-          <Link
-            to="/trips"
-            className="hidden px-3 py-2 font-body text-sm font-medium text-white/80 transition-colors hover:text-white md:inline"
-          >
-            My Trips
-          </Link>
+          {item('mytrips', 'My Trips', '/trips')}
           {showSignIn ? (
             <Link
               to="/login"

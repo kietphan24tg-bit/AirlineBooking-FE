@@ -43,7 +43,7 @@ export default function BookingStepper({ current }: BookingStepperProps) {
               </div>
               {i < steps.length - 1 ? (
                 <div
-                  className={`mx-[-10px] mt-5 hidden h-0.5 w-12 shrink-0 md:block md:w-20 ${
+                  className={`-mx-2.5 mt-5 hidden h-0.5 w-12 shrink-0 md:block md:w-20 ${
                     i < activeIdx ? 'bg-primary opacity-30' : 'bg-surface-container-high'
                   }`}
                 />

@@ -10,15 +10,40 @@ import {
   User,
   UtensilsCrossed,
   Headset,
+  RotateCcw,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import Select from 'react-select';
 import AmbientSweep from '../components/layout/AmbientSweep';
 import MarketingNav from '../components/layout/MarketingNav';
 import SiteFooter from '../components/layout/SiteFooter';
 
 const HERO_WING =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuDhbnWHSXyZEIc2WLBnhOd8qPY45Y8JYORsa-L0oq7JPRn9I4oA9_W7OkkNhMz9zF8JD3bicGF4GrcM506MBeGkuKj4o9A6fHVkHaAMgcqxRr2xqWTzrWEdOFtljcl0_8qdOxagUmxX_oTMFP_3N2YaRyH0RGeVAXtvJvdRu6KhMFIrrcWTVzmVFSeaeNi7vqxkms17m4cZWkdLwWtdz1zZ17qMDCUZ_3_1otxOuya4kNUb_BN5Wc7E4sM56D5JgO3fZytmZtSOOyJU';
+
+const AIRPORTS = [
+  { value: 'LHR', label: 'London (LHR)' },
+  { value: 'DXB', label: 'Dubai (DXB)' },
+  { value: 'CDG', label: 'Paris (CDG)' },
+  { value: 'NRT', label: 'Tokyo (NRT)' },
+  { value: 'JFK', label: 'New York (JFK)' },
+  { value: 'LAX', label: 'Los Angeles (LAX)' },
+  { value: 'SFO', label: 'San Francisco (SFO)' },
+  { value: 'HKG', label: 'Hong Kong (HKG)' },
+  { value: 'SIN', label: 'Singapore (SIN)' },
+  { value: 'BKK', label: 'Bangkok (BKK)' },
+];
+
+const TRAVELERS = [
+  { value: '1', label: '1 Adult' },
+  { value: '2', label: '2 Adults' },
+  { value: '3', label: '3 Adults' },
+  { value: '1-1', label: '1 Adult, 1 Child' },
+  { value: '2-1', label: '2 Adults, 1 Child' },
+  { value: '2-2', label: '2 Adults, 2 Children' },
+  { value: '1-1-1', label: '1 Adult, 1 Child, 1 Infant' },
+];
 
 const destinations = [
   {
@@ -56,26 +81,85 @@ const TAIL_IMG =
 
 export default function Landing() {
   const navigate = useNavigate();
-  const [from, setFrom] = useState('London LHR');
-  const [to, setTo] = useState('Dubai DXB');
-  const [dates, setDates] = useState('24 Oct - 01 Nov');
-  const [travelers, setTravelers] = useState('2 Adults, First');
+  const [tripType, setTripType] = useState<'one-way' | 'round-trip'>('one-way');
+  const [from, setFrom] = useState<{ value: string; label: string } | null>({
+    value: 'LHR',
+    label: 'London (LHR)',
+  });
+  const [to, setTo] = useState<{ value: string; label: string } | null>({
+    value: 'DXB',
+    label: 'Dubai (DXB)',
+  });
+  const [departDate, setDepartDate] = useState('2024-10-24');
+  const [returnDate, setReturnDate] = useState('2024-11-01');
+  const [travelers, setTravelers] = useState<{ value: string; label: string } | null>({
+    value: '2',
+    label: '2 Adults',
+  });
 
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    if (
+      !from ||
+      !to ||
+      !departDate ||
+      (tripType === 'round-trip' && !returnDate) ||
+      !travelers ||
+      returnDate < departDate
+    ) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    //finding flight results
     navigate('/flights');
+  };
+
+  const customSelectStyles = {
+    control: (base: any) => ({
+      ...base,
+      border: 'none',
+      backgroundColor: 'transparent',
+      boxShadow: 'none',
+      padding: 0,
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: '#1a1a2e',
+      fontSize: '1.125rem',
+      fontWeight: 700,
+    }),
+    input: (base: any) => ({
+      ...base,
+      color: '#1a1a2e',
+    }),
+    placeholder: (base: any) => ({
+      ...base,
+      color: 'rgba(26, 26, 46, 0.4)',
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isSelected ? '#1a1a2e' : state.isFocused ? '#f5f5f5' : 'white',
+      color: state.isSelected ? '#f4e4d6' : '#1a1a2e',
+      cursor: 'pointer',
+    }),
+    menu: (base: any) => ({
+      ...base,
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+      borderRadius: '0.75rem',
+    }),
   };
 
   return (
     <div className="min-h-screen bg-surface font-body text-on-surface antialiased">
       <MarketingNav active="book" />
       <main className="pt-20">
-        <section className="relative flex min-h-[700px] w-full items-center overflow-hidden md:h-[870px]">
+        <section className="relative flex min-h-175 w-full items-center overflow-hidden md:h-217.5">
           <div className="absolute inset-0 z-0">
             <img alt="" src={HERO_WING} className="h-full w-full object-cover" />
             <div className="absolute inset-0 bg-black/40" />
           </div>
-          <div className="relative z-10 mx-auto w-full max-w-[1920px] px-6 md:px-20">
+          <div className="relative z-10 mx-auto w-full max-w-480 px-6 md:px-20">
             <div className="mb-12 max-w-4xl">
               <h1 className="mb-6 font-headline text-5xl font-black leading-[0.9] tracking-tighter text-white md:text-8xl">
                 REDEFINING <br />
@@ -88,12 +172,46 @@ export default function Landing() {
             </div>
             <form
               onSubmit={onSearch}
-              className="glass-panel max-w-6xl rounded-xl border border-luxury-gold/20 p-1 shadow-2xl"
+              className="glass-panel max-w-400 rounded-xl border border-luxury-gold/20 p-1 shadow-2xl"
             >
-              <div className="grid grid-cols-1 divide-y divide-luxury-gold/10 p-4 md:grid-cols-4 md:divide-x md:divide-y-0 lg:grid-cols-5">
+              {/* Trip Type Toggle */}
+              <div className="flex items-center gap-4 border-b border-luxury-gold/10 p-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="tripType"
+                    value="one-way"
+                    checked={tripType === 'one-way'}
+                    onChange={(e) => setTripType(e.target.value as 'one-way' | 'round-trip')}
+                    className="cursor-pointer"
+                  />
+                  <span className="font-headline font-bold text-midnight-burgundy">One-Way</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="tripType"
+                    value="round-trip"
+                    checked={tripType === 'round-trip'}
+                    onChange={(e) => setTripType(e.target.value as 'one-way' | 'round-trip')}
+                    className="cursor-pointer"
+                  />
+                  <span className="font-headline font-bold text-midnight-burgundy">Round-Trip</span>
+                </label>
+              </div>
+
+              {/* Search Form Grid */}
+              <div
+                className={`grid gap-1 p-4 ${
+                  tripType === 'round-trip'
+                    ? 'grid-cols-1 md:grid-cols-3 lg:grid-cols-6'
+                    : 'grid-cols-1 divide-y divide-luxury-gold/10 md:grid-cols-4 md:divide-x md:divide-y-0 lg:grid-cols-5'
+                }`}
+              >
+                {/* From */}
                 <div className="space-y-1 p-4">
                   <label
-                    htmlFor="landing-from"
+                    htmlFor="from"
                     className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
                   >
                     From
@@ -103,18 +221,22 @@ export default function Landing() {
                       className="h-5 w-5 shrink-0 text-midnight-burgundy"
                       strokeWidth={1.75}
                     />
-                    <input
-                      id="landing-from"
+                    <Select
                       value={from}
-                      onChange={(e) => setFrom(e.target.value)}
-                      className="w-full border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy placeholder-midnight-burgundy/40 focus:ring-0"
-                      placeholder="London LHR"
+                      onChange={setFrom}
+                      options={AIRPORTS}
+                      styles={customSelectStyles}
+                      isSearchable
+                      isClearable={false}
+                      className="w-full"
                     />
                   </div>
                 </div>
+
+                {/* To */}
                 <div className="space-y-1 p-4">
                   <label
-                    htmlFor="landing-to"
+                    htmlFor="to"
                     className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
                   >
                     To
@@ -124,21 +246,25 @@ export default function Landing() {
                       className="h-5 w-5 shrink-0 text-midnight-burgundy"
                       strokeWidth={1.75}
                     />
-                    <input
-                      id="landing-to"
+                    <Select
                       value={to}
-                      onChange={(e) => setTo(e.target.value)}
-                      className="w-full border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy placeholder-midnight-burgundy/40 focus:ring-0"
-                      placeholder="Dubai DXB"
+                      onChange={setTo}
+                      options={AIRPORTS}
+                      styles={customSelectStyles}
+                      isSearchable
+                      isClearable={false}
+                      className="w-full"
                     />
                   </div>
                 </div>
+
+                {/* Depart Date */}
                 <div className="space-y-1 p-4">
                   <label
-                    htmlFor="landing-dates"
+                    htmlFor="depart-date"
                     className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
                   >
-                    Dates
+                    {tripType === 'round-trip' ? 'Depart' : 'Date'}
                   </label>
                   <div className="flex items-center gap-2">
                     <Calendar
@@ -146,32 +272,63 @@ export default function Landing() {
                       strokeWidth={1.75}
                     />
                     <input
-                      id="landing-dates"
-                      value={dates}
-                      onChange={(e) => setDates(e.target.value)}
-                      className="w-full border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy placeholder-midnight-burgundy/40 focus:ring-0"
-                      placeholder="24 Oct - 01 Nov"
+                      id="depart-date"
+                      type="date"
+                      value={departDate}
+                      onChange={(e) => setDepartDate(e.target.value)}
+                      className="w-full border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy focus:ring-0"
                     />
                   </div>
                 </div>
+
+                {/* Return Date (only for round-trip) */}
+                {tripType === 'round-trip' && (
+                  <div className="space-y-1 p-4">
+                    <label
+                      htmlFor="return-date"
+                      className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
+                    >
+                      Return
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <RotateCcw
+                        className="h-5 w-5 shrink-0 text-midnight-burgundy"
+                        strokeWidth={1.75}
+                      />
+                      <input
+                        id="return-date"
+                        type="date"
+                        value={returnDate}
+                        onChange={(e) => setReturnDate(e.target.value)}
+                        className="w-full border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy focus:ring-0"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Travelers */}
                 <div className="space-y-1 p-4">
                   <label
-                    htmlFor="landing-travelers"
+                    htmlFor="travelers"
                     className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
                   >
                     Travelers
                   </label>
                   <div className="flex items-center gap-2">
                     <User className="h-5 w-5 shrink-0 text-midnight-burgundy" strokeWidth={1.75} />
-                    <input
-                      id="landing-travelers"
+                    <Select
                       value={travelers}
-                      onChange={(e) => setTravelers(e.target.value)}
-                      className="w-full border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy placeholder-midnight-burgundy/40 focus:ring-0"
-                      placeholder="2 Adults, First"
+                      onChange={setTravelers}
+                      options={TRAVELERS}
+                      styles={customSelectStyles}
+                      isSearchable={false}
+                      isClearable={false}
+                      className="w-full"
                     />
                   </div>
                 </div>
+
+                {/* Submit Button */}
                 <div className="flex items-center p-2 md:p-1">
                   <button
                     type="submit"
@@ -188,7 +345,7 @@ export default function Landing() {
 
         <section className="relative px-6 py-24 md:px-20">
           <AmbientSweep />
-          <div className="relative z-10 mx-auto max-w-[1920px]">
+          <div className="relative z-10 mx-auto max-w-480">
             <div className="mb-16 flex flex-col justify-between gap-6 md:flex-row md:items-end">
               <div>
                 <span className="font-label mb-4 block font-extrabold tracking-[0.2em] text-midnight-burgundy">
@@ -213,7 +370,7 @@ export default function Landing() {
               {destinations.map((d) => (
                 <div
                   key={d.city}
-                  className={`group relative aspect-[3/4] overflow-hidden rounded-xl border border-luxury-gold/10 bg-surface-container-low shadow-sm ${d.offset}`}
+                  className={`group relative aspect-3/4 overflow-hidden rounded-xl border border-luxury-gold/10 bg-surface-container-low shadow-sm ${d.offset}`}
                 >
                   <img
                     alt=""
@@ -243,15 +400,15 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-[1920px] px-6 py-12 md:px-20">
-          <div className="grid h-auto grid-cols-1 gap-6 lg:h-[500px] lg:grid-cols-12">
+        <section className="mx-auto max-w-480 px-6 py-12 md:px-20">
+          <div className="grid h-auto grid-cols-1 gap-6 lg:h-125 lg:grid-cols-12">
             <div className="relative overflow-hidden rounded-xl border border-luxury-gold/10 shadow-lg lg:col-span-8">
               <img
                 alt=""
                 src={BANNER_SUITE}
-                className="h-full min-h-[280px] w-full object-cover lg:min-h-0"
+                className="h-full min-h-70 w-full object-cover lg:min-h-0"
               />
-              <div className="absolute inset-0 flex flex-col justify-center bg-gradient-to-r from-black/80 via-black/40 to-transparent p-8 md:p-12">
+              <div className="absolute inset-0 flex flex-col justify-center bg-linear-to-r from-black/80 via-black/40 to-transparent p-8 md:p-12">
                 <span className="font-label mb-4 font-black tracking-widest text-luxury-gold">
                   THE BUSINESS CLASS REDEFINED
                 </span>
@@ -275,7 +432,7 @@ export default function Landing() {
               <div className="absolute inset-0 opacity-20">
                 <img alt="" src={LOUNGE_IMG} className="h-full w-full object-cover" />
               </div>
-              <div className="relative z-10 flex h-full min-h-[320px] flex-col p-10 lg:min-h-0">
+              <div className="relative z-10 flex h-full min-h-80 flex-col p-10 lg:min-h-0">
                 <Sparkles className="mb-6 h-12 w-12 text-luxury-gold" strokeWidth={1.25} />
                 <h3 className="mb-4 font-headline text-3xl font-black uppercase tracking-tight text-white">
                   The Sovereign Platinum Lounge
@@ -311,7 +468,7 @@ export default function Landing() {
               />
             </svg>
           </div>
-          <div className="relative z-10 mx-auto grid max-w-[1920px] grid-cols-1 items-center gap-20 px-6 md:grid-cols-2 md:px-20">
+          <div className="relative z-10 mx-auto grid max-w-480 grid-cols-1 items-center gap-20 px-6 md:grid-cols-2 md:px-20">
             <div className="relative">
               <div className="aspect-square overflow-hidden rounded-2xl border border-luxury-gold/10 shadow-2xl">
                 <img alt="" src={TAIL_IMG} className="h-full w-full object-cover" />

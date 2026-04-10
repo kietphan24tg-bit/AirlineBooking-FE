@@ -1,10 +1,10 @@
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import AmbientSweep from '../components/layout/AmbientSweep';
-import BookingStepper from '../components/booking/BookingStepper';
 import FlightResultCard from '../components/booking/FlightResultCard';
 import MarketingNav from '../components/layout/MarketingNav';
 import type { FlightLeg } from '../types/flight.types';
+import SiteFooter from '../components/layout/SiteFooter';
 
 const MOCK_LEGS: FlightLeg[] = [
   {
@@ -62,8 +62,7 @@ export default function FlightResults() {
     <div className="relative min-h-screen bg-surface text-on-surface antialiased">
       <AmbientSweep />
       <MarketingNav active="explore" />
-      <main className="relative z-10 mx-auto max-w-[1920px] px-4 pb-20 pt-28 md:px-12">
-        <BookingStepper current="select" />
+      <main className="relative z-10 mx-auto max-w-480 px-4 pb-20 pt-28 md:px-12">
         <div className="mb-8 flex flex-col items-end justify-between gap-6 md:flex-row">
           <div>
             <h1 className="mb-2 text-4xl font-black uppercase tracking-tight text-on-surface">
@@ -144,6 +143,7 @@ export default function FlightResults() {
           </div>
         </div>
       </main>
+      <SiteFooter />
     </div>
   );
 }

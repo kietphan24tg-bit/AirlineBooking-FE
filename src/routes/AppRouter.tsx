@@ -12,6 +12,7 @@ import Register from '../pages/Register';
 import SeatSelection from '../pages/SeatSelection';
 import TripHistory from '../pages/TripHistory';
 import ProtectedRoute from './ProtectedRoute';
+import ManageBooking from '../pages/ManageBooking';
 
 const AppRouter = createBrowserRouter([
   {
@@ -49,6 +50,10 @@ const AppRouter = createBrowserRouter([
   {
     path: '/trips',
     element: <TripHistory />,
+  },
+  {
+    path: '/manage-booking',
+    element: <ManageBooking />,
   },
   {
     element: <ProtectedRoute />,

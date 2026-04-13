@@ -15,7 +15,6 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import Select from 'react-select';
-import AmbientSweep from '../components/layout/AmbientSweep';
 import MarketingNav from '../components/layout/MarketingNav';
 import SiteFooter from '../components/layout/SiteFooter';
 
@@ -154,30 +153,25 @@ export default function Landing() {
       <main>
         <section className="relative flex min-h-175 w-full items-center overflow-hidden md:h-280">
           <div className="absolute inset-0 z-0">
-            <img alt="" src="/sky.jpg" className="h-full w-full object-cover" />
+            <img alt="" src="/src/assets/sky.jpg" className="h-full w-full object-cover" />
             <img
               alt="clouds"
-              src="/cloud.png"
+              src="/src/assets/cloud.png"
               className="absolute inset-0 opacity-0 w-full object-cover animate-clouds"
             />
             <img
               alt="clouds"
-              src="/cloud.png"
+              src="/src/assets/cloud.png"
               className="absolute inset-0 opacity-0 w-full object-cover animate-clouds delay-5"
             />
             <img
               alt="clouds"
-              src="/cloud.png"
-              className="absolute inset-0 opacity-0 w-full object-cover animate-clouds delay-10"
-            />
-            <img
-              alt="clouds"
-              src="/cloud.png"
+              src="/src/assets/cloud.png"
               className="absolute inset-0 opacity-0 w-full object-cover animate-clouds delay-15"
             />
             <img
               alt="plane"
-              src="/plane.png"
+              src="/src/assets/plane.png"
               className="absolute inset-0 h-full w-full object-cover animate-fly-in"
             />
             <div className="absolute inset-0 bg-linear-to-t from-black/25 to-white/20" />
@@ -367,7 +361,6 @@ export default function Landing() {
         </section>
 
         <section className="relative px-6 py-24 md:px-20">
-          <AmbientSweep />
           <div className="relative z-10 mx-auto max-w-480">
             <div className="mb-16 flex flex-col justify-between gap-6 md:flex-row md:items-end">
               <div>

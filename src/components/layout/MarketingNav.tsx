@@ -47,7 +47,7 @@ export default function MarketingNav({ active = 'book', showSignIn = true }: Mar
           <div className="hidden items-center gap-6 md:flex md:gap-8">
             {item('book', 'Book', '/')}
             {item('explore', 'Explore', '/flights')}
-            {item('manage', 'Manage', '/booking/seats')}
+            {item('manage', 'Manage', '/manage-booking')}
             {item('experience', 'Experience', '/')}
             {item('loyalty', 'Loyalty', '/')}
           </div>

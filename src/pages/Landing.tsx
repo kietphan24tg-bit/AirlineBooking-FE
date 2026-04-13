@@ -19,8 +19,7 @@ import AmbientSweep from '../components/layout/AmbientSweep';
 import MarketingNav from '../components/layout/MarketingNav';
 import SiteFooter from '../components/layout/SiteFooter';
 
-const HERO_WING =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuDhbnWHSXyZEIc2WLBnhOd8qPY45Y8JYORsa-L0oq7JPRn9I4oA9_W7OkkNhMz9zF8JD3bicGF4GrcM506MBeGkuKj4o9A6fHVkHaAMgcqxRr2xqWTzrWEdOFtljcl0_8qdOxagUmxX_oTMFP_3N2YaRyH0RGeVAXtvJvdRu6KhMFIrrcWTVzmVFSeaeNi7vqxkms17m4cZWkdLwWtdz1zZ17qMDCUZ_3_1otxOuya4kNUb_BN5Wc7E4sM56D5JgO3fZytmZtSOOyJU';
+//const HERO_WING = 'https://lh3.googleusercontent.com/aida-public/AB6AXuDhbnWHSXyZEIc2WLBnhOd8qPY45Y8JYORsa-L0oq7JPRn9I4oA9_W7OkkNhMz9zF8JD3bicGF4GrcM506MBeGkuKj4o9A6fHVkHaAMgcqxRr2xqWTzrWEdOFtljcl0_8qdOxagUmxX_oTMFP_3N2YaRyH0RGeVAXtvJvdRu6KhMFIrrcWTVzmVFSeaeNi7vqxkms17m4cZWkdLwWtdz1zZ17qMDCUZ_3_1otxOuya4kNUb_BN5Wc7E4sM56D5JgO3fZytmZtSOOyJU';
 
 const AIRPORTS = [
   { value: 'LHR', label: 'London (LHR)' },
@@ -146,26 +145,50 @@ export default function Landing() {
     menu: (base: any) => ({
       ...base,
       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-      borderRadius: '0.75rem',
     }),
   };
 
   return (
     <div className="min-h-screen bg-surface font-body text-on-surface antialiased">
       <MarketingNav active="book" />
-      <main className="pt-20">
-        <section className="relative flex min-h-175 w-full items-center overflow-hidden md:h-217.5">
+      <main>
+        <section className="relative flex min-h-175 w-full items-center overflow-hidden md:h-280">
           <div className="absolute inset-0 z-0">
-            <img alt="" src={HERO_WING} className="h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-black/40" />
+            <img alt="" src="/sky.jpg" className="h-full w-full object-cover" />
+            <img
+              alt="clouds"
+              src="/cloud.png"
+              className="absolute inset-0 opacity-0 w-full object-cover animate-clouds"
+            />
+            <img
+              alt="clouds"
+              src="/cloud.png"
+              className="absolute inset-0 opacity-0 w-full object-cover animate-clouds delay-5"
+            />
+            <img
+              alt="clouds"
+              src="/cloud.png"
+              className="absolute inset-0 opacity-0 w-full object-cover animate-clouds delay-10"
+            />
+            <img
+              alt="clouds"
+              src="/cloud.png"
+              className="absolute inset-0 opacity-0 w-full object-cover animate-clouds delay-15"
+            />
+            <img
+              alt="plane"
+              src="/plane.png"
+              className="absolute inset-0 h-full w-full object-cover animate-fly-in"
+            />
+            <div className="absolute inset-0 bg-linear-to-t from-black/25 to-white/20" />
           </div>
           <div className="relative z-10 mx-auto w-full max-w-480 px-6 md:px-20">
-            <div className="mb-12 max-w-4xl">
-              <h1 className="mb-6 font-headline text-5xl font-black leading-[0.9] tracking-tighter text-white md:text-8xl">
+            <div className="mb-20 max-w-4xl">
+              <h1 className="mb-6 font-headline text-5xl font-black leading-[0.9] tracking-tighter text-white md:text-8xl drop-shadow-xl">
                 REDEFINING <br />
                 THE <span className="text-luxury-gold">EXCEPTIONAL</span>
               </h1>
-              <p className="max-w-xl text-xl font-medium tracking-wide text-white/90">
+              <p className="max-w-xl text-xl font-medium tracking-wide text-white drop-shadow-xl">
                 Journey beyond expectation. Experience the pinnacle of international travel with
                 bespoke service and uncompromised luxury.
               </p>

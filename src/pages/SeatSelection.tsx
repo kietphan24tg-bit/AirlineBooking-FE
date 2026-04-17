@@ -1,20 +1,18 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
-import { Armchair, Luggage, Utensils, Wifi, PackageOpen } from 'lucide-react';
-import AmbientSweep from '../components/layout/AmbientSweep';
-import Button from '../components/ui/Button';
+import { Armchair, Luggage, Utensils, Wifi, PackageOpen, ChevronRight, LuggageIcon } from 'lucide-react';
 import type { PassengerProfile } from '../types/booking.types';
 import SiteHeader from '../components/layout/SiteHeader';
 import BookingStepper from '../components/booking/BookingStepper';
 import SiteFooter from '../components/layout/SiteFooter';
+import AircraftSeatsMap from '../components/booking/AircraftSeatsMap';
+import AdditionalService from '../components/booking/AdditionalService';
 
 const MOCK_PASSENGERS: PassengerProfile[] = [
   { id: '1', fullName: 'Arthur Wellesley', seat: '2A' },
   { id: '2', fullName: 'Jane Austen', seat: undefined },
 ];
 
-const SEAT_ROWS = ['A', 'B', 'C', '', 'D', 'E', 'F'] as const;
-const SEAT_NUMS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 const ADD_ON_SERVICES = [
   {
@@ -47,51 +45,11 @@ const ADD_ON_SERVICES = [
   },
 ];
 
-function SeatCell({
-  id,
-  taken,
-  selected,
-  onSelect,
-}: {
-  id: string;
-  taken?: boolean;
-  selected?: boolean;
-  onSelect?: () => void;
-}) {
-  if (id === '') {
-    return <div className="w-10" />;
-  }
-  return (
-    <button
-      type="button"
-      disabled={taken}
-      onClick={() => onSelect?.()}
-      className={`flex h-10 w-10 items-center justify-center rounded-md text-[10px] font-bold transition-all ${
-        taken
-          ? 'cursor-not-allowed bg-surface-container-high text-on-surface-variant/50'
-          : selected
-            ? 'border-2 border-midnight-burgundy bg-midnight-burgundy text-white'
-            : 'border border-luxury-gold/30 bg-surface-container-lowest text-midnight-burgundy hover:border-midnight-burgundy hover:bg-midnight-burgundy/5'
-      }`}
-    >
-      {id}
-    </button>
-  );
-}
-
 export default function SeatSelection() {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
-
-  const toggleService = (serviceId: string) => {
-    setSelectedServices((prev) =>
-      prev.includes(serviceId) ? prev.filter((id) => id !== serviceId) : [...prev, serviceId]
-    );
-  };
-
-  const handleSeatSelect = (seatId: string) => {
-    setSelectedSeat((prev) => (prev === seatId ? null : seatId));
-  };
+  const [isSeatSelecting, setIsSeatSelecting] = useState(true);
+  const [isServiceSelecting, setIsServiceSelecting] = useState(false);
 
   const totalServicePrice = selectedServices.reduce((total, serviceId) => {
     const service = ADD_ON_SERVICES.find((s) => s.id === serviceId);
@@ -102,12 +60,11 @@ export default function SeatSelection() {
 
   return (
     <div className="relative min-h-screen bg-surface font-body text-on-surface antialiased">
-      <AmbientSweep />
       <SiteHeader />
       <div className="relative z-10 mx-auto max-w-4xl px-6 pt-28" />
-      <BookingStepper current="details" />
-      <main className="relative z-10 mx-auto grid max-w-360 grid-cols-1 gap-8 px-6 pb-16 lg:grid-cols-12 lg:px-12">
-        <div className="mb-8 flex flex-col space-y-6 lg:col-span-8 lg:mb-0">
+      <BookingStepper current="select" />
+      <main className="relative z-10 mx-auto grid max-w-400 grid-cols-1 gap-8 px-6 pb-16 lg:grid-cols-12 lg:px-12">
+        <div className="mb-8 flex flex-col space-y-6 lg:col-span-7 lg:mb-0">
           <div className="rounded-xl border border-luxury-gold/10 bg-white/60 p-6 shadow-sm backdrop-blur-md">
             <p className="mb-4 text-[0.6875rem] font-bold uppercase tracking-[0.15em] text-secondary">
               Select Passenger
@@ -140,84 +97,34 @@ export default function SeatSelection() {
               ))}
             </div>
           </div>
-          <div className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-headline text-xl font-black text-midnight-burgundy">
-                Cabin layout
-              </h2>
-              <Armchair className="h-6 w-6 text-luxury-gold" strokeWidth={1.5} />
-            </div>
-            <div className="seat-map-container max-h-105 overflow-auto rounded-lg bg-surface-container-low p-4">
-              <div className="mx-auto flex max-w-md flex-col gap-2">
-                <div className="mb-4 rounded-lg bg-midnight-burgundy/10 py-2 text-center text-xs font-bold uppercase tracking-widest text-midnight-burgundy">
-                  First — Forward
-                </div>
-                {SEAT_NUMS.map((row) => (
-                  <div key={row} className="flex items-center justify-center gap-2">
-                    <span className="w-6 text-center text-xs text-on-surface-variant">{row}</span>
-                    {SEAT_ROWS.map((col, i) => {
-                      const label = col ? `${row}${col}` : '';
-                      const taken = label === '1A' || label === '1B';
-                      return (
-                        <SeatCell
-                          key={`${row}-${i}`}
-                          id={label}
-                          taken={taken || false}
-                          selected={selectedSeat === label}
-                          onSelect={() => handleSeatSelect(label)}
-                        />
-                      );
-                    })}
-                  </div>
-                ))}
+          {/* Seat Selection */}
+          <button className="rounded-xl border border-luxury-gold/10 bg-white/60 p-6 shadow-sm backdrop-blur-md flex flex-row items-center gap-6 hover:shadow-lg duration-200" onClick={() => { setIsSeatSelecting(true); setIsServiceSelecting(false);}}>
+              <Armchair className="h-20 w-20 p-4 rounded-xl text-luxury-gold bg-midnight-burgundy" strokeWidth={1.5} />
+              <div className="flex flex-col items-start">
+                <h2 className="mb-2 font-headline text-xl font-black text-midnight-burgundy">
+                  Chọn ghế ngồi
+                </h2>
+                <p className="text-sm text-on-surface-variant">
+                  Chọn chỗ ngồi yêu thích của bạn trên máy bay.
+                </p>
               </div>
-            </div>
-          </div>
-          <div className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm">
-            <h2 className="mb-6 font-headline text-xl font-black text-midnight-burgundy">
-              Dịch vụ bổ sung
-            </h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              {ADD_ON_SERVICES.map((service) => {
-                const Icon = service.icon;
-                const isSelected = selectedServices.includes(service.id);
-                return (
-                  <button
-                    key={service.id}
-                    type="button"
-                    onClick={() => toggleService(service.id)}
-                    className={`cursor-pointer rounded-lg border-2 p-4 transition-all text-left ${
-                      isSelected
-                        ? 'border-midnight-burgundy bg-midnight-burgundy/5'
-                        : 'border-outline-variant/20 bg-surface-container-low hover:border-luxury-gold/30'
-                    }`}
-                  >
-                    <div className="mb-3 flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        <Icon className="mt-0.5 h-5 w-5 text-luxury-gold" strokeWidth={1.5} />
-                        <div>
-                          <h3 className="font-bold text-midnight-burgundy">{service.name}</h3>
-                          <p className="mt-1 text-xs text-on-surface-variant">
-                            {service.description}
-                          </p>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleService(service.id)}
-                        className="cursor-pointer"
-                      />
-                    </div>
-                    <p className="text-right font-bold text-secondary">{service.price}</p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-        <aside className="lg:col-span-4">
-          <div className="sticky top-28 rounded-xl border border-luxury-gold/20 bg-surface-container-lowest p-6 shadow-lg">
+              <ChevronRight className="ml-auto h-10 w-10 text-on-surface-variant" strokeWidth={1.5} />
+          </button>
+          {/* Additional Services */}
+          <button className="rounded-xl border border-luxury-gold/10 bg-white/60 p-6 shadow-sm backdrop-blur-md flex flex-row items-center gap-6 hover:shadow-lg duration-200" onClick={() => { setIsServiceSelecting(true); setIsSeatSelecting(false); }}>
+              <LuggageIcon className="h-20 w-20 p-4 rounded-xl text-luxury-gold bg-midnight-burgundy" strokeWidth={1.5} />
+              <div className="flex flex-col items-start">
+                <h2 className="mb-2 font-headline text-xl font-black text-midnight-burgundy">
+                  Chọn dịch vụ bổ sung
+                </h2>
+                <p className="text-sm text-on-surface-variant">
+                  Thêm hành lý, bữa ăn, wifi và nhiều hơn nữa.
+                </p>
+              </div>
+              <ChevronRight className="ml-auto h-10 w-10 text-on-surface-variant" strokeWidth={1.5} />
+          </button>
+
+          <div className=" rounded-xl border border-luxury-gold/20 bg-surface-container-lowest p-6 shadow-lg">
             <h3 className="mb-4 font-headline text-lg font-black text-on-surface">Tóm tắt</h3>
             <p className="text-sm text-on-surface-variant">London → Dubai • SV-204</p>
             <p className="mt-6 text-2xl font-black text-secondary">£2,890</p>
@@ -257,21 +164,23 @@ export default function SeatSelection() {
               </div>
             )}
 
-            <div className="mt-8 space-y-3">
-              <Link to="/booking/checkout">
-                <Button className="block w-full rounded-md border border-outline-variant/30 py-3 text-center text-sm font-semibold text-white hover:bg-surface-container-low">
-                  Thanh toán
-                </Button>
-              </Link>
-
+            <div className="mt-8 h-15 gap-5 flex flex-row">
               <Link
                 to="/home"
-                className="block w-full mt-4 rounded-md border border-outline-variant/30 py-3 text-center text-sm font-semibold text-on-surface hover:bg-surface-container-low"
-              >
+                className="inline-flex w-50 items-center justify-center gap-2 rounded-md px-4 bg-cabin-silver">
                 Hủy
+              </Link>
+              <Link 
+                to="/booking/checkout" 
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md px-4 auth-primary-btn text-white hover:bg-midnight-burgundy/90 transition-all">
+                Thanh toán
               </Link>
             </div>
           </div>
+        </div>
+        <aside className="lg:col-span-5">
+          {isSeatSelecting && <AircraftSeatsMap onSeatSelect={(seatId) => setSelectedSeat(seatId)} crSeatId={selectedSeat} />}
+          {isServiceSelecting && <AdditionalService onSelectServices={(serviceIds) => setSelectedServices(serviceIds)} crServiceIds={selectedServices}/>}
         </aside>
       </main>
       <SiteFooter />

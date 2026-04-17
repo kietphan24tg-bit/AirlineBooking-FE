@@ -1,10 +1,10 @@
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
-import AmbientSweep from '../components/layout/AmbientSweep';
 import FlightResultCard from '../components/booking/FlightResultCard';
-import MarketingNav from '../components/layout/MarketingNav';
 import type { FlightLeg } from '../types/flight.types';
 import SiteFooter from '../components/layout/SiteFooter';
+import SiteHeader from '../components/layout/SiteHeader';
+import BookingStepper from '../components/booking/BookingStepper';
 
 const MOCK_LEGS: FlightLeg[] = [
   {
@@ -60,9 +60,9 @@ export default function FlightResults() {
 
   return (
     <div className="relative min-h-screen bg-surface text-on-surface antialiased">
-      <AmbientSweep />
-      <MarketingNav active="explore" />
+      <SiteHeader />
       <main className="relative z-10 mx-auto max-w-480 px-4 pb-20 pt-28 md:px-12">
+        <BookingStepper current='search' />
         <div className="mb-8 flex flex-col items-end justify-between gap-6 md:flex-row">
           <div>
             <h1 className="mb-2 text-4xl font-black uppercase tracking-tight text-on-surface">
@@ -93,7 +93,7 @@ export default function FlightResults() {
           <aside className="space-y-8 lg:col-span-3">
             <div className="sticky top-28 rounded-xl border border-surface-variant/30 bg-surface-container-low/90 p-8 backdrop-blur-sm">
               <h3 className="mb-6 text-sm font-black uppercase tracking-widest text-on-surface">
-                Refine Selection
+                Filters
               </h3>
               <div className="mb-8">
                 <span className="mb-4 block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
@@ -101,21 +101,171 @@ export default function FlightResults() {
                 </span>
                 <label className="group flex cursor-pointer items-center gap-3">
                   <input
-                    type="checkbox"
+                    type="radio"
+                    name="stops"
                     defaultChecked
+                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+                    No Preference
+                  </span>
+                </label>
+                <label className="group mt-3 flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="stops"
                     className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
                   />
                   <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
                     Direct only
                   </span>
                 </label>
-                <label className="group mt-3 flex cursor-pointer items-center gap-3">
+              </div>
+              <div className="mb-8">
+                <span className="mb-4 block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                  Departure Time
+                </span>
+                <label className="group flex cursor-pointer items-center gap-3">
                   <input
-                    type="checkbox"
+                    type="radio"
+                    name="departure-time"
+                    defaultChecked
                     className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
                   />
                   <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
-                    1 Stop
+                    No Preference
+                  </span>
+                </label>
+                <label className="group mt-3 flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="departure-time"
+                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+                    Morning (5am - 12pm)
+                  </span>
+                </label>
+                <label className="group mt-3 flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="departure-time"
+                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+                    Afternoon (12pm - 6pm)
+                  </span>
+                </label>
+                <label className="group mt-3 flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="departure-time"
+                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+                    Evening (6pm - 12am)
+                  </span>
+                </label>
+              </div>
+              <div className="mb-8">
+                <span className="mb-4 block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                  Arrival Time
+                </span>
+                <label className="group flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="arrival-time"
+                    defaultChecked
+                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+                    No Preference
+                  </span>
+                </label>
+                <label className="group mt-3 flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="arrival-time"
+                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+                    Morning (5am - 12pm)
+                  </span>
+                </label>
+                <label className="group mt-3 flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="arrival-time"
+                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+                    Afternoon (12pm - 6pm)
+                  </span>
+                </label>
+                <label className="group mt-3 flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="arrival-time"
+                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+                    Evening (6pm - 12am)
+                  </span>
+                </label>
+              </div>
+              <div className="mb-8">
+                <span className="mb-4 block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                  Cabin Class
+                </span>
+                <label className="group flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="cabin-class"
+                    defaultChecked
+                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+                    No Preference
+                  </span>
+                </label>
+                <label className="group mt-3 flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="cabin-class"
+                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+                    Economy
+                  </span>
+                </label>
+                <label className="group mt-3 flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="cabin-class"
+                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+                    Premium
+                  </span>
+                </label>
+                <label className="group mt-3 flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="cabin-class"
+                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+                    Business
+                  </span>
+                </label>
+                <label className="group mt-3 flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="cabin-class"
+                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+                    First
                   </span>
                 </label>
               </div>

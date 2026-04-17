@@ -40,13 +40,12 @@ export default function MarketingNav({ active = 'book', showSignIn = true }: Mar
         <div className="flex items-center gap-8 md:gap-12">
           <Link
             to="/"
-            className="font-headline text-xl font-black uppercase italic tracking-tighter text-luxury-gold md:text-2xl"
+            className="font-headline text-xl font-black uppercase italic tracking-tighter text-luxury-gold md:text-3xl"
           >
             <span className="not-italic">The Sovereign</span>
           </Link>
           <div className="hidden items-center gap-6 md:flex md:gap-8">
             {item('book', 'Book', '/')}
-            {item('explore', 'Explore', '/flights')}
             {item('manage', 'Manage', '/manage-booking')}
             {item('experience', 'Experience', '/')}
             {item('loyalty', 'Loyalty', '/')}

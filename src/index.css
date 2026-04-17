@@ -183,9 +183,20 @@
 .delay-5 {
   animation-delay: 5s;
 }
-.delay-10 {
-  animation-delay: 10s;
-}
 .delay-15 {
   animation-delay: 15s;
+}
+
+@keyframes moving-up {
+  0% {
+    opacity: 0;
+    transform: translateY(1000px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+}
+.animate-moving-up {
+  animation: moving-up 0.25s ease-out;
 }

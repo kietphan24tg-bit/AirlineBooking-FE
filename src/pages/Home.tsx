@@ -62,7 +62,7 @@ export default function Home() {
             <Button
               type="button"
               variant="ghost"
-              className="!w-auto"
+              className="w-auto!"
               onClick={() => void handleLogout()}
             >
               Đăng xuất

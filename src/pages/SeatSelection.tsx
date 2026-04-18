@@ -1,44 +1,70 @@
 import { Link } from 'react-router-dom';
-import { Armchair } from 'lucide-react';
-import AmbientSweep from '../components/layout/AmbientSweep';
-import MarketingNav from '../components/layout/MarketingNav';
-import Button from '../components/ui/Button';
+import { useState } from 'react';
+import { Armchair, Luggage, Utensils, Wifi, PackageOpen, ChevronRight, LuggageIcon } from 'lucide-react';
 import type { PassengerProfile } from '../types/booking.types';
+import SiteHeader from '../components/layout/SiteHeader';
+import BookingStepper from '../components/booking/BookingStepper';
+import SiteFooter from '../components/layout/SiteFooter';
+import AircraftSeatsMap from '../components/booking/AircraftSeatsMap';
+import AdditionalService from '../components/booking/AdditionalService';
 
 const MOCK_PASSENGERS: PassengerProfile[] = [
   { id: '1', fullName: 'Arthur Wellesley', seat: '2A' },
   { id: '2', fullName: 'Jane Austen', seat: undefined },
 ];
 
-const SEAT_ROWS = ['A', 'B', 'C', '', 'D', 'E', 'F'] as const;
-const SEAT_NUMS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
-function SeatCell({ id, taken }: { id: string; taken?: boolean }) {
-  if (id === '') {
-    return <div className="w-10" />;
-  }
-  return (
-    <button
-      type="button"
-      disabled={taken}
-      className={`flex h-10 w-10 items-center justify-center rounded-md text-[10px] font-bold transition-all ${
-        taken
-          ? 'cursor-not-allowed bg-surface-container-high text-on-surface-variant/50'
-          : 'border border-luxury-gold/30 bg-surface-container-lowest text-midnight-burgundy hover:border-midnight-burgundy hover:bg-midnight-burgundy/5'
-      }`}
-    >
-      {id}
-    </button>
-  );
-}
+const ADD_ON_SERVICES = [
+  {
+    id: 'extra-baggage',
+    name: 'Hành lý thêm',
+    description: '20kg hành lý ký gửi',
+    price: '£45',
+    icon: Luggage,
+  },
+  {
+    id: 'meal-upgrade',
+    name: 'Nâng cấp bữa ăn',
+    description: 'Premium meal service',
+    price: '£35',
+    icon: Utensils,
+  },
+  {
+    id: 'wifi-pass',
+    name: 'Wifi không giới hạn',
+    description: 'Internet suốt chuyến bay',
+    price: '£12',
+    icon: Wifi,
+  },
+  {
+    id: 'lounge-access',
+    name: 'Truy cập Lounge VIP',
+    description: 'Sovereign Platinum Lounge',
+    price: '£99',
+    icon: PackageOpen,
+  },
+];
 
 export default function SeatSelection() {
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
+  const [isSeatSelecting, setIsSeatSelecting] = useState(true);
+  const [isServiceSelecting, setIsServiceSelecting] = useState(false);
+
+  const totalServicePrice = selectedServices.reduce((total, serviceId) => {
+    const service = ADD_ON_SERVICES.find((s) => s.id === serviceId);
+    if (!service) return total;
+    const price = parseInt(service.price.replace('£', ''));
+    return total + price;
+  }, 0);
+
   return (
     <div className="relative min-h-screen bg-surface font-body text-on-surface antialiased">
-      <AmbientSweep />
-      <MarketingNav active="manage" />
-      <main className="relative z-10 mx-auto grid max-w-[1440px] grid-cols-1 gap-8 px-6 pb-16 pt-24 lg:grid-cols-12 lg:px-12">
-        <div className="mb-8 flex flex-col space-y-6 lg:col-span-8 lg:mb-0">
+      <SiteHeader />
+      <div className="relative z-10 mx-auto max-w-4xl px-6 pt-28" />
+      <BookingStepper current="select" />
+      <main className="relative z-10 mx-auto grid max-w-400 grid-cols-1 gap-8 px-6 pb-16 lg:grid-cols-12 lg:px-12">
+        <div className="mb-8 flex flex-col space-y-6 lg:col-span-7 lg:mb-0">
           <div className="rounded-xl border border-luxury-gold/10 bg-white/60 p-6 shadow-sm backdrop-blur-md">
             <p className="mb-4 text-[0.6875rem] font-bold uppercase tracking-[0.15em] text-secondary">
               Select Passenger
@@ -71,52 +97,93 @@ export default function SeatSelection() {
               ))}
             </div>
           </div>
-          <div className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-headline text-xl font-black text-midnight-burgundy">
-                Cabin layout
-              </h2>
-              <Armchair className="h-6 w-6 text-luxury-gold" strokeWidth={1.5} />
-            </div>
-            <div className="seat-map-container max-h-[420px] overflow-auto rounded-lg bg-surface-container-low p-4">
-              <div className="mx-auto flex max-w-md flex-col gap-2">
-                <div className="mb-4 rounded-lg bg-midnight-burgundy/10 py-2 text-center text-xs font-bold uppercase tracking-widest text-midnight-burgundy">
-                  First — Forward
-                </div>
-                {SEAT_NUMS.map((row) => (
-                  <div key={row} className="flex items-center justify-center gap-2">
-                    <span className="w-6 text-center text-xs text-on-surface-variant">{row}</span>
-                    {SEAT_ROWS.map((col, i) => {
-                      const label = col ? `${row}${col}` : '';
-                      const taken = label === '1A' || label === '1B';
-                      return <SeatCell key={`${row}-${i}`} id={label} taken={taken || false} />;
-                    })}
-                  </div>
-                ))}
+          {/* Seat Selection */}
+          <button className="rounded-xl border border-luxury-gold/10 bg-white/60 p-6 shadow-sm backdrop-blur-md flex flex-row items-center gap-6 hover:shadow-lg duration-200" onClick={() => { setIsSeatSelecting(true); setIsServiceSelecting(false);}}>
+              <Armchair className="h-20 w-20 p-4 rounded-xl text-luxury-gold bg-midnight-burgundy" strokeWidth={1.5} />
+              <div className="flex flex-col items-start">
+                <h2 className="mb-2 font-headline text-xl font-black text-midnight-burgundy">
+                  Chọn ghế ngồi
+                </h2>
+                <p className="text-sm text-on-surface-variant">
+                  Chọn chỗ ngồi yêu thích của bạn trên máy bay.
+                </p>
               </div>
-            </div>
-          </div>
-        </div>
-        <aside className="lg:col-span-4">
-          <div className="sticky top-28 rounded-xl border border-luxury-gold/20 bg-surface-container-lowest p-6 shadow-lg">
+              <ChevronRight className="ml-auto h-10 w-10 text-on-surface-variant" strokeWidth={1.5} />
+          </button>
+          {/* Additional Services */}
+          <button className="rounded-xl border border-luxury-gold/10 bg-white/60 p-6 shadow-sm backdrop-blur-md flex flex-row items-center gap-6 hover:shadow-lg duration-200" onClick={() => { setIsServiceSelecting(true); setIsSeatSelecting(false); }}>
+              <LuggageIcon className="h-20 w-20 p-4 rounded-xl text-luxury-gold bg-midnight-burgundy" strokeWidth={1.5} />
+              <div className="flex flex-col items-start">
+                <h2 className="mb-2 font-headline text-xl font-black text-midnight-burgundy">
+                  Chọn dịch vụ bổ sung
+                </h2>
+                <p className="text-sm text-on-surface-variant">
+                  Thêm hành lý, bữa ăn, wifi và nhiều hơn nữa.
+                </p>
+              </div>
+              <ChevronRight className="ml-auto h-10 w-10 text-on-surface-variant" strokeWidth={1.5} />
+          </button>
+
+          <div className=" rounded-xl border border-luxury-gold/20 bg-surface-container-lowest p-6 shadow-lg">
             <h3 className="mb-4 font-headline text-lg font-black text-on-surface">Tóm tắt</h3>
             <p className="text-sm text-on-surface-variant">London → Dubai • SV-204</p>
             <p className="mt-6 text-2xl font-black text-secondary">£2,890</p>
             <p className="text-xs text-on-surface-variant">Business • 1 khách</p>
-            <div className="mt-8 space-y-3">
-              <Button type="button" className="w-full">
-                Xác nhận ghế
-              </Button>
+
+            {/* Seat Selection Summary */}
+            {selectedSeat && (
+              <div className="mt-4 rounded-lg bg-midnight-burgundy/10 p-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-midnight-burgundy">
+                  Ghế đã chọn
+                </p>
+                <p className="mt-1 text-lg font-black text-secondary">{selectedSeat}</p>
+              </div>
+            )}
+
+            {/* Services Summary */}
+            {selectedServices.length > 0 && (
+              <div className="mt-6 space-y-2 border-t border-outline-variant/20 pt-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                  Dịch vụ bổ sung
+                </p>
+                {selectedServices.map((serviceId) => {
+                  const service = ADD_ON_SERVICES.find((s) => s.id === serviceId);
+                  return service ? (
+                    <div key={serviceId} className="flex justify-between text-sm">
+                      <span className="text-on-surface-variant">{service.name}</span>
+                      <span className="font-bold text-secondary">{service.price}</span>
+                    </div>
+                  ) : null;
+                })}
+                <div className="border-t border-outline-variant/20 pt-2">
+                  <div className="flex justify-between font-bold text-midnight-burgundy">
+                    <span>Dịch vụ:</span>
+                    <span>£{totalServicePrice}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-8 h-15 gap-5 flex flex-row">
               <Link
                 to="/home"
-                className="block w-full rounded-md border border-outline-variant/30 py-3 text-center text-sm font-semibold text-on-surface hover:bg-surface-container-low"
-              >
+                className="inline-flex w-50 items-center justify-center gap-2 rounded-md px-4 bg-cabin-silver">
                 Hủy
+              </Link>
+              <Link 
+                to="/booking/checkout" 
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md px-4 auth-primary-btn text-white hover:bg-midnight-burgundy/90 transition-all">
+                Thanh toán
               </Link>
             </div>
           </div>
+        </div>
+        <aside className="lg:col-span-5">
+          {isSeatSelecting && <AircraftSeatsMap onSeatSelect={(seatId) => setSelectedSeat(seatId)} crSeatId={selectedSeat} />}
+          {isServiceSelecting && <AdditionalService onSelectServices={(serviceIds) => setSelectedServices(serviceIds)} crServiceIds={selectedServices}/>}
         </aside>
       </main>
+      <SiteFooter />
     </div>
   );
 }

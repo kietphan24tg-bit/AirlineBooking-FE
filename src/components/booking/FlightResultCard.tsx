@@ -1,10 +1,38 @@
-import { Plane, PlaneTakeoff } from 'lucide-react';
+import { Plane, PlaneTakeoff, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { FlightLeg } from '../../types/flight.types';
 
 export interface FlightResultCardProps {
   leg: FlightLeg;
 }
+
+const CABIN_PRIVILEGES: Record<string, { benefits: string[] }> = {
+  Economy: {
+    benefits: ['1 carry-on bag', 'Basic snacks & beverage', 'Standard seating'],
+  },
+  Premium: {
+    benefits: ['2 checked bags', 'Premium meals', 'Seat selection', 'Priority boarding'],
+  },
+  Business: {
+    benefits: [
+      '3 checked bags',
+      'Gourmet dining',
+      'Lie-flat seats',
+      'Priority lounge access',
+      'Premium amenities kit',
+    ],
+  },
+  First: {
+    benefits: [
+      'Unlimited luggage',
+      'Michelin-star cuisine',
+      'Private suites',
+      'Sovereign Platinum Lounge',
+      'Personal concierge',
+      'Spa & shower services',
+    ],
+  },
+};
 
 export default function FlightResultCard({ leg }: FlightResultCardProps) {
   return (
@@ -62,27 +90,52 @@ export default function FlightResultCard({ leg }: FlightResultCardProps) {
       </div>
       <div className="grid grid-cols-1 gap-0 divide-y border-t border-surface-container-high md:grid-cols-4 md:divide-x md:divide-y-0">
         {leg.cabinFares.map((c) => (
-          <div
-            key={c.cabin}
-            className={`flex flex-col justify-between p-4 transition-colors hover:bg-surface-container-low/30 ${
-              c.highlight ? 'ring-1 ring-secondary/20' : ''
-            }`}
-          >
-            <div className="mb-4">
-              <span
-                className={`text-[11px] font-black uppercase tracking-[0.15em] ${
-                  c.cabin === 'Economy'
-                    ? 'text-cabin-bronze'
-                    : c.cabin === 'Premium'
-                      ? 'text-on-surface-variant/70'
-                      : c.cabin === 'Business'
-                        ? 'text-secondary'
-                        : 'text-cabin-burgundy'
-                }`}
-              >
-                {c.cabin}
-              </span>
-              <div className="mt-1 text-xl font-black text-on-surface">{c.priceLabel}</div>
+          <div key={c.cabin} className="flex flex-col h-full">
+            <div
+              className={`flex flex-col justify-between p-4 transition-colors hover:bg-surface-container-low/30 cursor-pointer ${
+                c.highlight ? 'ring-1 ring-secondary/20' : ''
+              } ${
+                c.cabin === 'Economy'
+                  ? 'bg-white/10'
+                  : c.cabin === 'Premium'
+                    ? 'bg-cabin-silver/10'
+                    : c.cabin === 'Business'
+                      ? 'bg-luxury-gold/10'
+                      : 'bg-cabin-burgundy/5'
+              }`}
+            >
+              <div className="mb-4">
+                <span
+                  className={`text-[11px] font-black uppercase tracking-[0.15em] ${
+                    c.cabin === 'Economy'
+                      ? 'text-cabin-bronze'
+                      : c.cabin === 'Premium'
+                        ? 'text-on-surface-variant/70'
+                        : c.cabin === 'Business'
+                          ? 'text-secondary'
+                          : 'text-cabin-burgundy'
+                  }`}
+                >
+                  {c.cabin}
+                </span>
+                <div className="mt-1 text-xl font-black text-on-surface">{c.priceLabel}</div>
+              </div>
+            </div>
+            <div className="border-t border-surface-container-high bg-surface-container-low/50 p-4 flex-1">
+              <h5 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-on-surface">
+                Included Benefits
+              </h5>
+              <ul className="space-y-2">
+                {CABIN_PRIVILEGES[c.cabin]?.benefits.map((benefit, idx) => (
+                  <li
+                    key={idx}
+                    className="flex items-start gap-2 text-[12px] text-on-surface-variant"
+                  >
+                    <Check className="mt-0.5 h-3 w-3 shrink-0 text-luxury-gold" strokeWidth={3} />
+                    <span>{benefit}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
             <Link
               to="/booking/passengers"

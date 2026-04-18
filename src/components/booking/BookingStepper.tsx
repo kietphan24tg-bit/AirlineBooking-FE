@@ -6,8 +6,8 @@ export interface BookingStepperProps {
 
 const steps: { id: BookingStep; label: string; step: number }[] = [
   { id: 'search', label: 'Search', step: 1 },
-  { id: 'select', label: 'Select', step: 2 },
-  { id: 'details', label: 'Details', step: 3 },
+  { id: 'details', label: 'Details', step: 2 },
+  { id: 'select', label: 'Select', step: 3 },
   { id: 'pay', label: 'Pay', step: 4 },
 ];
 
@@ -43,7 +43,7 @@ export default function BookingStepper({ current }: BookingStepperProps) {
               </div>
               {i < steps.length - 1 ? (
                 <div
-                  className={`mx-[-10px] mt-5 hidden h-0.5 w-12 shrink-0 md:block md:w-20 ${
+                  className={`-mx-2.5 mt-5 hidden h-0.5 w-12 shrink-0 md:block md:w-20 ${
                     i < activeIdx ? 'bg-primary opacity-30' : 'bg-surface-container-high'
                   }`}
                 />

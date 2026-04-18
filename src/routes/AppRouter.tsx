@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom';
 import App from '../App';
 import AccountManagement from '../pages/AccountManagement';
+import Checkout from '../pages/Checkout';
 import FlightResults from '../pages/FlightResults';
 import Home from '../pages/Home';
 import Landing from '../pages/Landing';
@@ -11,6 +12,7 @@ import Register from '../pages/Register';
 import SeatSelection from '../pages/SeatSelection';
 import TripHistory from '../pages/TripHistory';
 import ProtectedRoute from './ProtectedRoute';
+import ManageBooking from '../pages/ManageBooking';
 
 const AppRouter = createBrowserRouter([
   {
@@ -34,6 +36,26 @@ const AppRouter = createBrowserRouter([
     element: <PasswordResetConfirm />,
   },
   {
+    path: '/booking/passengers',
+    element: <PassengerInfo />,
+  },
+  {
+    path: '/booking/passengers/seats',
+    element: <SeatSelection />,
+  },
+  {
+    path: '/booking/checkout',
+    element: <Checkout />,
+  },
+  {
+    path: '/trips',
+    element: <TripHistory />,
+  },
+  {
+    path: '/manage-booking',
+    element: <ManageBooking />,
+  },
+  {
     element: <ProtectedRoute />,
     children: [
       {
@@ -51,6 +73,10 @@ const AppRouter = createBrowserRouter([
       {
         path: '/booking/seats',
         element: <SeatSelection />,
+      },
+      {
+        path: '/booking/checkout',
+        element: <Checkout />,
       },
       {
         path: '/account',

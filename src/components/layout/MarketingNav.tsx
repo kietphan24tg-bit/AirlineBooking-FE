@@ -1,6 +1,12 @@
 import { Link } from 'react-router-dom';
 
-export type MarketingNavLinkId = 'book' | 'explore' | 'experience' | 'loyalty' | 'manage';
+export type MarketingNavLinkId =
+  | 'book'
+  | 'explore'
+  | 'experience'
+  | 'loyalty'
+  | 'manage'
+  | 'mytrips';
 
 export interface MarketingNavProps {
   /** Which main nav item is visually active (underline). */
@@ -30,29 +36,23 @@ export default function MarketingNav({ active = 'book', showSignIn = true }: Mar
 
   return (
     <nav className="fixed top-0 z-50 w-full border-b border-luxury-gold/20 bg-midnight-burgundy shadow-xl">
-      <div className="mx-auto flex h-20 w-full max-w-[1920px] items-center justify-between px-6 md:px-8">
+      <div className="mx-auto flex h-20 w-full max-w-480 items-center justify-between px-6 md:px-8">
         <div className="flex items-center gap-8 md:gap-12">
           <Link
             to="/"
-            className="font-headline text-xl font-black uppercase italic tracking-tighter text-luxury-gold md:text-2xl"
+            className="font-headline text-xl font-black uppercase italic tracking-tighter text-luxury-gold md:text-3xl"
           >
             <span className="not-italic">The Sovereign</span>
           </Link>
           <div className="hidden items-center gap-6 md:flex md:gap-8">
             {item('book', 'Book', '/')}
-            {item('explore', 'Explore', '/flights')}
-            {item('manage', 'Manage', '/booking/seats')}
+            {item('manage', 'Manage', '/manage-booking')}
             {item('experience', 'Experience', '/')}
             {item('loyalty', 'Loyalty', '/')}
           </div>
         </div>
         <div className="flex items-center gap-3 md:gap-4">
-          <Link
-            to="/trips"
-            className="hidden px-3 py-2 font-body text-sm font-medium text-white/80 transition-colors hover:text-white md:inline"
-          >
-            My Trips
-          </Link>
+          {item('mytrips', 'My Trips', '/trips')}
           {showSignIn ? (
             <Link
               to="/login"

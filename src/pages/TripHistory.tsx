@@ -1,5 +1,6 @@
-import { Link } from 'react-router-dom';
 import type { TripRecord } from '../types/booking.types';
+import SiteFooter from '../components/layout/SiteFooter';
+import MarketingNav from '../components/layout/MarketingNav';
 
 const MOCK_TRIPS: TripRecord[] = [
   {
@@ -34,30 +35,9 @@ function statusStyle(s: TripRecord['status']) {
 
 export default function TripHistory() {
   return (
-    <div className="min-h-screen bg-surface font-body text-on-surface">
-      <nav className="fixed top-0 z-50 flex w-full items-center justify-between border-b border-outline-variant/10 bg-primary px-8 py-0">
-        <Link to="/home" className="font-headline text-2xl font-black tracking-tight text-white">
-          The Sovereign
-        </Link>
-        <div className="hidden items-center gap-8 md:flex">
-          <Link
-            to="/flights"
-            className="border-b-2 border-secondary-fixed pb-1 text-[0.6875rem] font-bold uppercase tracking-[0.05rem] text-white"
-          >
-            Book
-          </Link>
-          <span className="text-[0.6875rem] font-bold uppercase tracking-[0.05rem] text-white/80">
-            Explore
-          </span>
-        </div>
-        <Link
-          to="/login"
-          className="text-[0.6875rem] font-bold uppercase tracking-[0.05rem] text-secondary-fixed hover:text-white"
-        >
-          Sign In
-        </Link>
-      </nav>
-      <main className="relative mx-auto max-w-4xl px-6 pt-28 pb-16">
+    <div className="flex min-h-screen flex-col bg-surface font-body text-on-surface">
+      <MarketingNav active="mytrips" />
+      <main className="relative z-10 mx-auto w-full max-w-4xl flex-1 px-6 pt-28 pb-16">
         <div className="pointer-events-none absolute inset-0 opacity-15">
           <div
             className="h-full w-full"
@@ -93,6 +73,7 @@ export default function TripHistory() {
           </ul>
         </div>
       </main>
+      <SiteFooter />
     </div>
   );
 }

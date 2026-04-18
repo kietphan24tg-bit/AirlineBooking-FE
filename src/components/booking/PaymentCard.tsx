@@ -31,7 +31,7 @@ export default function PaymentCard({ onClose }: PaymentCardProps) {
     <div className="fixed inset-0 min-h-svh z-100 items-center justify-center bg-black/40 flex flex-row">
         <div className="bg-white rounded-lg shadow-lg p-8 mx-4 grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
             <div>
-                <FieldLabel htmlFor="paymentMethod" className="mb-2 font-semibold text-sm text-gray-700">
+                <FieldLabel htmlFor="cardHolder" className="mb-2 font-semibold text-sm text-gray-700">
                     Tên trên thẻ
                 </FieldLabel>
                 <TextInput id="cardHolder" placeholder="Nhập tên trên thẻ" className="mb-4" />

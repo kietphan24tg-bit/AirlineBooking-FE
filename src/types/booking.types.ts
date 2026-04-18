@@ -13,3 +13,17 @@ export interface PassengerProfile {
   fullName: string;
   seat?: string;
 }
+
+/** Passenger details from PassengerInfo, forwarded via `navigate(..., { state })`. */
+export interface PassengerBookingDetails {
+  title: string;
+  name: string;
+  email: string;
+  phone: string;
+  passport: string;
+  dob: string;
+}
+
+export type PassengerInfoNavigationState = {
+  passengers: PassengerBookingDetails[];
+};

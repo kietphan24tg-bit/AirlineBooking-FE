@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import type { User } from './user.type';
 
 export type RegisterPayload = Pick<

@@ -40,10 +40,6 @@ const AppRouter = createBrowserRouter([
     element: <PassengerInfo />,
   },
   {
-    path: '/booking/passengers/seats',
-    element: <SeatSelection />,
-  },
-  {
     path: '/booking/checkout',
     element: <Checkout />,
   },
@@ -53,6 +49,10 @@ const AppRouter = createBrowserRouter([
   },
   {
     path: '/manage-booking',
+    element: <ManageBooking />,
+  },
+  {
+    path: '/manage-booking/:id',
     element: <ManageBooking />,
   },
   {
@@ -71,7 +71,7 @@ const AppRouter = createBrowserRouter([
         element: <PassengerInfo />,
       },
       {
-        path: '/booking/seats',
+        path: '/booking/passengers/seats',
         element: <SeatSelection />,
       },
       {

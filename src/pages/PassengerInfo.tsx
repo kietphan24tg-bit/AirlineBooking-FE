@@ -9,6 +9,7 @@ import FieldLabel from '../components/ui/FieldLabel';
 import TextInput from '../components/ui/TextInput';
 import SiteHeader from '../components/layout/SiteHeader';
 import SiteFooter from '../components/layout/SiteFooter';
+import type { PassengerBookingDetails } from '../types/booking.types';
 
 const TITLES = [
   { value: 'Mr', label: 'Mr' },
@@ -43,8 +44,18 @@ export default function PassengerInfo() {
     },
   });
 
-  const onSubmit = () => {
-    navigate('/booking/passengers/seats');
+  const onSubmit = (data: PassengerInfoFormValues) => {
+    const details: PassengerBookingDetails = {
+      title: data.title?.value ?? '',
+      name: [data.firstName, data.lastName].filter(Boolean).join(' ').trim(),
+      email: data.email.trim(),
+      phone: data.phone.trim(),
+      passport: data.passport.trim(),
+      dob: data.dateOfBirth,
+    };
+    navigate('/booking/passengers/seats', {
+      state: { passengers: [details] },
+    });
   };
 
   const customSelectStyles = {

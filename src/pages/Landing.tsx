@@ -18,7 +18,6 @@ import Select from 'react-select';
 import MarketingNav from '../components/layout/MarketingNav';
 import SiteFooter from '../components/layout/SiteFooter';
 
-
 //const HERO_WING = 'https://lh3.googleusercontent.com/aida-public/AB6AXuDhbnWHSXyZEIc2WLBnhOd8qPY45Y8JYORsa-L0oq7JPRn9I4oA9_W7OkkNhMz9zF8JD3bicGF4GrcM506MBeGkuKj4o9A6fHVkHaAMgcqxRr2xqWTzrWEdOFtljcl0_8qdOxagUmxX_oTMFP_3N2YaRyH0RGeVAXtvJvdRu6KhMFIrrcWTVzmVFSeaeNi7vqxkms17m4cZWkdLwWtdz1zZ17qMDCUZ_3_1otxOuya4kNUb_BN5Wc7E4sM56D5JgO3fZytmZtSOOyJU';
 
 const TRAVELERS = [
@@ -70,13 +69,13 @@ interface Airport {
   code: string;
   name: string;
   city: string;
-};
+}
 
 export default function Landing() {
   const navigate = useNavigate();
-  const [airportList,setAirportList] = useState<Airport[]>([]);
-  const [isFromPicking,setIsFromPicking] = useState(false);
-  const [isToPicking,setIsToPicking] = useState(false);
+  const [airportList, setAirportList] = useState<Airport[]>([]);
+  const [isFromPicking, setIsFromPicking] = useState(false);
+  const [isToPicking, setIsToPicking] = useState(false);
 
   const [tripType, setTripType] = useState<'one-way' | 'round-trip'>('one-way');
   const [from, setFrom] = useState<string | null>();
@@ -141,42 +140,56 @@ export default function Landing() {
 
   function AirportCard({ city, code, name }: any) {
     return (
-      <button className="text-left items-center justify-between p-3 bg-white" onClick={() => {
-          let x = city + " (" + code + ")";
-          if (isFromPicking){
+      <button
+        className="text-left items-center justify-between p-3 bg-white"
+        onClick={() => {
+          const x = city + ' (' + code + ')';
+          if (isFromPicking) {
             setFrom(x);
             setIsFromPicking(false);
-          }
-          else if (isToPicking){
+          } else if (isToPicking) {
             setTo(x);
             setIsToPicking(false);
           }
-        }}>
+        }}
+      >
         <p className="text-[12px] font-bold uppercase tracking-widest text-on-surface-variant">
           {city}
         </p>
-        <h1 className="font-bold text-on-surface">Airport: {name} - {code}</h1>
+        <h1 className="font-bold text-on-surface">
+          Airport: {name} - {code}
+        </h1>
       </button>
     );
   }
 
   function SearchForm() {
     return (
-      <div className={`fixed inset-0 min-h-svh w-full z-100 items-center flex flex-col ${isFromPicking !== isToPicking ? 'animate-moving-up' : ''}`}>
-        <button className='w-full h-full' onClick={() => {setIsFromPicking(false); setIsToPicking(false);}}/>
-        
+      <div
+        className={`fixed inset-0 min-h-svh w-full z-100 items-center flex flex-col ${isFromPicking !== isToPicking ? 'animate-moving-up' : ''}`}
+      >
+        <button
+          className="w-full h-full"
+          onClick={() => {
+            setIsFromPicking(false);
+            setIsToPicking(false);
+          }}
+        />
+
         <div className="h-300 w-full flex flex-col overflow-auto bg-white">
           {airportList.map((a) => (
             <AirportCard key={a.id} code={a.code} name={a.name} city={a.city} />
           ))}
         </div>
       </div>
-    )
+    );
   }
 
   const updateairports = async () => {
     try {
-      const response = await fetch('https://airline-booking-production.up.railway.app/api/airports');
+      const response = await fetch(
+        'https://airline-booking-production.up.railway.app/api/airports'
+      );
       const data = await response.json();
       const list = Object.values(data.data).flat() as Airport[];
       setAirportList(list);
@@ -192,8 +205,8 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-surface font-body text-on-surface antialiased">
       <MarketingNav active="book" />
-      {(isFromPicking || isToPicking) && <SearchForm/>}
-      
+      {(isFromPicking || isToPicking) && <SearchForm />}
+
       <main>
         <section className="relative flex min-h-175 w-full items-center overflow-hidden md:h-280">
           <div className="absolute inset-0 z-0">
@@ -231,9 +244,7 @@ export default function Landing() {
                 bespoke service and uncompromised luxury.
               </p>
             </div>
-            <div
-              className="glass-panel max-w-400 rounded-xl border border-luxury-gold/20 p-1 shadow-2xl"
-            >
+            <div className="glass-panel max-w-400 rounded-xl border border-luxury-gold/20 p-1 shadow-2xl">
               {/* Trip Type Toggle */}
               <div className="flex items-center gap-4 border-b border-luxury-gold/10 p-4">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -276,12 +287,15 @@ export default function Landing() {
                   >
                     From
                   </label>
-                  <button className="flex items-center gap-2 w-full h-fit py-2" onClick={() => setIsFromPicking(!isFromPicking)}>
+                  <button
+                    className="flex items-center gap-2 w-full h-fit py-2"
+                    onClick={() => setIsFromPicking(!isFromPicking)}
+                  >
                     <PlaneTakeoff
                       className="h-5 w-5 shrink-0 text-midnight-burgundy"
                       strokeWidth={1.75}
                     />
-                    <p className='font-bold'>{from || "Ha Noi (HNA)"}</p>
+                    <p className="font-bold">{from || 'Ha Noi (HNA)'}</p>
                   </button>
                 </div>
 
@@ -293,12 +307,15 @@ export default function Landing() {
                   >
                     To
                   </label>
-                  <button className="flex items-center gap-2 w-full h-fit py-2" onClick={() => setIsToPicking(!isToPicking)}>
+                  <button
+                    className="flex items-center gap-2 w-full h-fit py-2"
+                    onClick={() => setIsToPicking(!isToPicking)}
+                  >
                     <PlaneLanding
                       className="h-5 w-5 shrink-0 text-midnight-burgundy"
                       strokeWidth={1.75}
                     />
-                    <p className='font-bold'>{to || "Ho Chi Minh (SGN)"}</p>
+                    <p className="font-bold">{to || 'Ho Chi Minh (SGN)'}</p>
                   </button>
                 </div>
 

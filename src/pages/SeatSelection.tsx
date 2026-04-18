@@ -1,51 +1,41 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
-import { Armchair, Luggage, Utensils, Wifi, PackageOpen, ChevronRight, LuggageIcon } from 'lucide-react';
-import type { PassengerProfile } from '../types/booking.types';
+import { Armchair, ChevronRight, LuggageIcon } from 'lucide-react';
+import type {
+  PassengerBookingDetails,
+  PassengerInfoNavigationState,
+  PassengerProfile,
+} from '../types/booking.types';
 import SiteHeader from '../components/layout/SiteHeader';
 import BookingStepper from '../components/booking/BookingStepper';
 import SiteFooter from '../components/layout/SiteFooter';
 import AircraftSeatsMap from '../components/booking/AircraftSeatsMap';
 import AdditionalService from '../components/booking/AdditionalService';
+import { ADD_ON_SERVICES } from '../constants/addOnServices';
 
 const MOCK_PASSENGERS: PassengerProfile[] = [
   { id: '1', fullName: 'Arthur Wellesley', seat: '2A' },
   { id: '2', fullName: 'Jane Austen', seat: undefined },
 ];
 
-
-const ADD_ON_SERVICES = [
-  {
-    id: 'extra-baggage',
-    name: 'Hành lý thêm',
-    description: '20kg hành lý ký gửi',
-    price: '£45',
-    icon: Luggage,
-  },
-  {
-    id: 'meal-upgrade',
-    name: 'Nâng cấp bữa ăn',
-    description: 'Premium meal service',
-    price: '£35',
-    icon: Utensils,
-  },
-  {
-    id: 'wifi-pass',
-    name: 'Wifi không giới hạn',
-    description: 'Internet suốt chuyến bay',
-    price: '£12',
-    icon: Wifi,
-  },
-  {
-    id: 'lounge-access',
-    name: 'Truy cập Lounge VIP',
-    description: 'Sovereign Platinum Lounge',
-    price: '£99',
-    icon: PackageOpen,
-  },
-];
+function passengersFromNavigationState(
+  list: PassengerBookingDetails[] | undefined
+): PassengerProfile[] | null {
+  if (!list?.length) return null;
+  return list.map((p, i) => ({
+    id: String(i + 1),
+    fullName: [p.title, p.name].filter(Boolean).join(' ').trim(),
+    seat: undefined,
+  }));
+}
 
 export default function SeatSelection() {
+  const location = useLocation();
+  const navPassengers = passengersFromNavigationState(
+    (location.state as Partial<PassengerInfoNavigationState> | null)?.passengers
+  );
+  const passengers = navPassengers ?? MOCK_PASSENGERS;
+
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
   const [isSeatSelecting, setIsSeatSelecting] = useState(true);
@@ -70,7 +60,7 @@ export default function SeatSelection() {
               Select Passenger
             </p>
             <div className="flex flex-wrap gap-4">
-              {MOCK_PASSENGERS.map((p, idx) => (
+              {passengers.map((p, idx) => (
                 <button
                   key={p.id}
                   type="button"
@@ -98,30 +88,48 @@ export default function SeatSelection() {
             </div>
           </div>
           {/* Seat Selection */}
-          <button className="rounded-xl border border-luxury-gold/10 bg-white/60 p-6 shadow-sm backdrop-blur-md flex flex-row items-center gap-6 hover:shadow-lg duration-200" onClick={() => { setIsSeatSelecting(true); setIsServiceSelecting(false);}}>
-              <Armchair className="h-20 w-20 p-4 rounded-xl text-luxury-gold bg-midnight-burgundy" strokeWidth={1.5} />
-              <div className="flex flex-col items-start">
-                <h2 className="mb-2 font-headline text-xl font-black text-midnight-burgundy">
-                  Chọn ghế ngồi
-                </h2>
-                <p className="text-sm text-on-surface-variant">
-                  Chọn chỗ ngồi yêu thích của bạn trên máy bay.
-                </p>
-              </div>
-              <ChevronRight className="ml-auto h-10 w-10 text-on-surface-variant" strokeWidth={1.5} />
+          <button
+            className="rounded-xl border border-luxury-gold/10 bg-white/60 p-6 shadow-sm backdrop-blur-md flex flex-row items-center gap-6 hover:shadow-lg duration-200"
+            onClick={() => {
+              setIsSeatSelecting(true);
+              setIsServiceSelecting(false);
+            }}
+          >
+            <Armchair
+              className="h-20 w-20 p-4 rounded-xl text-luxury-gold bg-midnight-burgundy"
+              strokeWidth={1.5}
+            />
+            <div className="flex flex-col items-start">
+              <h2 className="mb-2 font-headline text-xl font-black text-midnight-burgundy">
+                Chọn ghế ngồi
+              </h2>
+              <p className="text-sm text-on-surface-variant">
+                Chọn chỗ ngồi yêu thích của bạn trên máy bay.
+              </p>
+            </div>
+            <ChevronRight className="ml-auto h-10 w-10 text-on-surface-variant" strokeWidth={1.5} />
           </button>
           {/* Additional Services */}
-          <button className="rounded-xl border border-luxury-gold/10 bg-white/60 p-6 shadow-sm backdrop-blur-md flex flex-row items-center gap-6 hover:shadow-lg duration-200" onClick={() => { setIsServiceSelecting(true); setIsSeatSelecting(false); }}>
-              <LuggageIcon className="h-20 w-20 p-4 rounded-xl text-luxury-gold bg-midnight-burgundy" strokeWidth={1.5} />
-              <div className="flex flex-col items-start">
-                <h2 className="mb-2 font-headline text-xl font-black text-midnight-burgundy">
-                  Chọn dịch vụ bổ sung
-                </h2>
-                <p className="text-sm text-on-surface-variant">
-                  Thêm hành lý, bữa ăn, wifi và nhiều hơn nữa.
-                </p>
-              </div>
-              <ChevronRight className="ml-auto h-10 w-10 text-on-surface-variant" strokeWidth={1.5} />
+          <button
+            className="rounded-xl border border-luxury-gold/10 bg-white/60 p-6 shadow-sm backdrop-blur-md flex flex-row items-center gap-6 hover:shadow-lg duration-200"
+            onClick={() => {
+              setIsServiceSelecting(true);
+              setIsSeatSelecting(false);
+            }}
+          >
+            <LuggageIcon
+              className="h-20 w-20 p-4 rounded-xl text-luxury-gold bg-midnight-burgundy"
+              strokeWidth={1.5}
+            />
+            <div className="flex flex-col items-start">
+              <h2 className="mb-2 font-headline text-xl font-black text-midnight-burgundy">
+                Chọn dịch vụ bổ sung
+              </h2>
+              <p className="text-sm text-on-surface-variant">
+                Thêm hành lý, bữa ăn, wifi và nhiều hơn nữa.
+              </p>
+            </div>
+            <ChevronRight className="ml-auto h-10 w-10 text-on-surface-variant" strokeWidth={1.5} />
           </button>
 
           <div className=" rounded-xl border border-luxury-gold/20 bg-surface-container-lowest p-6 shadow-lg">
@@ -167,20 +175,32 @@ export default function SeatSelection() {
             <div className="mt-8 h-15 gap-5 flex flex-row">
               <Link
                 to="/home"
-                className="inline-flex w-50 items-center justify-center gap-2 rounded-md px-4 bg-cabin-silver">
+                className="inline-flex w-50 items-center justify-center gap-2 rounded-md px-4 bg-cabin-silver"
+              >
                 Hủy
               </Link>
-              <Link 
-                to="/booking/checkout" 
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md px-4 auth-primary-btn text-white hover:bg-midnight-burgundy/90 transition-all">
+              <Link
+                to="/booking/checkout"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md px-4 auth-primary-btn text-white hover:bg-midnight-burgundy/90 transition-all"
+              >
                 Thanh toán
               </Link>
             </div>
           </div>
         </div>
         <aside className="lg:col-span-5">
-          {isSeatSelecting && <AircraftSeatsMap onSeatSelect={(seatId) => setSelectedSeat(seatId)} crSeatId={selectedSeat} />}
-          {isServiceSelecting && <AdditionalService onSelectServices={(serviceIds) => setSelectedServices(serviceIds)} crServiceIds={selectedServices}/>}
+          {isSeatSelecting && (
+            <AircraftSeatsMap
+              onSeatSelect={(seatId) => setSelectedSeat(seatId)}
+              crSeatId={selectedSeat}
+            />
+          )}
+          {isServiceSelecting && (
+            <AdditionalService
+              onSelectServices={(serviceIds) => setSelectedServices(serviceIds)}
+              crServiceIds={selectedServices}
+            />
+          )}
         </aside>
       </main>
       <SiteFooter />

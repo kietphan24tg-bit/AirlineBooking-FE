@@ -60,6 +60,16 @@ export default [
       ...prettierConfig.rules,
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // Base rule flags callback parameter names in types; use TS-aware rule instead.
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
     },
   },
   {

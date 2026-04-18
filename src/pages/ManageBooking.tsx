@@ -21,11 +21,19 @@ const mytrip: TripRecord = {
 };
 
 export default function ManageBooking() {
-  const [sampleTrigger, setSampleTrigger] = useState(false);
+  const [pnr, setPnr] = useState('');
+  const [name, setName] = useState('');
+  const [showResult, setShowResult] = useState(false);
+
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setSampleTrigger(!sampleTrigger); // Just to trigger a re-render with the same data. Replace with actual search logic.
-    // Implement search logic here
+    const pnrTrimmed = pnr.trim();
+    const nameTrimmed = name.trim();
+    if (!pnrTrimmed || !nameTrimmed) {
+      alert('Please enter your booking code (PNR) and full name.');
+      return;
+    }
+    setShowResult(true);
   };
   return (
     <div className="relative min-h-screen bg-surface text-on-surface antialiased">
@@ -55,8 +63,12 @@ export default function ManageBooking() {
                 <Ticket className="h-5 w-5 shrink-0 text-midnight-burgundy" strokeWidth={1.75} />
                 <TextInput
                   id="pnr"
+                  name="pnr"
                   type="text"
                   placeholder="Enter your booking code"
+                  value={pnr}
+                  onChange={(e) => setPnr(e.target.value)}
+                  autoComplete="off"
                   className="w-full border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy focus:ring-0"
                 />
               </div>
@@ -74,8 +86,12 @@ export default function ManageBooking() {
                 <User className="h-5 w-5 shrink-0 text-midnight-burgundy" strokeWidth={1.75} />
                 <TextInput
                   id="name"
+                  name="name"
                   type="text"
                   placeholder="Enter your full name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoComplete="name"
                   className="w-full border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy focus:ring-0"
                 />
               </div>
@@ -92,7 +108,7 @@ export default function ManageBooking() {
             </button>
           </div>
         </form>
-        {sampleTrigger && <BookingResultCard trip={mytrip} passenger={passenger} />}
+        {showResult && <BookingResultCard trip={mytrip} passenger={passenger} />}
       </main>
       <SiteFooter />
     </div>

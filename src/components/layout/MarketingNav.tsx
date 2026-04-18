@@ -35,7 +35,7 @@ export default function MarketingNav({ active = 'book', showSignIn = true }: Mar
   };
 
   return (
-    <nav className="fixed top-0 z-50 w-full border-b border-luxury-gold/20 bg-midnight-burgundy shadow-xl">
+    <nav className="fixed top-0 z-[70] w-full border-b border-luxury-gold/20 bg-midnight-burgundy shadow-xl">
       <div className="mx-auto flex h-20 w-full max-w-480 items-center justify-between px-6 md:px-8">
         <div className="flex items-center gap-8 md:gap-12">
           <Link

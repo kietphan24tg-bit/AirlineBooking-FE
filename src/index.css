@@ -147,6 +147,53 @@
   .auth-input:focus {
     box-shadow: 0 0 0 2px rgb(255 223 158 / 50%);
   }
+
+  /* Date inputs in hero search: strip UA chrome (border/focus box) so they match From/To/Travelers */
+  .search-widget-date-input {
+    appearance: none;
+    -webkit-appearance: none;
+    accent-color: var(--color-midnight-burgundy);
+    color-scheme: light;
+    border: 0;
+    border-radius: 0;
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  .search-widget-date-input:focus,
+  .search-widget-date-input:focus-visible {
+    outline: none;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .search-widget-date-input::-webkit-datetime-edit {
+    padding: 0;
+  }
+
+  .search-widget-date-input::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+    background: transparent;
+  }
+
+  .search-widget-date-input::-webkit-datetime-edit-text {
+    color: inherit;
+  }
+
+  .search-widget-date-input::-webkit-datetime-edit-month-field,
+  .search-widget-date-input::-webkit-datetime-edit-day-field,
+  .search-widget-date-input::-webkit-datetime-edit-year-field {
+    padding: 0;
+  }
+
+  /* Hide native trailing calendar control; picker opens from leading icon via showPicker() */
+  .search-widget-date-input::-webkit-calendar-picker-indicator {
+    display: none;
+  }
+
+  .search-widget-date-input::-moz-calendar-picker-indicator {
+    display: none;
+  }
 }
 
 @keyframes flying-in {
@@ -185,6 +232,38 @@
 }
 .delay-15 {
   animation-delay: 15s;
+}
+
+@keyframes sky-flow-move {
+  0% {
+    transform: translate3d(0%, 0%, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0%, 0);
+  }
+}
+
+.sky-flow-track {
+  position: absolute;
+  top: -10%;
+  left: -10%;
+  width: 400%;
+  height: 120%;
+  display: flex;
+  animation: sky-flow-move 24s linear infinite;
+  will-change: transform;
+}
+
+.sky-flow-tile {
+  width: 25%;
+  height: 100%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.sky-flow-tile--mirror {
+  transform: scaleX(-1);
+  transform-origin: center;
 }
 
 @keyframes moving-up {

@@ -1,34 +1,69 @@
 import {
+  ArrowLeft,
   ArrowRight,
   Calendar,
+  ChevronDown,
   ChevronRight,
   PlaneLanding,
   PlaneTakeoff,
   Plus,
   Sparkles,
   MoveRight,
+  Minus,
   User,
   UtensilsCrossed,
   Headset,
   RotateCcw,
+  Search,
+  MapPin,
+  Gift,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import Select from 'react-select';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import MarketingNav from '../components/layout/MarketingNav';
 import SiteFooter from '../components/layout/SiteFooter';
+import { airportService, type Airport } from '../services/airport.service';
 
 //const HERO_WING = 'https://lh3.googleusercontent.com/aida-public/AB6AXuDhbnWHSXyZEIc2WLBnhOd8qPY45Y8JYORsa-L0oq7JPRn9I4oA9_W7OkkNhMz9zF8JD3bicGF4GrcM506MBeGkuKj4o9A6fHVkHaAMgcqxRr2xqWTzrWEdOFtljcl0_8qdOxagUmxX_oTMFP_3N2YaRyH0RGeVAXtvJvdRu6KhMFIrrcWTVzmVFSeaeNi7vqxkms17m4cZWkdLwWtdz1zZ17qMDCUZ_3_1otxOuya4kNUb_BN5Wc7E4sM56D5JgO3fZytmZtSOOyJU';
 
-const TRAVELERS = [
-  { value: '1', label: '1 Adult' },
-  { value: '2', label: '2 Adults' },
-  { value: '3', label: '3 Adults' },
-  { value: '1-1', label: '1 Adult, 1 Child' },
-  { value: '2-1', label: '2 Adults, 1 Child' },
-  { value: '2-2', label: '2 Adults, 2 Children' },
-  { value: '1-1-1', label: '1 Adult, 1 Child, 1 Infant' },
-];
+const MAX_BOOKING_PASSENGERS = 9;
+
+type TravelerCounts = { adults: number; children: number; infants: number };
+
+function clampTravelers(p: TravelerCounts): TravelerCounts {
+  let adults = Math.max(1, Math.min(9, p.adults));
+  let children = Math.max(0, Math.min(8, p.children));
+  let infants = Math.max(0, Math.min(p.infants, adults));
+  let total = adults + children + infants;
+  if (total > MAX_BOOKING_PASSENGERS) {
+    children = Math.max(0, children - (total - MAX_BOOKING_PASSENGERS));
+    total = adults + children + infants;
+    if (total > MAX_BOOKING_PASSENGERS) {
+      infants = Math.max(0, infants - (total - MAX_BOOKING_PASSENGERS));
+    }
+    total = adults + children + infants;
+    if (total > MAX_BOOKING_PASSENGERS && adults > 1) {
+      adults = Math.max(1, adults - (total - MAX_BOOKING_PASSENGERS));
+      infants = Math.min(infants, adults);
+    }
+  }
+  infants = Math.min(infants, adults);
+  return { adults, children, infants };
+}
+
+function canBumpTraveler(p: TravelerCounts, field: keyof TravelerCounts, delta: number): boolean {
+  const bumped = { ...p, [field]: p[field] + delta } as TravelerCounts;
+  const c = clampTravelers(bumped);
+  return c[field] !== p[field];
+}
+
+function formatTravelerSummary(p: TravelerCounts): string {
+  const bits: string[] = [];
+  bits.push(p.adults === 1 ? '1 Adult' : `${p.adults} Adults`);
+  if (p.children > 0) bits.push(p.children === 1 ? '1 Child' : `${p.children} Children`);
+  if (p.infants > 0) bits.push(p.infants === 1 ? '1 Infant' : `${p.infants} Infants`);
+  return bits.join(', ');
+}
 
 const destinations = [
   {
@@ -64,28 +99,353 @@ const LOUNGE_IMG =
 const TAIL_IMG =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuDGid7JcZ9bpqlgE2oSAlcjguLckow2RBVAa_jYKWWVC7LecTproe0o3KrEwqVs4N_npAHgJH6IVIKYN6ZJuwdxjamXoIc4fkfrKvqSVLI3Vj3GKlrvPn2nWadx-BYGvODXykTTcwyYMZEVzp7EadmLX3WDFGGq91L0pBpjrH5P4dNjYup3fqJ3FR6kJ2d7bb-VL8_6kmEmVVh5CIZxhsUoOUxk5L-XjxXN8nMirmO4um3DE8TdCWge8R-zMOVVlsccuEk5-SSYakdh';
 
-interface Airport {
-  id: number;
-  code: string;
-  name: string;
-  city: string;
+function filterAirports(list: Airport[], query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return list;
+  return list.filter(
+    (a) =>
+      a.city.toLowerCase().includes(q) ||
+      a.name.toLowerCase().includes(q) ||
+      a.code.toLowerCase().includes(q)
+  );
+}
+
+function toDateInputValue(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function openNativeDatePicker(el: HTMLInputElement | null) {
+  if (!el) return;
+  if (typeof el.showPicker === 'function') {
+    try {
+      el.showPicker();
+      return;
+    } catch {
+      /* not allowed or unsupported */
+    }
+  }
+  el.focus();
+  el.click();
+}
+
+type LandingAirportSearchPanelProps = {
+  regionsModalOpen: boolean;
+  onCloseRegionsModal: () => void;
+  onOpenRegionsExplorer: () => void;
+  regionKeys: string[];
+  selectedRegionKey: string;
+  onSelectRegion: (key: string) => void;
+  airportsInSelectedRegion: Airport[];
+  hoveredModalAirportId: number | null;
+  onHoverModalAirport: (id: number | null) => void;
+  airportSearchQuery: string;
+  onAirportSearchQueryChange: (q: string) => void;
+  airportSearchInputRef: RefObject<HTMLInputElement | null>;
+  mainPickerAirports: Airport[];
+  pickerLoading: boolean;
+  hoveredAirportId: number | null;
+  onHoverAirport: (id: number | null) => void;
+  onPickAirport: (a: Airport) => void;
+};
+
+/** Module-level component so React does not remount on every parent re-render (fixes scroll jump). */
+function LandingAirportSearchPanel({
+  regionsModalOpen,
+  onCloseRegionsModal,
+  onOpenRegionsExplorer,
+  regionKeys,
+  selectedRegionKey,
+  onSelectRegion,
+  airportsInSelectedRegion,
+  hoveredModalAirportId,
+  onHoverModalAirport,
+  airportSearchQuery,
+  onAirportSearchQueryChange,
+  airportSearchInputRef,
+  mainPickerAirports,
+  pickerLoading,
+  hoveredAirportId,
+  onHoverAirport,
+  onPickAirport,
+}: LandingAirportSearchPanelProps) {
+  return (
+    <div
+      className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-[min(100vw-1.5rem,26.25rem)] overflow-hidden rounded-xl border border-luxury-gold/20 bg-white shadow-[0_12px_40px_rgba(26,28,28,0.12)]"
+      role="listbox"
+      aria-label="Search airports"
+    >
+      {!regionsModalOpen ? (
+        <div className="border-b border-luxury-gold/10 bg-white p-4">
+          <div className="flex items-stretch overflow-hidden rounded-lg border border-midnight-burgundy/25 bg-white">
+            <div className="flex shrink-0 items-center justify-center pl-3 pr-2">
+              <Search className="h-5 w-5 text-midnight-burgundy" strokeWidth={2} aria-hidden />
+            </div>
+            <div
+              className="my-2.5 w-px shrink-0 self-stretch bg-midnight-burgundy/25"
+              aria-hidden
+            />
+            <input
+              ref={airportSearchInputRef}
+              type="search"
+              value={airportSearchQuery}
+              onChange={(e) => onAirportSearchQueryChange(e.target.value)}
+              placeholder="Tìm kiếm"
+              className="min-w-0 flex-1 bg-transparent py-3 pl-3 pr-4 font-body text-base text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none"
+              autoComplete="off"
+            />
+          </div>
+        </div>
+      ) : null}
+      {regionsModalOpen ? (
+        <>
+          <div className="border-b border-luxury-gold/10 bg-white p-2">
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded-md px-2 py-1.5 font-label text-[0.6875rem] font-bold uppercase tracking-wide text-midnight-burgundy transition-colors hover:bg-surface-container-low"
+              onClick={onCloseRegionsModal}
+            >
+              <ArrowLeft className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} />
+              Quay lại
+            </button>
+          </div>
+          <div className="flex h-[21rem] min-h-0">
+            <aside className="flex w-44 shrink-0 flex-col gap-0.5 overflow-y-auto overscroll-y-contain border-r border-luxury-gold/15 bg-surface-container-low p-2 touch-pan-y">
+              {regionKeys.length === 0 ? (
+                <p className="px-2 py-3 text-center text-xs text-on-surface-variant">Đang tải…</p>
+              ) : (
+                regionKeys.map((key) => {
+                  const active = selectedRegionKey === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`rounded-lg px-2.5 py-2 text-left font-label text-base leading-tight font-bold uppercase tracking-wide transition-colors ${
+                        active
+                          ? 'bg-midnight-burgundy text-luxury-gold'
+                          : 'text-on-surface hover:bg-white'
+                      }`}
+                      onClick={() => onSelectRegion(key)}
+                    >
+                      {key.toUpperCase()}
+                    </button>
+                  );
+                })
+              )}
+            </aside>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-white touch-pan-y">
+              {airportsInSelectedRegion.length === 0 ? (
+                <p className="px-6 py-10 text-center text-sm text-on-surface-variant">
+                  {regionKeys.length === 0
+                    ? 'Không có dữ liệu khu vực.'
+                    : 'Không có sân bay trong khu vực này.'}
+                </p>
+              ) : (
+                airportsInSelectedRegion.map((a) => {
+                  const active = hoveredModalAirportId === a.id;
+                  const subtitle = `${a.city} (${a.code})`;
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      className={`group/item flex w-full items-center justify-between border-l-4 p-4 text-left transition-colors ${
+                        active
+                          ? 'border-midnight-burgundy bg-midnight-burgundy/5'
+                          : 'border-transparent hover:bg-surface-container'
+                      }`}
+                      onMouseEnter={() => onHoverModalAirport(a.id)}
+                      onMouseLeave={() => onHoverModalAirport(null)}
+                      onClick={() => onPickAirport(a)}
+                    >
+                      <div>
+                        <div
+                          className={`font-headline text-lg font-bold leading-tight ${
+                            active ? 'text-midnight-burgundy' : 'text-on-surface'
+                          }`}
+                        >
+                          {a.city}
+                        </div>
+                        <div
+                          className={`font-body text-sm ${
+                            active ? 'text-midnight-burgundy/80' : 'text-on-surface-variant'
+                          }`}
+                        >
+                          {selectedRegionKey}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 pl-2">
+                        <span
+                          className={`font-headline text-xs font-semibold tracking-wider rounded-full border px-3 py-1 ${
+                            active
+                              ? 'border-midnight-burgundy text-midnight-burgundy'
+                              : 'border-midnight-burgundy/35 text-midnight-burgundy group-hover/item:border-midnight-burgundy'
+                          }`}
+                        >
+                          {a.code}
+                        </span>
+                        <span
+                          className={`font-body text-xs ${
+                            active
+                              ? 'text-midnight-burgundy/80'
+                              : 'text-on-surface-variant group-hover/item:text-midnight-burgundy/70'
+                          }`}
+                        >
+                          {subtitle}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="max-h-[min(22rem,calc(100dvh-12rem))] min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y">
+            {airportSearchQuery.trim() === '' && pickerLoading ? (
+              <p className="px-4 py-8 text-center text-sm text-on-surface-variant">Đang tải…</p>
+            ) : mainPickerAirports.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-on-surface-variant">
+                Không có sân bay phù hợp.
+              </p>
+            ) : (
+              mainPickerAirports.map((a) => {
+                const active = hoveredAirportId === a.id;
+                const subtitle = `${a.city} (${a.code})`;
+                const secondary = a.country?.trim() || a.name;
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    className={`group/item flex w-full items-center justify-between border-l-4 p-4 text-left transition-colors ${
+                      active
+                        ? 'border-midnight-burgundy bg-midnight-burgundy/5'
+                        : 'border-transparent hover:bg-surface-container'
+                    }`}
+                    onMouseEnter={() => onHoverAirport(a.id)}
+                    onMouseLeave={() => onHoverAirport(null)}
+                    onClick={() => onPickAirport(a)}
+                  >
+                    <div>
+                      <div
+                        className={`font-headline text-lg font-bold leading-tight ${
+                          active ? 'text-midnight-burgundy' : 'text-on-surface'
+                        }`}
+                      >
+                        {a.city}
+                      </div>
+                      <div
+                        className={`font-body text-sm ${
+                          active ? 'text-midnight-burgundy/80' : 'text-on-surface-variant'
+                        }`}
+                      >
+                        {secondary}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 pl-2">
+                      <span
+                        className={`font-headline text-xs font-semibold tracking-wider rounded-full border px-3 py-1 ${
+                          active
+                            ? 'border-midnight-burgundy text-midnight-burgundy'
+                            : 'border-midnight-burgundy/35 text-midnight-burgundy group-hover/item:border-midnight-burgundy'
+                        }`}
+                      >
+                        {a.code}
+                      </span>
+                      <span
+                        className={`font-body text-xs ${
+                          active
+                            ? 'text-midnight-burgundy/80'
+                            : 'text-on-surface-variant group-hover/item:text-midnight-burgundy/70'
+                        }`}
+                      >
+                        {subtitle}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+          <div className="border-t border-outline-variant/30 bg-surface-container-lowest">
+            <button
+              type="button"
+              className="flex w-full items-center justify-center gap-2 py-2.5 font-headline text-sm font-bold text-midnight-burgundy transition-colors hover:bg-midnight-burgundy/5 hover:text-midnight-burgundy"
+              onClick={onOpenRegionsExplorer}
+            >
+              <MapPin className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+              Xem tất cả
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function Landing() {
   const navigate = useNavigate();
   const [airportList, setAirportList] = useState<Airport[]>([]);
+  const [airportsByRegion, setAirportsByRegion] = useState<Record<string, Airport[]>>({});
   const [isFromPicking, setIsFromPicking] = useState(false);
   const [isToPicking, setIsToPicking] = useState(false);
+  const [airportSearchQuery, setAirportSearchQuery] = useState('');
+  const [hoveredAirportId, setHoveredAirportId] = useState<number | null>(null);
+  const [regionsModalOpen, setRegionsModalOpen] = useState(false);
+  const [selectedRegionKey, setSelectedRegionKey] = useState<string>('');
+  const [hoveredModalAirportId, setHoveredModalAirportId] = useState<number | null>(null);
+  const [pickerSuggestions, setPickerSuggestions] = useState<Airport[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const fromFieldRef = useRef<HTMLDivElement>(null);
+  const toFieldRef = useRef<HTMLDivElement>(null);
+  const airportSearchInputRef = useRef<HTMLInputElement>(null);
+  const glassPanelRef = useRef<HTMLDivElement>(null);
+  const travelersFieldRef = useRef<HTMLDivElement>(null);
+  const departDateInputRef = useRef<HTMLInputElement>(null);
+  const returnDateInputRef = useRef<HTMLInputElement>(null);
+  const pickerContextRef = useRef<'from' | 'to' | null>(null);
+
+  const [bookingPanelBlur, setBookingPanelBlur] = useState(false);
+  const [travelersMenuOpen, setTravelersMenuOpen] = useState(false);
+  const [searchSubmitFocused, setSearchSubmitFocused] = useState(false);
 
   const [tripType, setTripType] = useState<'one-way' | 'round-trip'>('one-way');
-  const [from, setFrom] = useState<string | null>();
-  const [to, setTo] = useState<string | null>();
-  const [departDate, setDepartDate] = useState('2024-10-24');
-  const [returnDate, setReturnDate] = useState('2024-11-01');
-  const [travelers, setTravelers] = useState<{ value: string; label: string } | null>({
-    value: '2',
-    label: '2 Adults',
+  const [from, setFrom] = useState<string | null>(null);
+  const [to, setTo] = useState<string | null>(null);
+  const [departDate, setDepartDate] = useState('');
+  const [returnDate, setReturnDate] = useState('');
+  const [travelerCounts, setTravelerCounts] = useState<TravelerCounts>({
+    adults: 1,
+    children: 0,
+    infants: 0,
   });
+  const [promoCode, setPromoCode] = useState('');
+
+  const travelerSummaryLabel = useMemo(
+    () => formatTravelerSummary(travelerCounts),
+    [travelerCounts]
+  );
+
+  const todayMin = toDateInputValue(new Date());
+  const returnDateMin = departDate && departDate >= todayMin ? departDate : todayMin;
+
+  useEffect(() => {
+    if (!departDate) return;
+    if (departDate < todayMin) setDepartDate(todayMin);
+  }, [departDate, todayMin]);
+
+  useEffect(() => {
+    if (tripType !== 'round-trip') return;
+    setReturnDate((r) => {
+      if (!r) return r;
+      return r < returnDateMin ? returnDateMin : r;
+    });
+  }, [tripType, returnDateMin]);
 
   const onSearch = () => {
     if (
@@ -93,8 +453,8 @@ export default function Landing() {
       !to ||
       !departDate ||
       (tripType === 'round-trip' && !returnDate) ||
-      !travelers ||
-      returnDate < departDate
+      travelerCounts.adults < 1 ||
+      (tripType === 'round-trip' && returnDate && departDate && returnDate < departDate)
     ) {
       alert('Please fill in all required fields');
       return;
@@ -104,94 +464,153 @@ export default function Landing() {
     navigate('/flights');
   };
 
-  const customSelectStyles = {
-    control: (base: any) => ({
-      ...base,
-      border: 'none',
-      backgroundColor: 'transparent',
-      boxShadow: 'none',
-      padding: 0,
-    }),
-    singleValue: (base: any) => ({
-      ...base,
-      color: '#1a1a2e',
-      fontSize: '1.125rem',
-      fontWeight: 700,
-    }),
-    input: (base: any) => ({
-      ...base,
-      color: '#1a1a2e',
-    }),
-    placeholder: (base: any) => ({
-      ...base,
-      color: 'rgba(26, 26, 46, 0.4)',
-    }),
-    option: (base: any, state: any) => ({
-      ...base,
-      backgroundColor: state.isSelected ? '#1a1a2e' : state.isFocused ? '#f5f5f5' : 'white',
-      color: state.isSelected ? '#f4e4d6' : '#1a1a2e',
-      cursor: 'pointer',
-    }),
-    menu: (base: any) => ({
-      ...base,
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-    }),
+  const syncBookingPanelBlur = () => {
+    const panel = glassPanelRef.current;
+    if (!panel) return;
+    const ae = document.activeElement;
+    if (!ae || !(ae instanceof Element) || !panel.contains(ae)) {
+      setBookingPanelBlur(false);
+      return;
+    }
+    if (ae.closest('[data-booking-search-submit]')) {
+      setBookingPanelBlur(false);
+      return;
+    }
+    setBookingPanelBlur(true);
   };
 
-  function AirportCard({ city, code, name }: any) {
-    return (
-      <button
-        className="text-left items-center justify-between p-3 bg-white"
-        onClick={() => {
-          const x = city + ' (' + code + ')';
-          if (isFromPicking) {
-            setFrom(x);
-            setIsFromPicking(false);
-          } else if (isToPicking) {
-            setTo(x);
-            setIsToPicking(false);
-          }
-        }}
-      >
-        <p className="text-[12px] font-bold uppercase tracking-widest text-on-surface-variant">
-          {city}
-        </p>
-        <h1 className="font-bold text-on-surface">
-          Airport: {name} - {code}
-        </h1>
-      </button>
-    );
-  }
+  const filteredAirports = filterAirports(airportList, airportSearchQuery);
+  const mainPickerAirports = useMemo(() => {
+    if (airportSearchQuery.trim()) return filteredAirports;
+    return pickerSuggestions;
+  }, [airportSearchQuery, filteredAirports, pickerSuggestions]);
+  const regionKeys = useMemo(() => Object.keys(airportsByRegion), [airportsByRegion]);
+  const airportsInSelectedRegion =
+    selectedRegionKey && airportsByRegion[selectedRegionKey]
+      ? airportsByRegion[selectedRegionKey]
+      : [];
 
-  function SearchForm() {
-    return (
-      <div
-        className={`fixed inset-0 min-h-svh w-full z-100 items-center flex flex-col ${isFromPicking !== isToPicking ? 'animate-moving-up' : ''}`}
-      >
-        <button
-          className="w-full h-full"
-          onClick={() => {
-            setIsFromPicking(false);
-            setIsToPicking(false);
-          }}
-        />
+  const resetAirportPickerUi = () => {
+    setIsFromPicking(false);
+    setIsToPicking(false);
+    setRegionsModalOpen(false);
+    setAirportSearchQuery('');
+    setHoveredAirportId(null);
+    setHoveredModalAirportId(null);
+    pickerContextRef.current = null;
+  };
 
-        <div className="h-300 w-full flex flex-col overflow-auto bg-white">
-          {airportList.map((a) => (
-            <AirportCard key={a.id} code={a.code} name={a.name} city={a.city} />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const closeAirportPicker = () => {
+    resetAirportPickerUi();
+  };
+
+  const closeRegionsModal = () => {
+    setRegionsModalOpen(false);
+    setHoveredModalAirportId(null);
+  };
+
+  const resetBookingOverlayState = () => {
+    setBookingPanelBlur(false);
+    setTravelersMenuOpen(false);
+    setSearchSubmitFocused(false);
+    closeAirportPicker();
+    closeRegionsModal();
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  };
+
+  const applyAirportSelection = (a: Airport) => {
+    const label = `${a.city} (${a.code})`;
+    const ctx = pickerContextRef.current;
+    if (ctx === 'from') setFrom(label);
+    else if (ctx === 'to') setTo(label);
+    pickerContextRef.current = null;
+    setIsFromPicking(false);
+    setIsToPicking(false);
+    setAirportSearchQuery('');
+    setHoveredAirportId(null);
+    setHoveredModalAirportId(null);
+    setRegionsModalOpen(false);
+  };
+
+  const openRegionsExplorer = () => {
+    setTravelersMenuOpen(false);
+    const keys = Object.keys(airportsByRegion);
+    setSelectedRegionKey(keys[0] ?? '');
+    setRegionsModalOpen(true);
+    airportSearchInputRef.current?.blur();
+  };
+
+  useEffect(() => {
+    if (!isFromPicking && !isToPicking) return;
+    const id = requestAnimationFrame(() => airportSearchInputRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [isFromPicking, isToPicking]);
+
+  useEffect(() => {
+    if (!isFromPicking && !isToPicking) return;
+    let cancelled = false;
+    setPickerLoading(true);
+    airportService
+      .fetchAirportPicker()
+      .then((list) => {
+        if (!cancelled) setPickerSuggestions(list);
+      })
+      .catch(() => {
+        if (!cancelled) setPickerSuggestions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPickerLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isFromPicking, isToPicking]);
+
+  useEffect(() => {
+    if (!isFromPicking && !isToPicking) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (fromFieldRef.current?.contains(t) || toFieldRef.current?.contains(t)) return;
+      closeAirportPicker();
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [isFromPicking, isToPicking]);
+
+  useEffect(() => {
+    if (!travelersMenuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (travelersFieldRef.current?.contains(t)) return;
+      setTravelersMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [travelersMenuOpen]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (regionsModalOpen) {
+        closeRegionsModal();
+        return;
+      }
+      if (travelersMenuOpen) {
+        setTravelersMenuOpen(false);
+        return;
+      }
+      if (isFromPicking || isToPicking) closeAirportPicker();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isFromPicking, isToPicking, regionsModalOpen, travelersMenuOpen]);
 
   const updateairports = async () => {
     try {
-      const response = await fetch(
-        'https://airline-booking-production.up.railway.app/api/airports'
-      );
-      const data = await response.json();
-      const list = Object.values(data.data).flat() as Airport[];
+      const { byCountry, list } = await airportService.fetchAirportsForUI();
+      setAirportsByRegion(byCountry);
       setAirportList(list);
     } catch (error) {
       console.error('Error fetching airports:', error);
@@ -202,15 +621,58 @@ export default function Landing() {
     updateairports();
   }, []);
 
+  const showHeroBookingBlur =
+    !searchSubmitFocused && (bookingPanelBlur || isFromPicking || isToPicking || travelersMenuOpen);
+
+  const bumpTraveler = (field: keyof TravelerCounts, delta: number) => {
+    if (!canBumpTraveler(travelerCounts, field, delta)) return;
+    setTravelerCounts((p) => clampTravelers({ ...p, [field]: p[field] + delta }));
+  };
+
+  useEffect(() => {
+    if (!regionsModalOpen) return;
+    const keys = Object.keys(airportsByRegion);
+    if (keys.length === 0) return;
+    setSelectedRegionKey((prev) => (prev && keys.includes(prev) ? prev : keys[0]));
+  }, [regionsModalOpen, airportsByRegion]);
+
   return (
     <div className="min-h-screen bg-surface font-body text-on-surface antialiased">
       <MarketingNav active="book" />
-      {(isFromPicking || isToPicking) && <SearchForm />}
 
-      <main>
-        <section className="relative flex min-h-175 w-full items-center overflow-hidden md:h-280">
-          <div className="absolute inset-0 z-0">
-            <img alt="" src="/src/assets/sky.jpg" className="h-full w-full object-cover" />
+      <main className="relative">
+        {/* Full-viewport tinted blur (Vietnam Airlines–style); hero stays above via z-index */}
+        <div
+          className={`fixed inset-0 z-[52] bg-black/50 transition-opacity duration-300 ease-out ${
+            showHeroBookingBlur
+              ? 'pointer-events-auto opacity-100'
+              : 'pointer-events-none opacity-0'
+          }`}
+          onClick={resetBookingOverlayState}
+          aria-hidden
+        />
+        <section
+          className={`relative flex h-screen min-h-screen w-full items-stretch ${
+            isFromPicking || isToPicking || travelersMenuOpen
+              ? 'overflow-visible'
+              : 'overflow-hidden'
+          }`}
+        >
+          <div className="absolute inset-0 z-0 overflow-hidden">
+            <div className="sky-flow-track" aria-hidden>
+              <img alt="" src="/src/assets/sky.jpg" className="sky-flow-tile" />
+              <img
+                alt=""
+                src="/src/assets/sky.jpg"
+                className="sky-flow-tile sky-flow-tile--mirror"
+              />
+              <img alt="" src="/src/assets/sky.jpg" className="sky-flow-tile" />
+              <img
+                alt=""
+                src="/src/assets/sky.jpg"
+                className="sky-flow-tile sky-flow-tile--mirror"
+              />
+            </div>
             <img
               alt="clouds"
               src="/src/assets/cloud.png"
@@ -229,24 +691,25 @@ export default function Landing() {
             <img
               alt="plane"
               src="/src/assets/plane.png"
-              className="absolute inset-0 h-full w-full object-cover animate-fly-in"
+              className="absolute inset-0 h-full w-full scale-70 object-cover"
             />
             <div className="absolute inset-0 bg-linear-to-t from-black/25 to-white/20" />
           </div>
-          <div className="relative z-10 mx-auto w-full max-w-480 px-6 md:px-20">
-            <div className="mb-20 max-w-4xl">
-              <h1 className="mb-6 font-headline text-5xl font-black leading-[0.9] tracking-tighter text-white md:text-8xl drop-shadow-xl">
+          <div className="relative mx-auto flex h-full w-full min-w-0 max-w-480 flex-col px-4 pb-0 pt-24 sm:px-6 md:px-20 md:pb-0">
+            <div className="max-w-3xl pt-4 md:pt-6">
+              <h1 className="mb-4 font-headline text-4xl font-black leading-[0.92] tracking-tighter text-white md:mb-5 md:text-7xl drop-shadow-xl">
                 REDEFINING <br />
                 THE <span className="text-luxury-gold">EXCEPTIONAL</span>
               </h1>
-              <p className="max-w-xl text-xl font-medium tracking-wide text-white drop-shadow-xl">
-                Journey beyond expectation. Experience the pinnacle of international travel with
-                bespoke service and uncompromised luxury.
-              </p>
             </div>
-            <div className="glass-panel max-w-400 rounded-xl border border-luxury-gold/20 p-1 shadow-2xl">
+            <div
+              ref={glassPanelRef}
+              onFocusCapture={() => queueMicrotask(syncBookingPanelBlur)}
+              onBlurCapture={() => queueMicrotask(syncBookingPanelBlur)}
+              className="glass-panel relative z-[55] mt-auto w-full min-w-0 max-w-400 rounded-xl border border-luxury-gold/20 p-1 shadow-2xl"
+            >
               {/* Trip Type Toggle */}
-              <div className="flex items-center gap-4 border-b border-luxury-gold/10 p-4">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-luxury-gold/10 p-3 sm:p-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
@@ -271,16 +734,19 @@ export default function Landing() {
                 </label>
               </div>
 
-              {/* Search Form Grid */}
+              {/* Search Form Grid: stack on small screens; tablet3×2 for round-trip; full row from xl / lg */}
               <div
-                className={`grid gap-1 p-4 ${
+                className={`grid min-w-0 gap-0 p-3 sm:p-4 [&>*]:min-w-0 ${
                   tripType === 'round-trip'
-                    ? 'grid-cols-1 md:grid-cols-3 lg:grid-cols-6'
-                    : 'grid-cols-1 divide-y divide-luxury-gold/10 md:grid-cols-4 md:divide-x md:divide-y-0 lg:grid-cols-5'
+                    ? 'grid-cols-1 divide-y divide-luxury-gold/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0 lg:divide-luxury-gold/10 xl:grid-cols-6'
+                    : 'grid-cols-1 divide-y divide-luxury-gold/10 lg:grid-cols-5 lg:divide-x lg:divide-y-0 lg:divide-luxury-gold/10'
                 }`}
               >
                 {/* From */}
-                <div className="space-y-1 p-4">
+                <div
+                  ref={fromFieldRef}
+                  className={`relative space-y-1 p-4 ${isFromPicking ? 'z-30' : ''}`}
+                >
                   <label
                     htmlFor="from"
                     className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
@@ -288,19 +754,64 @@ export default function Landing() {
                     From
                   </label>
                   <button
-                    className="flex items-center gap-2 w-full h-fit py-2"
-                    onClick={() => setIsFromPicking(!isFromPicking)}
+                    id="from"
+                    type="button"
+                    className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border-2 py-2 transition-all ${
+                      isFromPicking
+                        ? 'border-midnight-burgundy/25 shadow-[0_0_8px_rgba(125,6,51,0.15)]'
+                        : 'border-transparent'
+                    }`}
+                    onClick={() => {
+                      setTravelersMenuOpen(false);
+                      setAirportSearchQuery('');
+                      setIsToPicking(false);
+                      setIsFromPicking((v) => {
+                        const next = !v;
+                        pickerContextRef.current = next ? 'from' : null;
+                        return next;
+                      });
+                    }}
                   >
                     <PlaneTakeoff
                       className="h-5 w-5 shrink-0 text-midnight-burgundy"
                       strokeWidth={1.75}
                     />
-                    <p className="font-bold">{from || 'Ha Noi (HNA)'}</p>
+                    <p
+                      className={`font-headline text-lg font-bold ${
+                        from ? 'text-midnight-burgundy' : 'text-midnight-burgundy/45'
+                      }`}
+                    >
+                      {from ?? 'FROM'}
+                    </p>
                   </button>
+                  {isFromPicking && (
+                    <LandingAirportSearchPanel
+                      regionsModalOpen={regionsModalOpen}
+                      onCloseRegionsModal={() => setRegionsModalOpen(false)}
+                      onOpenRegionsExplorer={openRegionsExplorer}
+                      regionKeys={regionKeys}
+                      selectedRegionKey={selectedRegionKey}
+                      onSelectRegion={setSelectedRegionKey}
+                      airportsInSelectedRegion={airportsInSelectedRegion}
+                      hoveredModalAirportId={hoveredModalAirportId}
+                      onHoverModalAirport={setHoveredModalAirportId}
+                      airportSearchQuery={airportSearchQuery}
+                      onAirportSearchQueryChange={setAirportSearchQuery}
+                      airportSearchInputRef={airportSearchInputRef}
+                      mainPickerAirports={mainPickerAirports}
+                      pickerLoading={pickerLoading}
+                      hoveredAirportId={hoveredAirportId}
+                      onHoverAirport={setHoveredAirportId}
+                      onPickAirport={applyAirportSelection}
+                    />
+                  )}
                 </div>
 
                 {/* To */}
-                <div className="space-y-1 p-4">
+                <div
+                  ref={toFieldRef}
+                  className={`relative space-y-1 p-4 ${isToPicking ? 'z-30' : ''}`}
+                >
                   <label
                     htmlFor="to"
                     className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
@@ -308,15 +819,57 @@ export default function Landing() {
                     To
                   </label>
                   <button
-                    className="flex items-center gap-2 w-full h-fit py-2"
-                    onClick={() => setIsToPicking(!isToPicking)}
+                    id="to"
+                    type="button"
+                    className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border-2 py-2 transition-all ${
+                      isToPicking
+                        ? 'border-midnight-burgundy/25 shadow-[0_0_8px_rgba(125,6,51,0.15)]'
+                        : 'border-transparent'
+                    }`}
+                    onClick={() => {
+                      setTravelersMenuOpen(false);
+                      setAirportSearchQuery('');
+                      setIsFromPicking(false);
+                      setIsToPicking((v) => {
+                        const next = !v;
+                        pickerContextRef.current = next ? 'to' : null;
+                        return next;
+                      });
+                    }}
                   >
                     <PlaneLanding
                       className="h-5 w-5 shrink-0 text-midnight-burgundy"
                       strokeWidth={1.75}
                     />
-                    <p className="font-bold">{to || 'Ho Chi Minh (SGN)'}</p>
+                    <p
+                      className={`font-headline text-lg font-bold ${
+                        to ? 'text-midnight-burgundy' : 'text-midnight-burgundy/45'
+                      }`}
+                    >
+                      {to ?? 'TO'}
+                    </p>
                   </button>
+                  {isToPicking && (
+                    <LandingAirportSearchPanel
+                      regionsModalOpen={regionsModalOpen}
+                      onCloseRegionsModal={() => setRegionsModalOpen(false)}
+                      onOpenRegionsExplorer={openRegionsExplorer}
+                      regionKeys={regionKeys}
+                      selectedRegionKey={selectedRegionKey}
+                      onSelectRegion={setSelectedRegionKey}
+                      airportsInSelectedRegion={airportsInSelectedRegion}
+                      hoveredModalAirportId={hoveredModalAirportId}
+                      onHoverModalAirport={setHoveredModalAirportId}
+                      airportSearchQuery={airportSearchQuery}
+                      onAirportSearchQueryChange={setAirportSearchQuery}
+                      airportSearchInputRef={airportSearchInputRef}
+                      mainPickerAirports={mainPickerAirports}
+                      pickerLoading={pickerLoading}
+                      hoveredAirportId={hoveredAirportId}
+                      onHoverAirport={setHoveredAirportId}
+                      onPickAirport={applyAirportSelection}
+                    />
+                  )}
                 </div>
 
                 {/* Depart Date */}
@@ -327,18 +880,36 @@ export default function Landing() {
                   >
                     {tripType === 'round-trip' ? 'Depart' : 'Date'}
                   </label>
-                  <div className="flex items-center gap-2">
-                    <Calendar
-                      className="h-5 w-5 shrink-0 text-midnight-burgundy"
-                      strokeWidth={1.75}
-                    />
-                    <input
-                      id="depart-date"
-                      type="date"
-                      value={departDate}
-                      onChange={(e) => setDepartDate(e.target.value)}
-                      className="w-full border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy focus:ring-0"
-                    />
+                  <div className="flex w-full items-center gap-2 rounded-lg border-2 border-midnight-burgundy/25 bg-white px-2 py-2 text-midnight-burgundy shadow-[0_0_8px_rgba(125,6,51,0.15)] transition-[box-shadow,border-color] focus-within:border-midnight-burgundy/35 focus-within:shadow-[0_0_10px_rgba(125,6,51,0.2)]">
+                    <button
+                      type="button"
+                      className="inline-flex shrink-0 rounded-md p-0.5 text-midnight-burgundy transition-opacity hover:opacity-80 focus-visible:outline focus-visible:ring-2 focus-visible:ring-midnight-burgundy/30"
+                      aria-label="Chọn ngày đi"
+                      onClick={() => openNativeDatePicker(departDateInputRef.current)}
+                    >
+                      <Calendar
+                        className="h-5 w-5 stroke-midnight-burgundy"
+                        strokeWidth={1.75}
+                        aria-hidden
+                      />
+                    </button>
+                    <div className="group relative min-w-0 flex-1">
+                      <input
+                        ref={departDateInputRef}
+                        id="depart-date"
+                        type="date"
+                        min={todayMin}
+                        value={departDate}
+                        placeholder="mm/dd/yyyy"
+                        onChange={(e) => setDepartDate(e.target.value)}
+                        className="search-widget-date-input relative z-[1] min-w-0 w-full border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy shadow-none outline-none focus:border-transparent focus:shadow-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+                      />
+                      {!departDate ? (
+                        <span className="pointer-events-none absolute left-0 top-1/2 z-0 -translate-y-1/2 font-headline text-lg font-bold text-midnight-burgundy/45 group-focus-within:hidden">
+                          mm/dd/yyyy
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
@@ -351,50 +922,236 @@ export default function Landing() {
                     >
                       Return
                     </label>
-                    <div className="flex items-center gap-2">
-                      <RotateCcw
-                        className="h-5 w-5 shrink-0 text-midnight-burgundy"
-                        strokeWidth={1.75}
-                      />
-                      <input
-                        id="return-date"
-                        type="date"
-                        value={returnDate}
-                        onChange={(e) => setReturnDate(e.target.value)}
-                        className="w-full border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy focus:ring-0"
-                      />
+                    <div className="flex w-full items-center gap-2 rounded-lg border-2 border-midnight-burgundy/25 bg-white px-2 py-2 text-midnight-burgundy shadow-[0_0_8px_rgba(125,6,51,0.15)] transition-[box-shadow,border-color] focus-within:border-midnight-burgundy/35 focus-within:shadow-[0_0_10px_rgba(125,6,51,0.2)]">
+                      <button
+                        type="button"
+                        className="inline-flex shrink-0 rounded-md p-0.5 text-midnight-burgundy transition-opacity hover:opacity-80 focus-visible:outline focus-visible:ring-2 focus-visible:ring-midnight-burgundy/30"
+                        aria-label="Chọn ngày về"
+                        onClick={() => openNativeDatePicker(returnDateInputRef.current)}
+                      >
+                        <RotateCcw
+                          className="h-5 w-5 stroke-midnight-burgundy"
+                          strokeWidth={1.75}
+                          aria-hidden
+                        />
+                      </button>
+                      <div className="group relative min-w-0 flex-1">
+                        <input
+                          ref={returnDateInputRef}
+                          id="return-date"
+                          type="date"
+                          min={returnDateMin}
+                          value={returnDate}
+                          placeholder="mm/dd/yyyy"
+                          onChange={(e) => setReturnDate(e.target.value)}
+                          className="search-widget-date-input relative z-[1] min-w-0 w-full border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy shadow-none outline-none focus:border-transparent focus:shadow-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+                        />
+                        {!returnDate ? (
+                          <span className="pointer-events-none absolute left-0 top-1/2 z-0 -translate-y-1/2 font-headline text-lg font-bold text-midnight-burgundy/45 group-focus-within:hidden">
+                            mm/dd/yyyy
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 )}
 
                 {/* Travelers */}
-                <div className="space-y-1 p-4">
+                <div
+                  ref={travelersFieldRef}
+                  className={`relative space-y-1 p-4 ${travelersMenuOpen ? 'z-[60]' : ''}`}
+                >
                   <label
-                    htmlFor="travelers"
+                    htmlFor="travelers-trigger"
                     className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
                   >
                     Travelers
                   </label>
-                  <div className="flex items-center gap-2">
-                    <User className="h-5 w-5 shrink-0 text-midnight-burgundy" strokeWidth={1.75} />
-                    <Select
-                      value={travelers}
-                      onChange={setTravelers}
-                      options={TRAVELERS}
-                      styles={customSelectStyles}
-                      isSearchable={false}
-                      isClearable={false}
-                      className="w-full"
+                  <button
+                    id="travelers-trigger"
+                    type="button"
+                    aria-expanded={travelersMenuOpen}
+                    aria-haspopup="dialog"
+                    onClick={() => setTravelersMenuOpen((o) => !o)}
+                    className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border-2 py-2 pl-0 pr-2 text-left transition-all ${
+                      travelersMenuOpen
+                        ? 'border-midnight-burgundy/25 shadow-[0_0_8px_rgba(125,6,51,0.15)]'
+                        : 'border-transparent'
+                    }`}
+                  >
+                    <User
+                      className="h-5 w-5 shrink-0 stroke-midnight-burgundy text-midnight-burgundy"
+                      strokeWidth={1.75}
                     />
-                  </div>
+                    <span className="min-w-0 flex-1 font-headline text-lg font-bold text-midnight-burgundy">
+                      {travelerSummaryLabel}
+                    </span>
+                    <ChevronDown
+                      className={`h-5 w-5 shrink-0 text-midnight-burgundy/60 transition-transform ${
+                        travelersMenuOpen ? 'rotate-180' : ''
+                      }`}
+                      strokeWidth={2}
+                      aria-hidden
+                    />
+                  </button>
+
+                  {travelersMenuOpen ? (
+                    <div
+                      className="absolute left-0 top-full z-[80] mt-2 w-[min(calc(100vw-2rem),22rem)] overflow-hidden rounded-xl border border-luxury-gold/20 bg-white shadow-[0_12px_40px_rgba(26,28,28,0.12)]"
+                      role="dialog"
+                      aria-label="Select number of travelers"
+                    >
+                      <div className="divide-y divide-luxury-gold/10 px-4">
+                        <div className="flex items-center gap-3 py-4">
+                          <button
+                            type="button"
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                              canBumpTraveler(travelerCounts, 'adults', -1)
+                                ? 'border-midnight-burgundy/25 text-midnight-burgundy hover:bg-surface-container-low'
+                                : 'cursor-not-allowed border-outline-variant/35 text-on-surface-variant/40'
+                            }`}
+                            aria-label={'Gi\u1EA3m ng\u01B0\u1EDDi l\u1EDBn'}
+                            disabled={!canBumpTraveler(travelerCounts, 'adults', -1)}
+                            onClick={() => bumpTraveler('adults', -1)}
+                          >
+                            <Minus className="h-4 w-4" strokeWidth={2.25} />
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-headline text-base font-bold text-midnight-burgundy">
+                              {`${travelerCounts.adults} Ng\u01B0\u1EDDi l\u1EDBn`}
+                            </p>
+                            <p className="mt-0.5 text-sm text-on-surface-variant">
+                              {'T\u1EEB 12 tu\u1ED5i'}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                              canBumpTraveler(travelerCounts, 'adults', 1)
+                                ? 'border-midnight-burgundy/25 text-midnight-burgundy hover:bg-surface-container-low'
+                                : 'cursor-not-allowed border-outline-variant/35 text-on-surface-variant/40'
+                            }`}
+                            aria-label={'T\u0103ng ng\u01B0\u1EDDi l\u1EDBn'}
+                            disabled={!canBumpTraveler(travelerCounts, 'adults', 1)}
+                            onClick={() => bumpTraveler('adults', 1)}
+                          >
+                            <Plus className="h-4 w-4" strokeWidth={2.25} />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-3 py-4">
+                          <button
+                            type="button"
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                              canBumpTraveler(travelerCounts, 'children', -1)
+                                ? 'border-midnight-burgundy/25 text-midnight-burgundy hover:bg-surface-container-low'
+                                : 'cursor-not-allowed border-outline-variant/35 text-on-surface-variant/40'
+                            }`}
+                            aria-label={'Gi\u1EA3m tr\u1EBB em'}
+                            disabled={!canBumpTraveler(travelerCounts, 'children', -1)}
+                            onClick={() => bumpTraveler('children', -1)}
+                          >
+                            <Minus className="h-4 w-4" strokeWidth={2.25} />
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-headline text-base font-bold text-midnight-burgundy">
+                              {`${travelerCounts.children} Tr\u1EBB em`}
+                            </p>
+                            <p className="mt-0.5 text-sm text-on-surface-variant">
+                              {'2\u201312 tu\u1ED5i'}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                              canBumpTraveler(travelerCounts, 'children', 1)
+                                ? 'border-midnight-burgundy/25 text-midnight-burgundy hover:bg-surface-container-low'
+                                : 'cursor-not-allowed border-outline-variant/35 text-on-surface-variant/40'
+                            }`}
+                            aria-label={'T\u0103ng tr\u1EBB em'}
+                            disabled={!canBumpTraveler(travelerCounts, 'children', 1)}
+                            onClick={() => bumpTraveler('children', 1)}
+                          >
+                            <Plus className="h-4 w-4" strokeWidth={2.25} />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-3 py-4">
+                          <button
+                            type="button"
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                              canBumpTraveler(travelerCounts, 'infants', -1)
+                                ? 'border-midnight-burgundy/25 text-midnight-burgundy hover:bg-surface-container-low'
+                                : 'cursor-not-allowed border-outline-variant/35 text-on-surface-variant/40'
+                            }`}
+                            aria-label={'Gi\u1EA3m em b\u00E9'}
+                            disabled={!canBumpTraveler(travelerCounts, 'infants', -1)}
+                            onClick={() => bumpTraveler('infants', -1)}
+                          >
+                            <Minus className="h-4 w-4" strokeWidth={2.25} />
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-headline text-base font-bold text-midnight-burgundy">
+                              {`${travelerCounts.infants} Em b\u00E9`}
+                            </p>
+                            <p className="mt-0.5 text-sm text-on-surface-variant">
+                              {'D\u01B0\u1EDBi 2 tu\u1ED5i'}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                              canBumpTraveler(travelerCounts, 'infants', 1)
+                                ? 'border-midnight-burgundy/25 text-midnight-burgundy hover:bg-surface-container-low'
+                                : 'cursor-not-allowed border-outline-variant/35 text-on-surface-variant/40'
+                            }`}
+                            aria-label={'T\u0103ng em b\u00E9'}
+                            disabled={!canBumpTraveler(travelerCounts, 'infants', 1)}
+                            onClick={() => bumpTraveler('infants', 1)}
+                          >
+                            <Plus className="h-4 w-4" strokeWidth={2.25} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex justify-end border-t border-luxury-gold/10 px-4 py-3">
+                        <button
+                          type="button"
+                          className="rounded-full bg-midnight-burgundy px-7 py-2.5 font-headline text-sm font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-[0.98]"
+                          onClick={() => setTravelersMenuOpen(false)}
+                        >
+                          {'Ch\u1ECDn'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
-                {/* Submit Button */}
-                <div className="flex items-center p-2 md:p-1">
+                {/* Promo + Search (same column) */}
+                <div className="flex min-h-0 flex-col gap-4 p-4 lg:h-full lg:justify-between">
+                  <div className="flex items-center gap-2 py-2">
+                    <Gift
+                      className="h-5 w-5 shrink-0 text-midnight-burgundy"
+                      strokeWidth={1.75}
+                      aria-hidden
+                    />
+                    <input
+                      id="promo-code"
+                      type="text"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value)}
+                      placeholder={'\u004D\u00E3 khuy\u1EBFn m\u00E3i'}
+                      autoComplete="off"
+                      aria-label={'\u004D\u00E3 khuy\u1EBFn m\u00E3i'}
+                      className="min-w-0 flex-1 border-0 border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy shadow-none outline-none ring-0 placeholder:text-midnight-burgundy/45 focus:border-0 focus:ring-0 focus:outline-none"
+                    />
+                  </div>
                   <button
+                    data-booking-search-submit
                     onClick={onSearch}
                     type="submit"
-                    className="flex h-full w-full items-center justify-center gap-2 rounded-lg bg-midnight-burgundy py-4 font-headline font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-95"
+                    onFocus={() => setSearchSubmitFocused(true)}
+                    onBlur={() => setSearchSubmitFocused(false)}
+                    className="flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-midnight-burgundy py-4 font-headline font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-95"
                   >
                     SEARCH FLIGHTS
                     <ArrowRight className="h-5 w-5" strokeWidth={2} />

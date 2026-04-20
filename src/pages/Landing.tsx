@@ -192,7 +192,7 @@ function LandingAirportSearchPanel({
               type="search"
               value={airportSearchQuery}
               onChange={(e) => onAirportSearchQueryChange(e.target.value)}
-              placeholder="Tìm kiếm"
+              placeholder="Search"
               className="min-w-0 flex-1 bg-transparent py-3 pl-3 pr-4 font-body text-base text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none"
               autoComplete="off"
             />
@@ -208,13 +208,13 @@ function LandingAirportSearchPanel({
               onClick={onCloseRegionsModal}
             >
               <ArrowLeft className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} />
-              Quay lại
+              Back
             </button>
           </div>
           <div className="flex h-[21rem] min-h-0">
             <aside className="flex w-44 shrink-0 flex-col gap-0.5 overflow-y-auto overscroll-y-contain border-r border-luxury-gold/15 bg-surface-container-low p-2 touch-pan-y">
               {regionKeys.length === 0 ? (
-                <p className="px-2 py-3 text-center text-xs text-on-surface-variant">Đang tải…</p>
+                <p className="px-2 py-3 text-center text-xs text-on-surface-variant">Loading...</p>
               ) : (
                 regionKeys.map((key) => {
                   const active = selectedRegionKey === key;
@@ -238,9 +238,7 @@ function LandingAirportSearchPanel({
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-white touch-pan-y">
               {airportsInSelectedRegion.length === 0 ? (
                 <p className="px-6 py-10 text-center text-sm text-on-surface-variant">
-                  {regionKeys.length === 0
-                    ? 'Không có dữ liệu khu vực.'
-                    : 'Không có sân bay trong khu vực này.'}
+                  {regionKeys.length === 0 ? 'No region data.' : 'No airports in this region.'}
                 </p>
               ) : (
                 airportsInSelectedRegion.map((a) => {
@@ -306,10 +304,10 @@ function LandingAirportSearchPanel({
         <>
           <div className="max-h-[min(22rem,calc(100dvh-12rem))] min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y">
             {airportSearchQuery.trim() === '' && pickerLoading ? (
-              <p className="px-4 py-8 text-center text-sm text-on-surface-variant">Đang tải…</p>
+              <p className="px-4 py-8 text-center text-sm text-on-surface-variant">Loading...</p>
             ) : mainPickerAirports.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-on-surface-variant">
-                Không có sân bay phù hợp.
+                No matching airports.
               </p>
             ) : (
               mainPickerAirports.map((a) => {
@@ -379,7 +377,7 @@ function LandingAirportSearchPanel({
               onClick={onOpenRegionsExplorer}
             >
               <MapPin className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-              Xem tất cả
+              View all
             </button>
           </div>
         </>
@@ -676,17 +674,17 @@ export default function Landing() {
             <img
               alt="clouds"
               src="/src/assets/cloud.png"
-              className="absolute inset-0 opacity-0 w-full object-cover animate-clouds"
+              className="absolute inset-0 w-full object-cover animate-clouds"
             />
             <img
               alt="clouds"
               src="/src/assets/cloud.png"
-              className="absolute inset-0 opacity-0 w-full object-cover animate-clouds delay-5"
+              className="absolute inset-0 w-full object-cover animate-clouds delay-neg-10"
             />
             <img
               alt="clouds"
               src="/src/assets/cloud.png"
-              className="absolute inset-0 opacity-0 w-full object-cover animate-clouds delay-15"
+              className="absolute inset-0 w-full object-cover animate-clouds delay-neg-20"
             />
             <img
               alt="plane"
@@ -880,11 +878,11 @@ export default function Landing() {
                   >
                     {tripType === 'round-trip' ? 'Depart' : 'Date'}
                   </label>
-                  <div className="flex w-full items-center gap-2 rounded-lg border-2 border-midnight-burgundy/25 bg-white px-2 py-2 text-midnight-burgundy shadow-[0_0_8px_rgba(125,6,51,0.15)] transition-[box-shadow,border-color] focus-within:border-midnight-burgundy/35 focus-within:shadow-[0_0_10px_rgba(125,6,51,0.2)]">
+                  <div className="flex w-full items-center gap-2 rounded-lg border-2 border-transparent px-2 py-2 text-midnight-burgundy transition-[box-shadow,border-color] focus-within:border-midnight-burgundy/25 focus-within:bg-white focus-within:shadow-[0_0_8px_rgba(125,6,51,0.15)]">
                     <button
                       type="button"
                       className="inline-flex shrink-0 rounded-md p-0.5 text-midnight-burgundy transition-opacity hover:opacity-80 focus-visible:outline focus-visible:ring-2 focus-visible:ring-midnight-burgundy/30"
-                      aria-label="Chọn ngày đi"
+                      aria-label="Select departure date"
                       onClick={() => openNativeDatePicker(departDateInputRef.current)}
                     >
                       <Calendar
@@ -922,11 +920,11 @@ export default function Landing() {
                     >
                       Return
                     </label>
-                    <div className="flex w-full items-center gap-2 rounded-lg border-2 border-midnight-burgundy/25 bg-white px-2 py-2 text-midnight-burgundy shadow-[0_0_8px_rgba(125,6,51,0.15)] transition-[box-shadow,border-color] focus-within:border-midnight-burgundy/35 focus-within:shadow-[0_0_10px_rgba(125,6,51,0.2)]">
+                    <div className="flex w-full items-center gap-2 rounded-lg border-2 border-transparent px-2 py-2 text-midnight-burgundy transition-[box-shadow,border-color] focus-within:border-midnight-burgundy/25 focus-within:bg-white focus-within:shadow-[0_0_8px_rgba(125,6,51,0.15)]">
                       <button
                         type="button"
                         className="inline-flex shrink-0 rounded-md p-0.5 text-midnight-burgundy transition-opacity hover:opacity-80 focus-visible:outline focus-visible:ring-2 focus-visible:ring-midnight-burgundy/30"
-                        aria-label="Chọn ngày về"
+                        aria-label="Select return date"
                         onClick={() => openNativeDatePicker(returnDateInputRef.current)}
                       >
                         <RotateCcw
@@ -1010,7 +1008,7 @@ export default function Landing() {
                                 ? 'border-midnight-burgundy/25 text-midnight-burgundy hover:bg-surface-container-low'
                                 : 'cursor-not-allowed border-outline-variant/35 text-on-surface-variant/40'
                             }`}
-                            aria-label={'Gi\u1EA3m ng\u01B0\u1EDDi l\u1EDBn'}
+                            aria-label={'Decrease adults'}
                             disabled={!canBumpTraveler(travelerCounts, 'adults', -1)}
                             onClick={() => bumpTraveler('adults', -1)}
                           >
@@ -1018,10 +1016,10 @@ export default function Landing() {
                           </button>
                           <div className="min-w-0 flex-1">
                             <p className="font-headline text-base font-bold text-midnight-burgundy">
-                              {`${travelerCounts.adults} Ng\u01B0\u1EDDi l\u1EDBn`}
+                              {`${travelerCounts.adults} Adults`}
                             </p>
                             <p className="mt-0.5 text-sm text-on-surface-variant">
-                              {'T\u1EEB 12 tu\u1ED5i'}
+                              {'From 12 years'}
                             </p>
                           </div>
                           <button
@@ -1031,7 +1029,7 @@ export default function Landing() {
                                 ? 'border-midnight-burgundy/25 text-midnight-burgundy hover:bg-surface-container-low'
                                 : 'cursor-not-allowed border-outline-variant/35 text-on-surface-variant/40'
                             }`}
-                            aria-label={'T\u0103ng ng\u01B0\u1EDDi l\u1EDBn'}
+                            aria-label={'Increase adults'}
                             disabled={!canBumpTraveler(travelerCounts, 'adults', 1)}
                             onClick={() => bumpTraveler('adults', 1)}
                           >
@@ -1047,7 +1045,7 @@ export default function Landing() {
                                 ? 'border-midnight-burgundy/25 text-midnight-burgundy hover:bg-surface-container-low'
                                 : 'cursor-not-allowed border-outline-variant/35 text-on-surface-variant/40'
                             }`}
-                            aria-label={'Gi\u1EA3m tr\u1EBB em'}
+                            aria-label={'Decrease children'}
                             disabled={!canBumpTraveler(travelerCounts, 'children', -1)}
                             onClick={() => bumpTraveler('children', -1)}
                           >
@@ -1055,11 +1053,9 @@ export default function Landing() {
                           </button>
                           <div className="min-w-0 flex-1">
                             <p className="font-headline text-base font-bold text-midnight-burgundy">
-                              {`${travelerCounts.children} Tr\u1EBB em`}
+                              {`${travelerCounts.children} Children`}
                             </p>
-                            <p className="mt-0.5 text-sm text-on-surface-variant">
-                              {'2\u201312 tu\u1ED5i'}
-                            </p>
+                            <p className="mt-0.5 text-sm text-on-surface-variant">{'2-12 years'}</p>
                           </div>
                           <button
                             type="button"
@@ -1068,7 +1064,7 @@ export default function Landing() {
                                 ? 'border-midnight-burgundy/25 text-midnight-burgundy hover:bg-surface-container-low'
                                 : 'cursor-not-allowed border-outline-variant/35 text-on-surface-variant/40'
                             }`}
-                            aria-label={'T\u0103ng tr\u1EBB em'}
+                            aria-label={'Increase children'}
                             disabled={!canBumpTraveler(travelerCounts, 'children', 1)}
                             onClick={() => bumpTraveler('children', 1)}
                           >
@@ -1084,7 +1080,7 @@ export default function Landing() {
                                 ? 'border-midnight-burgundy/25 text-midnight-burgundy hover:bg-surface-container-low'
                                 : 'cursor-not-allowed border-outline-variant/35 text-on-surface-variant/40'
                             }`}
-                            aria-label={'Gi\u1EA3m em b\u00E9'}
+                            aria-label={'Decrease infants'}
                             disabled={!canBumpTraveler(travelerCounts, 'infants', -1)}
                             onClick={() => bumpTraveler('infants', -1)}
                           >
@@ -1092,10 +1088,10 @@ export default function Landing() {
                           </button>
                           <div className="min-w-0 flex-1">
                             <p className="font-headline text-base font-bold text-midnight-burgundy">
-                              {`${travelerCounts.infants} Em b\u00E9`}
+                              {`${travelerCounts.infants} Infants`}
                             </p>
                             <p className="mt-0.5 text-sm text-on-surface-variant">
-                              {'D\u01B0\u1EDBi 2 tu\u1ED5i'}
+                              {'Under 2 years'}
                             </p>
                           </div>
                           <button
@@ -1105,7 +1101,7 @@ export default function Landing() {
                                 ? 'border-midnight-burgundy/25 text-midnight-burgundy hover:bg-surface-container-low'
                                 : 'cursor-not-allowed border-outline-variant/35 text-on-surface-variant/40'
                             }`}
-                            aria-label={'T\u0103ng em b\u00E9'}
+                            aria-label={'Increase infants'}
                             disabled={!canBumpTraveler(travelerCounts, 'infants', 1)}
                             onClick={() => bumpTraveler('infants', 1)}
                           >
@@ -1119,7 +1115,7 @@ export default function Landing() {
                           className="rounded-full bg-midnight-burgundy px-7 py-2.5 font-headline text-sm font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-[0.98]"
                           onClick={() => setTravelersMenuOpen(false)}
                         >
-                          {'Ch\u1ECDn'}
+                          {'Select'}
                         </button>
                       </div>
                     </div>
@@ -1139,9 +1135,9 @@ export default function Landing() {
                       type="text"
                       value={promoCode}
                       onChange={(e) => setPromoCode(e.target.value)}
-                      placeholder={'\u004D\u00E3 khuy\u1EBFn m\u00E3i'}
+                      placeholder={'Promo code'}
                       autoComplete="off"
-                      aria-label={'\u004D\u00E3 khuy\u1EBFn m\u00E3i'}
+                      aria-label={'Promo code'}
                       className="min-w-0 flex-1 border-0 border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy shadow-none outline-none ring-0 placeholder:text-midnight-burgundy/45 focus:border-0 focus:ring-0 focus:outline-none"
                     />
                   </div>

@@ -225,13 +225,13 @@
   }
 }
 .animate-clouds {
-  animation: clouds-move 20s ease-in-out infinite;
+  animation: clouds-move 30s ease-in-out infinite;
 }
-.delay-5 {
-  animation-delay: 5s;
+.delay-neg-10 {
+  animation-delay: -10s;
 }
-.delay-15 {
-  animation-delay: 15s;
+.delay-neg-20 {
+  animation-delay: -20s;
 }
 
 @keyframes sky-flow-move {
@@ -250,7 +250,7 @@
   width: 400%;
   height: 120%;
   display: flex;
-  animation: sky-flow-move 24s linear infinite;
+  animation: sky-flow-move 50s linear infinite;
   will-change: transform;
 }
 

@@ -6,35 +6,9 @@ export interface FlightResultCardProps {
   leg: FlightLeg;
 }
 
-const CABIN_PRIVILEGES: Record<string, { benefits: string[] }> = {
-  Economy: {
-    benefits: ['1 carry-on bag', 'Basic snacks & beverage', 'Standard seating'],
-  },
-  Premium: {
-    benefits: ['2 checked bags', 'Premium meals', 'Seat selection', 'Priority boarding'],
-  },
-  Business: {
-    benefits: [
-      '3 checked bags',
-      'Gourmet dining',
-      'Lie-flat seats',
-      'Priority lounge access',
-      'Premium amenities kit',
-    ],
-  },
-  First: {
-    benefits: [
-      'Unlimited luggage',
-      'Michelin-star cuisine',
-      'Private suites',
-      'Sovereign Platinum Lounge',
-      'Personal concierge',
-      'Spa & shower services',
-    ],
-  },
-};
-
 export default function FlightResultCard({ leg }: FlightResultCardProps) {
+  const subtitle = leg.aircraft.trim() ? `${leg.flightNumber} • ${leg.aircraft}` : leg.flightNumber;
+
   return (
     <div className="group/card flex flex-col overflow-hidden rounded-xl border border-surface-container-high bg-surface-container-lowest/90 shadow-sm backdrop-blur-sm transition-all duration-500 hover:shadow-xl">
       <div className="p-8 pb-4">
@@ -50,7 +24,7 @@ export default function FlightResultCard({ leg }: FlightResultCardProps) {
                     {leg.airlineLabel}
                   </span>
                   <h4 className="text-lg font-bold uppercase leading-tight tracking-tight">
-                    {leg.flightNumber} • {leg.aircraft}
+                    {subtitle}
                   </h4>
                 </div>
               </div>
@@ -90,9 +64,9 @@ export default function FlightResultCard({ leg }: FlightResultCardProps) {
       </div>
       <div className="grid grid-cols-1 gap-0 divide-y border-t border-surface-container-high md:grid-cols-4 md:divide-x md:divide-y-0">
         {leg.cabinFares.map((c) => (
-          <div key={c.cabin} className="flex flex-col h-full">
+          <div key={c.cabin} className="flex h-full flex-col">
             <div
-              className={`flex flex-col justify-between p-4 transition-colors hover:bg-surface-container-low/30 cursor-pointer ${
+              className={`flex h-full cursor-pointer flex-col justify-between p-4 transition-colors hover:bg-surface-container-low/30 ${
                 c.highlight ? 'ring-1 ring-secondary/20' : ''
               } ${
                 c.cabin === 'Economy'
@@ -121,28 +95,34 @@ export default function FlightResultCard({ leg }: FlightResultCardProps) {
                 <div className="mt-1 text-xl font-black text-on-surface">{c.priceLabel}</div>
               </div>
             </div>
-            <div className="border-t border-surface-container-high bg-surface-container-low/50 p-4 flex-1">
+            <div className="flex flex-1 flex-col border-t border-surface-container-high bg-surface-container-low/50 p-4">
               <h5 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-on-surface">
                 Included Benefits
               </h5>
-              <ul className="space-y-2">
-                {CABIN_PRIVILEGES[c.cabin]?.benefits.map((benefit, idx) => (
-                  <li
-                    key={idx}
-                    className="flex items-start gap-2 text-[12px] text-on-surface-variant"
-                  >
-                    <Check className="mt-0.5 h-3 w-3 shrink-0 text-luxury-gold" strokeWidth={3} />
-                    <span>{benefit}</span>
+              <ul className="mb-4 space-y-2">
+                {c.benefits.length === 0 ? (
+                  <li className="text-[12px] text-on-surface-variant">
+                    See fare rules for details.
                   </li>
-                ))}
+                ) : (
+                  c.benefits.map((benefit, idx) => (
+                    <li
+                      key={idx}
+                      className="flex items-start gap-2 text-[12px] text-on-surface-variant"
+                    >
+                      <Check className="mt-0.5 h-3 w-3 shrink-0 text-luxury-gold" strokeWidth={3} />
+                      <span>{benefit}</span>
+                    </li>
+                  ))
+                )}
               </ul>
+              <Link
+                to="/booking/passengers"
+                className="mt-auto w-full rounded bg-surface-container-highest py-2 text-center text-[9px] font-black uppercase tracking-widest transition-colors hover:bg-surface-variant"
+              >
+                Select
+              </Link>
             </div>
-            <Link
-              to="/booking/passengers"
-              className="w-full rounded bg-surface-container-highest py-2 text-center text-[9px] font-black uppercase tracking-widest transition-colors hover:bg-surface-variant"
-            >
-              Select
-            </Link>
           </div>
         ))}
       </div>

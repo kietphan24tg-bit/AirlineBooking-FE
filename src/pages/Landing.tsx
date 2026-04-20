@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import MarketingNav from '../components/layout/MarketingNav';
 import SiteFooter from '../components/layout/SiteFooter';
 import { airportService, type Airport } from '../services/airport.service';
+import { buildFlightResultsSearch, airportLabel } from '../utils/flightSearchUrl';
 
 //const HERO_WING = 'https://lh3.googleusercontent.com/aida-public/AB6AXuDhbnWHSXyZEIc2WLBnhOd8qPY45Y8JYORsa-L0oq7JPRn9I4oA9_W7OkkNhMz9zF8JD3bicGF4GrcM506MBeGkuKj4o9A6fHVkHaAMgcqxRr2xqWTzrWEdOFtljcl0_8qdOxagUmxX_oTMFP_3N2YaRyH0RGeVAXtvJvdRu6KhMFIrrcWTVzmVFSeaeNi7vqxkms17m4cZWkdLwWtdz1zZ17qMDCUZ_3_1otxOuya4kNUb_BN5Wc7E4sM56D5JgO3fZytmZtSOOyJU';
 
@@ -413,8 +414,8 @@ export default function Landing() {
   const [searchSubmitFocused, setSearchSubmitFocused] = useState(false);
 
   const [tripType, setTripType] = useState<'one-way' | 'round-trip'>('one-way');
-  const [from, setFrom] = useState<string | null>(null);
-  const [to, setTo] = useState<string | null>(null);
+  const [fromAirport, setFromAirport] = useState<Airport | null>(null);
+  const [toAirport, setToAirport] = useState<Airport | null>(null);
   const [departDate, setDepartDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
   const [travelerCounts, setTravelerCounts] = useState<TravelerCounts>({
@@ -447,8 +448,8 @@ export default function Landing() {
 
   const onSearch = () => {
     if (
-      !from ||
-      !to ||
+      !fromAirport ||
+      !toAirport ||
       !departDate ||
       (tripType === 'round-trip' && !returnDate) ||
       travelerCounts.adults < 1 ||
@@ -458,8 +459,20 @@ export default function Landing() {
       return;
     }
 
-    //finding flight results
-    navigate('/flights');
+    const qs = buildFlightResultsSearch({
+      tripType: tripType === 'round-trip' ? 'ROUND_TRIP' : 'ONE_WAY',
+      from: fromAirport.code,
+      to: toAirport.code,
+      departureDate: departDate,
+      returnDate: tripType === 'round-trip' ? returnDate : undefined,
+      adult: travelerCounts.adults,
+      child: travelerCounts.children,
+      infant: travelerCounts.infants,
+      promoCode: promoCode.trim() || undefined,
+      fromCity: fromAirport.city,
+      toCity: toAirport.city,
+    });
+    navigate(`/flights?${qs}`);
   };
 
   const syncBookingPanelBlur = () => {
@@ -519,10 +532,9 @@ export default function Landing() {
   };
 
   const applyAirportSelection = (a: Airport) => {
-    const label = `${a.city} (${a.code})`;
     const ctx = pickerContextRef.current;
-    if (ctx === 'from') setFrom(label);
-    else if (ctx === 'to') setTo(label);
+    if (ctx === 'from') setFromAirport(a);
+    else if (ctx === 'to') setToAirport(a);
     pickerContextRef.current = null;
     setIsFromPicking(false);
     setIsToPicking(false);
@@ -776,10 +788,10 @@ export default function Landing() {
                     />
                     <p
                       className={`font-headline text-lg font-bold ${
-                        from ? 'text-midnight-burgundy' : 'text-midnight-burgundy/45'
+                        fromAirport ? 'text-midnight-burgundy' : 'text-midnight-burgundy/45'
                       }`}
                     >
-                      {from ?? 'FROM'}
+                      {fromAirport ? airportLabel(fromAirport) : 'FROM'}
                     </p>
                   </button>
                   {isFromPicking && (
@@ -841,10 +853,10 @@ export default function Landing() {
                     />
                     <p
                       className={`font-headline text-lg font-bold ${
-                        to ? 'text-midnight-burgundy' : 'text-midnight-burgundy/45'
+                        toAirport ? 'text-midnight-burgundy' : 'text-midnight-burgundy/45'
                       }`}
                     >
-                      {to ?? 'TO'}
+                      {toAirport ? airportLabel(toAirport) : 'TO'}
                     </p>
                   </button>
                   {isToPicking && (

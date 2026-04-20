@@ -24,9 +24,14 @@ export type AirportsListResponse = {
 };
 
 const AIRPORTS_LS_KEY = 'airline-booking-fe:airports:v1';
-/** Airport list changes rarely — default TTL 7 days (adjust here if needed) */
-const AIRPORTS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** Grouped list (GET /api/airports) — powers “View all” / region explorer. TTL 7 days. */
+const AIRPORTS_GROUPED_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CACHE_SCHEMA_VERSION = 1;
+
+const PICKER_LS_PREFIX = 'airline-booking-fe:airport-picker:v1';
+/** Picker suggestions (GET /api/airports/picker) — dropdown before search. TTL 1 day. */
+const PICKER_CACHE_TTL_MS = 1 * 24 * 60 * 60 * 1000;
+const PICKER_CACHE_SCHEMA_VERSION = 1;
 
 type AirportsCachePayload = {
   v: number;
@@ -49,7 +54,7 @@ function loadCachedGrouped(): Record<string, Airport[]> | null {
       return null;
     }
     if (typeof parsed.savedAt !== 'number') return null;
-    if (Date.now() - parsed.savedAt > AIRPORTS_CACHE_TTL_MS) return null;
+    if (Date.now() - parsed.savedAt > AIRPORTS_GROUPED_CACHE_TTL_MS) return null;
     if (Object.keys(parsed.byCountry).length === 0) return null;
     return parsed.byCountry;
   } catch {
@@ -71,13 +76,83 @@ function saveCachedGrouped(byCountry: Record<string, Airport[]>): void {
   }
 }
 
-/** Clear cache (e.g. after backend updates the list) */
+type PickerCachePayload = {
+  v: number;
+  savedAt: number;
+  airports: Airport[];
+};
+
+function pickerStorageKey(paramsKey: string): string {
+  return `${PICKER_LS_PREFIX}:${paramsKey}`;
+}
+
+function pickerParamsKey(params?: AirportPickerParams): string {
+  if (!params) return 'default';
+  const { limit, recentLimit, suggestedLimit } = params;
+  if (limit == null && recentLimit == null && suggestedLimit == null) return 'default';
+  return JSON.stringify({ limit, recentLimit, suggestedLimit });
+}
+
+function loadCachedPicker(paramsKey: string): Airport[] | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(pickerStorageKey(paramsKey));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PickerCachePayload;
+    if (
+      parsed.v !== PICKER_CACHE_SCHEMA_VERSION ||
+      !Array.isArray(parsed.airports) ||
+      typeof parsed.savedAt !== 'number'
+    ) {
+      return null;
+    }
+    if (Date.now() - parsed.savedAt > PICKER_CACHE_TTL_MS) return null;
+    if (parsed.airports.length === 0) return null;
+    return parsed.airports;
+  } catch {
+    return null;
+  }
+}
+
+function saveCachedPicker(paramsKey: string, airports: Airport[]): void {
+  if (typeof localStorage === 'undefined') return;
+  if (airports.length === 0) return;
+  try {
+    const payload: PickerCachePayload = {
+      v: PICKER_CACHE_SCHEMA_VERSION,
+      savedAt: Date.now(),
+      airports,
+    };
+    localStorage.setItem(pickerStorageKey(paramsKey), JSON.stringify(payload));
+  } catch {
+    /* quota, private mode, etc. */
+  }
+}
+
+function removeAllPickerCacheEntries(): void {
+  if (typeof localStorage === 'undefined') return;
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith(`${PICKER_LS_PREFIX}:`)) keys.push(k);
+  }
+  for (const k of keys) {
+    try {
+      localStorage.removeItem(k);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/** Clear grouped airports + picker caches (e.g. after backend updates the list) */
 export function clearAirportsLocalCache(): void {
   try {
     localStorage.removeItem(AIRPORTS_LS_KEY);
   } catch {
     /* ignore */
   }
+  removeAllPickerCacheEntries();
 }
 
 /** Keep only entries whose values are arrays (country → airports) */
@@ -118,6 +193,11 @@ export type AirportPickerParams = {
   recentLimit?: number;
   /** Backend clamps 6–10 */
   suggestedLimit?: number;
+};
+
+export type FetchAirportPickerOptions = {
+  /** Skip localStorage and always call the API */
+  force?: boolean;
 };
 
 function unwrapData(body: unknown): unknown {
@@ -206,10 +286,23 @@ export const airportService = {
 
   /**
    * GET /api/airports/picker — suggestions for the From/To dropdown (before user searches).
-   * `X-Timezone` is set on all requests via the axios interceptor. Query limits are clamped on the server.
+   * Cached in localStorage for 1 day per param set. `X-Timezone` is set on all requests via the axios interceptor.
    */
-  fetchAirportPicker: async (params?: AirportPickerParams): Promise<Airport[]> => {
+  fetchAirportPicker: async (
+    params?: AirportPickerParams,
+    options?: FetchAirportPickerOptions
+  ): Promise<Airport[]> => {
+    const pk = pickerParamsKey(params);
+    if (!options?.force) {
+      const cached = loadCachedPicker(pk);
+      if (cached) return cached;
+    }
+
     const res = await api.get<unknown>('/api/airports/picker', { params });
-    return extractPickerAirports(res.data);
+    const list = extractPickerAirports(res.data);
+    if (list.length > 0) {
+      saveCachedPicker(pk, list);
+    }
+    return list;
   },
 };

@@ -4,11 +4,19 @@ import type {
   CabinFare,
   FlightLeg,
   FlightPriceRange,
+  FlightRevalidateFareRequest,
+  FlightRevalidateFareResponse,
   FlightSearchCriteria,
   FlightSearchFilters,
   FlightSearchPageInfo,
   FlightSearchResultBundle,
+  SeatMapCell,
+  SeatMapResponse,
+  ServiceCatalogResponse,
+  ServiceGroup,
+  ServiceOption,
 } from '../types/flight.types';
+import { mapFlightResultsSortToApiSort, type FlightResultsSort } from '../utils/flightSearchUrl';
 
 // --- Raw API shapes (searchFlights) ------------------------------------------
 
@@ -37,6 +45,7 @@ export interface FlightFareDto {
   fareCode: string;
   cabinClass: string;
   fareStatus: string;
+  selectable?: boolean;
   originalTotalPrice: number;
   discountedTotalPrice: number | null;
   discountAmount: number;
@@ -177,17 +186,34 @@ function mapFaresToCabinFares(fares: FlightFareDto[], currency: string): CabinFa
   for (const f of fares) {
     if (f.fareStatus && f.fareStatus !== 'AVAILABLE') continue;
     const cabin = normalizeCabin(f);
-    const amount =
-      f.discountedTotalPrice != null && f.discountedTotalPrice > 0
-        ? f.discountedTotalPrice
-        : f.originalTotalPrice;
+    const originalPrice = f.originalTotalPrice;
+    const discountedPrice =
+      f.discountedTotalPrice != null && f.discountedTotalPrice > 0 ? f.discountedTotalPrice : null;
+    const finalPrice =
+      discountedPrice != null && discountedPrice < originalPrice ? discountedPrice : originalPrice;
+    const hasDiscount = finalPrice < originalPrice;
     const existing = byCabin.get(cabin);
-    if (!existing || amount < existing.priceAmount) {
+    if (!existing || finalPrice < existing.priceAmount) {
       byCabin.set(cabin, {
         cabin,
-        priceLabel: formatMoney(amount, cur),
+        priceLabel: formatMoney(finalPrice, cur),
         currency: cur,
-        priceAmount: amount,
+        priceAmount: finalPrice,
+        originalPrice,
+        originalPriceLabel: formatMoney(originalPrice, cur),
+        finalPrice,
+        finalPriceLabel: formatMoney(finalPrice, cur),
+        discountAmount: hasDiscount
+          ? Math.max(0, f.discountAmount || originalPrice - finalPrice)
+          : 0,
+        discountAmountLabel: hasDiscount
+          ? formatMoney(Math.max(0, f.discountAmount || originalPrice - finalPrice), cur)
+          : undefined,
+        discountPercent: hasDiscount ? f.discountPercent : null,
+        promoStatus: f.promoStatus,
+        promoMessage: f.promoMessage,
+        hasDiscount,
+        selectable: f.selectable !== false,
         benefits: buildBenefitsFromFareClass(f.fareClassBenefits, cur),
         fareId: f.fareId,
         fareCode: f.fareCode,
@@ -283,6 +309,7 @@ function serializeSearchParams(params: Record<string, unknown>): string {
 function buildApiQuery(
   criteria: FlightSearchCriteria,
   filters: FlightSearchFilters,
+  sort: FlightResultsSort,
   extra?: { limit?: number; outboundCursor?: string; inboundCursor?: string }
 ): Record<string, unknown> {
   const q: Record<string, unknown> = {
@@ -293,6 +320,7 @@ function buildApiQuery(
     adult: criteria.adult,
     child: criteria.child,
     infant: criteria.infant,
+    sortBy: mapFlightResultsSortToApiSort(sort),
   };
   if (criteria.tripType === 'ROUND_TRIP' && criteria.returnDate) {
     q.returnDate = criteria.returnDate;
@@ -323,9 +351,10 @@ function buildApiQuery(
 export async function searchFlightsMapped(
   criteria: FlightSearchCriteria,
   filters: FlightSearchFilters,
+  sort: FlightResultsSort,
   extra?: { limit?: number; outboundCursor?: string; inboundCursor?: string }
 ): Promise<FlightSearchResultBundle> {
-  const query = buildApiQuery(criteria, filters, extra);
+  const query = buildApiQuery(criteria, filters, sort, extra);
   const qs = serializeSearchParams(query);
   const res = await api.get<FlightSearchApiEnvelope | FlightSearchDataDto>(
     `/api/flights/search?${qs}`
@@ -344,6 +373,172 @@ export async function searchFlightsMapped(
   return mapBundle(raw, criteria);
 }
 
+export async function revalidateFareMapped(
+  payload: FlightRevalidateFareRequest
+): Promise<FlightRevalidateFareResponse> {
+  // Re-check the selected fare right before booking so the backend can confirm
+  // the latest price/availability and return a revalidateId for downstream steps.
+  const res = await api.post<
+    FlightRevalidateFareResponse | { data?: FlightRevalidateFareResponse }
+  >('/api/flights/revalidate-fare', payload);
+  const raw = unwrapData(res.data) as FlightRevalidateFareResponse;
+  if (!raw?.revalidateId) {
+    throw new Error('Fare revalidation failed');
+  }
+  return raw;
+}
+
+export async function getSeatMapMapped(flightId: number, fareId: number): Promise<SeatMapResponse> {
+  const res = await api.get<SeatMapResponse | { data?: SeatMapResponse }>(
+    `/api/flights/${flightId}/seats`,
+    {
+      params: { fareId },
+    }
+  );
+  const raw = unwrapData(res.data) as SeatMapResponse;
+  if (!raw?.layout?.columns?.length || !Array.isArray(raw.rows)) {
+    throw new Error('Seat map is unavailable for this fare');
+  }
+  return normalizeSeatMap(raw);
+}
+
+export async function getServicesMapped(
+  flightId: number,
+  fareId: number
+): Promise<ServiceCatalogResponse> {
+  const res = await api.get<ServiceCatalogResponse | { data?: ServiceCatalogResponse }>(
+    '/api/services',
+    {
+      params: { flightId, fareId },
+    }
+  );
+  const raw = unwrapData(res.data) as ServiceCatalogResponse;
+  return normalizeServiceCatalog(raw);
+}
+
+function normalizeSeatDisplayText(cell: SeatMapCell, fallbackCurrency: string): string {
+  const current = cell.displayPrice?.text?.trim();
+  if (current) return current;
+
+  const badgeCode = cell.pricingBadge?.code ?? cell.displayPrice?.type;
+  if (!cell.selectable) {
+    if (badgeCode === 'NOT_ALLOWED' || cell.reason === 'SEAT_NOT_ALLOWED_FOR_FARE') {
+      return 'Not allowed';
+    }
+    return 'Unavailable';
+  }
+
+  if (badgeCode === 'FREE' || cell.included || (cell.extraPrice ?? 0) <= 0) {
+    return cell.included ? 'Included' : 'Free';
+  }
+
+  const currency = cell.currency ?? fallbackCurrency;
+  return `+${cell.extraPrice?.toLocaleString('vi-VN') ?? ''} ${currency}`.trim();
+}
+
+function normalizeSeatDisplayType(cell: SeatMapCell): string {
+  const current = cell.displayPrice?.type ?? cell.pricingBadge?.code;
+  if (current) return current;
+  if (!cell.selectable) {
+    return cell.reason === 'SEAT_NOT_ALLOWED_FOR_FARE' ? 'NOT_ALLOWED' : 'UNAVAILABLE';
+  }
+  if (cell.included || (cell.extraPrice ?? 0) <= 0) return 'FREE';
+  return 'PAID';
+}
+
+function normalizeSeatMap(raw: SeatMapResponse): SeatMapResponse {
+  return {
+    ...raw,
+    rows: raw.rows.map((row) => ({
+      ...row,
+      cells: row.cells.map((cell) => {
+        const type = normalizeSeatDisplayType(cell);
+        const text = normalizeSeatDisplayText(cell, raw.currency);
+        const currency = cell.currency ?? cell.displayPrice?.currency ?? raw.currency;
+        return {
+          ...cell,
+          displayPrice: {
+            type,
+            text,
+            amount: cell.displayPrice?.amount ?? cell.extraPrice,
+            currency: cell.displayPrice?.currency ?? cell.currency,
+            description: cell.displayPrice?.description ?? '',
+          },
+          pricingBadge: {
+            code: cell.pricingBadge?.code ?? type,
+            label: cell.pricingBadge?.label ?? text,
+            description: cell.pricingBadge?.description ?? '',
+          },
+          currency,
+        };
+      }),
+    })),
+  };
+}
+
+function normalizeServiceCatalog(raw: ServiceCatalogResponse): ServiceCatalogResponse {
+  const fallbackCurrency = raw?.currency || 'VND';
+  if (!raw || !Array.isArray(raw.services)) {
+    throw new Error('Service catalog is unavailable for this fare');
+  }
+
+  return {
+    currency: fallbackCurrency,
+    services: raw.services
+      .filter((service) => service && typeof service === 'object')
+      .map((service) => normalizeServiceGroup(service, fallbackCurrency)),
+  };
+}
+
+function normalizeServiceGroup(service: ServiceGroup, fallbackCurrency: string): ServiceGroup {
+  const serviceId = Number(service.serviceId);
+  const serviceType = service.serviceType || 'SERVICE';
+  const serviceName = service.serviceName || serviceType.replace(/_/g, ' ');
+
+  return {
+    serviceId,
+    serviceType,
+    serviceName,
+    iconUrl: service.iconUrl || null,
+    selectionMode: service.selectionMode || 'SINGLE',
+    options: Array.isArray(service.options)
+      ? service.options
+          .filter((option) => option && typeof option === 'object')
+          .map((option) =>
+            normalizeServiceOption(option, serviceId, serviceType, serviceName, fallbackCurrency)
+          )
+      : [],
+  };
+}
+
+function normalizeServiceOption(
+  option: ServiceOption,
+  serviceId: number,
+  serviceType: string,
+  serviceName: string,
+  fallbackCurrency: string
+): ServiceOption {
+  const price = Number(option.price ?? 0);
+  const currency = option.currency || fallbackCurrency;
+
+  return {
+    optionId: Number(option.optionId),
+    serviceId,
+    serviceType,
+    serviceName,
+    name: option.name || 'Service option',
+    description: option.description || '',
+    price: Number.isFinite(price) ? price : 0,
+    currency,
+    priceLabel: formatMoney(Number.isFinite(price) ? price : 0, currency),
+    imageUrl: option.imageUrl || null,
+    isActive: option.isActive !== false,
+  };
+}
+
 export const flightService = {
   searchFlights: searchFlightsMapped,
+  revalidateFare: revalidateFareMapped,
+  getSeatMap: getSeatMapMapped,
+  getServices: getServicesMapped,
 };

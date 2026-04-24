@@ -6,6 +6,7 @@ import type {
 import type { Airport } from '../services/airport.service';
 
 export type FlightResultsSort = 'Recommended' | 'Cheapest' | 'Fastest' | 'Best Experience';
+export type FlightSearchApiSort = 'RECOMMENDED' | 'CHEAPEST' | 'FASTEST' | 'BEST_EXPERIENCE';
 
 const VALID_CONNECTION_FILTERS = new Set<NonNullable<FlightSearchFilters['connectionFilter']>>([
   'ANY',
@@ -17,7 +18,7 @@ const VALID_TIME_BUCKETS = new Set<NonNullable<FlightSearchFilters['departureTim
   'AFTERNOON',
   'EVENING',
 ]);
-const VALID_CABIN_CLASSES = new Set(['ECONOMY', 'PREMIUM', 'BUSINESS', 'FIRST']);
+const VALID_CABIN_CLASSES = new Set(['ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST']);
 const VALID_SORTS = new Set<FlightResultsSort>([
   'Recommended',
   'Cheapest',
@@ -50,11 +51,17 @@ export function parseMaxBudgetFromSearchParams(sp: URLSearchParams): number | nu
   return Math.round(n);
 }
 
+function normalizeCabinFilterValue(cabin: string | null): string | null {
+  if (!cabin) return null;
+  if (cabin === 'PREMIUM') return 'PREMIUM_ECONOMY';
+  return VALID_CABIN_CLASSES.has(cabin) ? cabin : null;
+}
+
 export function parseFlightResultsFilters(sp: URLSearchParams): FlightSearchFilters {
   const connectionFilter = sp.get('stops');
   const departureTimeBucket = sp.get('departureTime');
   const arrivalTimeBucket = sp.get('arrivalTime');
-  const cabin = sp.get('cabin');
+  const cabin = normalizeCabinFilterValue(sp.get('cabin'));
 
   return {
     connectionFilter: VALID_CONNECTION_FILTERS.has(
@@ -72,7 +79,7 @@ export function parseFlightResultsFilters(sp: URLSearchParams): FlightSearchFilt
     )
       ? (arrivalTimeBucket as NonNullable<FlightSearchFilters['arrivalTimeBucket']>)
       : 'ANY',
-    cabinClasses: cabin && VALID_CABIN_CLASSES.has(cabin) ? [cabin] : [],
+    cabinClasses: cabin ? [cabin] : [],
     maxBudget: parseMaxBudgetFromSearchParams(sp),
   };
 }
@@ -83,6 +90,20 @@ export function parseFlightResultsSort(sp: URLSearchParams): FlightResultsSort {
     return sort as FlightResultsSort;
   }
   return 'Recommended';
+}
+
+export function mapFlightResultsSortToApiSort(sort: FlightResultsSort): FlightSearchApiSort {
+  switch (sort) {
+    case 'Cheapest':
+      return 'CHEAPEST';
+    case 'Fastest':
+      return 'FASTEST';
+    case 'Best Experience':
+      return 'BEST_EXPERIENCE';
+    case 'Recommended':
+    default:
+      return 'RECOMMENDED';
+  }
 }
 
 export function applyFlightResultsStateToSearchParams(
@@ -187,7 +208,8 @@ export function airportLabel(a: Airport): string {
 /** Stable query key for TanStack Query — primitives only, avoids redundant refetches. */
 export function buildFlightSearchQueryKey(
   criteria: FlightSearchCriteria,
-  filters: FlightSearchFilters
+  filters: FlightSearchFilters,
+  sort: FlightResultsSort
 ): readonly unknown[] {
   return [
     'flight-search',
@@ -207,5 +229,6 @@ export function buildFlightSearchQueryKey(
     filters.arrivalTimeBucket ?? 'ANY',
     [...filters.cabinClasses].slice().sort().join(','),
     filters.maxBudget ?? 'none',
+    sort,
   ] as const;
 }

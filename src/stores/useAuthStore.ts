@@ -3,13 +3,17 @@ import { authService } from '../services/auth.service';
 import type { User } from '../types/user.type';
 import { toast } from 'sonner';
 import type { AuthStore } from '../types/useAuthStore.type';
+import { useBookingStore } from './useBookingStore';
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
   accessToken: null,
   user: null,
   loading: false,
   setAccessToken: (token: string | null) => set({ accessToken: token }),
-  clearStore: () => set({ user: null, accessToken: null }),
+  clearStore: () => {
+    useBookingStore.getState().clearBooking();
+    set({ user: null, accessToken: null });
+  },
   register: async (payload) => {
     try {
       set({ loading: true });

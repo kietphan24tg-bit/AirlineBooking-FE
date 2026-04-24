@@ -8,6 +8,17 @@ export interface CabinFare {
   currency?: string;
   /** Numeric total for sorting / filtering (same basis as priceLabel) */
   priceAmount: number;
+  originalPrice: number;
+  originalPriceLabel: string;
+  finalPrice: number;
+  finalPriceLabel: string;
+  discountAmount: number;
+  discountAmountLabel?: string;
+  discountPercent: number | null;
+  promoStatus?: string;
+  promoMessage?: string | null;
+  hasDiscount: boolean;
+  selectable: boolean;
   highlight?: boolean;
   benefits: string[];
   fareId?: number;
@@ -62,7 +73,7 @@ export interface FlightSearchFilters {
   connectionFilter?: 'ANY' | 'DIRECT_ONLY';
   departureTimeBucket?: 'MORNING' | 'AFTERNOON' | 'EVENING' | 'ANY';
   arrivalTimeBucket?: 'MORNING' | 'AFTERNOON' | 'EVENING' | 'ANY';
-  /** Subset of ECONOMY | PREMIUM | BUSINESS | FIRST — empty = no preference */
+  /** Subset of ECONOMY | PREMIUM_ECONOMY | BUSINESS | FIRST — empty = no preference */
   cabinClasses: string[];
   maxBudget: number | null;
 }
@@ -87,3 +98,155 @@ export interface FlightSearchResultBundle {
   outboundPriceRange: FlightPriceRange | null;
   inboundPriceRange: FlightPriceRange | null;
 }
+
+export interface FlightRevalidatePassengerSummary {
+  adult: number;
+  child: number;
+  infant: number;
+}
+
+export interface FlightRevalidateFareRequest {
+  flightId: number;
+  fareId: number;
+  promoCode: string;
+  passengerSummary: FlightRevalidatePassengerSummary;
+}
+
+export interface FlightRevalidatePricing {
+  currency: string;
+  baseFare: number;
+  taxes: number;
+  fees: number;
+  originalTotalPrice: number;
+  discountAmount: number;
+  discountPercent: number | null;
+  discountedTotalPrice: number;
+}
+
+export interface FlightRevalidateFareResponse {
+  revalidateId: string;
+  expiresInSeconds: number;
+  flightId: number;
+  fareId: number;
+  promoCode: string;
+  passengerSummary: FlightRevalidatePassengerSummary;
+  pricing: FlightRevalidatePricing;
+}
+
+export type SeatMapSeatStatus = 'AVAILABLE' | 'RESERVED' | 'BOOKED' | 'UNAVAILABLE';
+
+export type SeatMapSeatType = 'WINDOW' | 'MIDDLE' | 'AISLE';
+
+export type SeatMapSeatCategory = 'STANDARD' | 'PREFERRED' | 'EXIT_ROW' | 'EXTRA_LEGROOM';
+
+export type SeatMapSeatClass = 'BUSINESS' | 'ECONOMY' | string;
+
+export type SeatMapSeatReason = 'SEAT_NOT_ALLOWED_FOR_FARE' | 'SEAT_UNAVAILABLE' | string | null;
+
+export interface SeatMapLayoutZone {
+  seatClass: SeatMapSeatClass;
+  rowStart: number;
+  rowEnd: number;
+}
+
+export interface SeatMapLayout {
+  columns: string[];
+  aisleAfterColumns: string[];
+  seatClassZones: SeatMapLayoutZone[];
+}
+
+export interface SeatMapLegend {
+  statuses: SeatMapSeatStatus[];
+  seatTypes: SeatMapSeatType[];
+  seatCategories: SeatMapSeatCategory[];
+  statusItems?: SeatMapDisplayItem[];
+  seatTypeItems?: SeatMapDisplayItem[];
+  seatCategoryItems?: SeatMapDisplayItem[];
+  pricingItems?: SeatMapDisplayItem[];
+}
+
+export interface SeatMapDisplayItem {
+  code: string;
+  label: string;
+  description: string;
+}
+
+export interface SeatMapDisplayPrice {
+  type: 'FREE' | 'PAID' | 'UNAVAILABLE' | 'NOT_ALLOWED' | string;
+  text: string;
+  amount: number | null;
+  currency: string | null;
+  description: string;
+}
+
+export interface SeatMapCell {
+  columnLetter: string;
+  seatId: number;
+  seatNumber: string;
+  seatClass: SeatMapSeatClass;
+  seatType: SeatMapSeatType;
+  seatTypeDisplay?: SeatMapDisplayItem;
+  seatCategory: SeatMapSeatCategory;
+  seatCategoryDisplay?: SeatMapDisplayItem;
+  status: SeatMapSeatStatus;
+  statusDisplay?: SeatMapDisplayItem;
+  selectable: boolean;
+  included: boolean;
+  extraPrice: number | null;
+  currency: string | null;
+  reason: SeatMapSeatReason;
+  displayPrice?: SeatMapDisplayPrice;
+  pricingBadge?: SeatMapDisplayItem;
+}
+
+export interface SeatMapRow {
+  rowNumber: number;
+  seatClass: SeatMapSeatClass;
+  cells: SeatMapCell[];
+}
+
+export interface SeatMapResponse {
+  flightId: number;
+  fareId: number;
+  fareClassId: number;
+  fareCode: string;
+  seatSelectionPolicy: string;
+  policyDisplay?: SeatMapDisplayItem;
+  includedSeatCategoryCode: string | null;
+  currency: string;
+  layout: SeatMapLayout;
+  legend: SeatMapLegend;
+  rows: SeatMapRow[];
+}
+
+export type ServiceSelectionMode = 'SINGLE' | 'MULTIPLE' | string;
+
+export interface ServiceOption {
+  optionId: number;
+  serviceId: number;
+  serviceType: string;
+  serviceName: string;
+  name: string;
+  description: string;
+  price: number;
+  currency: string;
+  priceLabel: string;
+  imageUrl: string | null;
+  isActive: boolean;
+}
+
+export interface ServiceGroup {
+  serviceId: number;
+  serviceType: string;
+  serviceName: string;
+  iconUrl: string | null;
+  selectionMode: ServiceSelectionMode;
+  options: ServiceOption[];
+}
+
+export interface ServiceCatalogResponse {
+  currency: string;
+  services: ServiceGroup[];
+}
+
+export type SelectedServiceOption = ServiceOption;

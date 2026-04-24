@@ -1,13 +1,14 @@
 import { ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import AmbientSweep from '../components/layout/AmbientSweep';
 import BookingStepper from '../components/booking/BookingStepper';
 import Button from '../components/ui/Button';
 import SiteHeader from '../components/layout/SiteHeader';
 import SiteFooter from '../components/layout/SiteFooter';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import PaymentCard from '../components/booking/PaymentCard';
+import { useBookingStore } from '../stores/useBookingStore';
 import type { CheckoutFormValues } from '../types/checkout.types';
 
 const PAYMENT_METHODS = [
@@ -18,8 +19,10 @@ const PAYMENT_METHODS = [
 ];
 
 export default function Checkout() {
+  const navigate = useNavigate();
   const [selected, setSelected] = useState('vietqr');
   const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
+  const bookingResponse = useBookingStore((state) => state.bookingResponse);
   const { register, watch } = useForm<CheckoutFormValues>({
     defaultValues: {
       paymentMethod: { value: 'vietqr', label: 'VietQR' },
@@ -35,8 +38,30 @@ export default function Checkout() {
       acceptTerms: false,
     },
   });
+  const pricing = bookingResponse?.pricing ?? null;
+  const hasBooking = Boolean(bookingResponse);
+
+  useEffect(() => {
+    if (!hasBooking) {
+      navigate('/booking/passengers', { replace: true });
+    }
+  }, [hasBooking, navigate]);
+
+  if (!hasBooking || !pricing) return null;
 
   const acceptTerms = watch('acceptTerms');
+  const currency = pricing.currency || 'VND';
+  const formatCurrency = (amount: number) => {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency,
+        maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+      }).format(amount);
+    } catch {
+      return `${amount} ${currency}`;
+    }
+  };
 
   const onPaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,20 +114,30 @@ export default function Checkout() {
               </h2>
               <div className="space-y-4">
                 <div className="flex justify-between border-b border-outline-variant/20 pb-3">
-                  <span className="text-on-surface-variant">Vé máy bay</span>
-                  <span className="font-bold text-on-surface">£2,890.00</span>
+                  <span className="text-on-surface-variant">Giá vé gốc</span>
+                  <span className="font-bold text-on-surface">
+                    {formatCurrency(pricing.originalTotalPrice)}
+                  </span>
                 </div>
                 <div className="flex justify-between border-b border-outline-variant/20 pb-3">
-                  <span className="text-on-surface-variant">Dịch vụ bổ sung</span>
-                  <span className="font-bold text-on-surface">£89.00</span>
+                  <span className="text-on-surface-variant">Giảm giá</span>
+                  <span className="font-bold text-secondary">
+                    -{formatCurrency(pricing.discountAmount)}
+                  </span>
                 </div>
                 <div className="flex justify-between border-b border-outline-variant/20 pb-3">
-                  <span className="text-on-surface-variant">Thuế & phí</span>
-                  <span className="font-bold text-on-surface">£289.00</span>
+                  <span className="text-on-surface-variant">Thuế</span>
+                  <span className="font-bold text-on-surface">{formatCurrency(pricing.taxes)}</span>
+                </div>
+                <div className="flex justify-between border-b border-outline-variant/20 pb-3">
+                  <span className="text-on-surface-variant">Phí</span>
+                  <span className="font-bold text-on-surface">{formatCurrency(pricing.fees)}</span>
                 </div>
                 <div className="flex justify-between pt-3">
                   <span className="font-bold text-on-surface">Tổng cộng</span>
-                  <span className="text-2xl font-black text-secondary">£3,268.00</span>
+                  <span className="text-2xl font-black text-secondary">
+                    {formatCurrency(pricing.discountedTotalPrice)}
+                  </span>
                 </div>
               </div>
             </div>

@@ -1,22 +1,31 @@
+import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Armchair, ChevronRight, LuggageIcon } from 'lucide-react';
 import type {
   PassengerBookingDetails,
   PassengerInfoNavigationState,
   PassengerProfile,
 } from '../types/booking.types';
+import type { SeatMapCell, SelectedServiceOption } from '../types/flight.types';
 import SiteHeader from '../components/layout/SiteHeader';
 import BookingStepper from '../components/booking/BookingStepper';
 import SiteFooter from '../components/layout/SiteFooter';
-import AircraftSeatsMap from '../components/booking/AircraftSeatsMap';
+import AircraftSeatsMap, { type SeatSelectionValue } from '../components/booking/AircraftSeatsMap';
 import AdditionalService from '../components/booking/AdditionalService';
-import { ADD_ON_SERVICES } from '../constants/addOnServices';
+import { useBookingStore } from '../stores/useBookingStore';
+import { flightService } from '../services/flight.service';
 
 const MOCK_PASSENGERS: PassengerProfile[] = [
   { id: '1', fullName: 'Arthur Wellesley', seat: '2A' },
   { id: '2', fullName: 'Jane Austen', seat: undefined },
 ];
+
+type SeatContext = {
+  flightId: number | null;
+  fareId: number | null;
+  fareCode: string | null;
+};
 
 function passengersFromNavigationState(
   list: PassengerBookingDetails[] | undefined
@@ -24,47 +33,174 @@ function passengersFromNavigationState(
   if (!list?.length) return null;
   return list.map((p, i) => ({
     id: String(i + 1),
-    fullName: [p.title, p.name].filter(Boolean).join(' ').trim(),
+    fullName: [p.lastName, p.firstName].filter(Boolean).join(' ').trim(),
     seat: undefined,
   }));
 }
 
+function pickNumericId(value: unknown): number | null {
+  const numeric = typeof value === 'string' ? Number(value) : value;
+  return typeof numeric === 'number' && Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+}
+
+function resolveSeatContext(source: unknown): SeatContext {
+  if (!source || typeof source !== 'object') {
+    return {
+      flightId: null,
+      fareId: null,
+      fareCode: null,
+    };
+  }
+
+  const raw = source as Record<string, unknown>;
+  const selectedFareContext =
+    raw.selectedFareContext && typeof raw.selectedFareContext === 'object'
+      ? (raw.selectedFareContext as Record<string, unknown>)
+      : null;
+  const rawResponse =
+    raw.raw && typeof raw.raw === 'object' ? (raw.raw as Record<string, unknown>) : null;
+  const flight =
+    raw.flight && typeof raw.flight === 'object'
+      ? (raw.flight as Record<string, unknown>)
+      : rawResponse?.flight && typeof rawResponse.flight === 'object'
+        ? (rawResponse.flight as Record<string, unknown>)
+        : null;
+  const fare =
+    raw.fare && typeof raw.fare === 'object'
+      ? (raw.fare as Record<string, unknown>)
+      : rawResponse?.fare && typeof rawResponse.fare === 'object'
+        ? (rawResponse.fare as Record<string, unknown>)
+        : null;
+
+  return {
+    flightId: pickNumericId(raw.flightId ?? selectedFareContext?.flightId ?? flight?.flightId),
+    fareId: pickNumericId(raw.fareId ?? selectedFareContext?.fareId ?? fare?.fareId),
+    fareCode:
+      typeof (raw.fareCode ?? selectedFareContext?.fareCode ?? fare?.code ?? fare?.fareCode) ===
+      'string'
+        ? String(raw.fareCode ?? selectedFareContext?.fareCode ?? fare?.code ?? fare?.fareCode)
+        : null,
+  };
+}
+
+function formatMoney(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${amount.toLocaleString('vi-VN')} ${currency}`;
+  }
+}
+
+function normalizeSeatPriceText(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value.trim().replace(/^\+\s*/, '');
+}
+
+function findSeatCellById(
+  rows: { cells: SeatMapCell[] }[] | undefined,
+  seatId: number | null
+): SeatMapCell | null {
+  if (!rows?.length || !seatId) return null;
+  for (const row of rows) {
+    const seat = row.cells.find((cell) => cell.seatId === seatId);
+    if (seat) return seat;
+  }
+  return null;
+}
+
 export default function SeatSelection() {
   const location = useLocation();
+  const bookingDraft = useBookingStore((state) => state.bookingDraft);
+  const bookingResponse = useBookingStore((state) => state.bookingResponse);
   const navPassengers = passengersFromNavigationState(
     (location.state as Partial<PassengerInfoNavigationState> | null)?.passengers
   );
-  const passengers = navPassengers ?? MOCK_PASSENGERS;
+  const storePassengers = bookingResponse?.passengers?.length
+    ? bookingResponse.passengers.map((passenger, index) => ({
+        id: String(index + 1),
+        fullName: [passenger.lastName, passenger.firstName].filter(Boolean).join(' ').trim(),
+        seat: undefined,
+      }))
+    : null;
+  const passengers = storePassengers ?? navPassengers ?? MOCK_PASSENGERS;
 
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
+  const [selectedServices, setSelectedServices] = useState<SelectedServiceOption[]>([]);
+  const [selectedSeat, setSelectedSeat] = useState<SeatSelectionValue | null>(null);
   const [isSeatSelecting, setIsSeatSelecting] = useState(true);
   const [isServiceSelecting, setIsServiceSelecting] = useState(false);
+  const seatContext = useMemo(() => {
+    const responseContext = resolveSeatContext(bookingResponse);
+    if (responseContext.flightId && responseContext.fareId) return responseContext;
+    return resolveSeatContext(bookingDraft);
+  }, [bookingDraft, bookingResponse]);
+  const canLoadSeatMap = isSeatSelecting && !!seatContext.flightId && !!seatContext.fareId;
+  const canLoadServices = isServiceSelecting && !!seatContext.flightId && !!seatContext.fareId;
 
-  const totalServicePrice = selectedServices.reduce((total, serviceId) => {
-    const service = ADD_ON_SERVICES.find((s) => s.id === serviceId);
-    if (!service) return total;
-    const price = parseInt(service.price.replace('£', ''));
-    return total + price;
-  }, 0);
+  const seatMapQuery = useQuery({
+    queryKey: ['seat-map', seatContext.flightId, seatContext.fareId],
+    queryFn: () =>
+      flightService.getSeatMap(seatContext.flightId as number, seatContext.fareId as number),
+    enabled: canLoadSeatMap,
+    staleTime: 60_000,
+  });
+
+  const servicesQuery = useQuery({
+    queryKey: ['services', seatContext.flightId, seatContext.fareId],
+    queryFn: () =>
+      flightService.getServices(seatContext.flightId as number, seatContext.fareId as number),
+    enabled: canLoadServices,
+    staleTime: 60_000,
+  });
+
+  const pricing = bookingResponse?.pricing ?? bookingDraft.pricing;
+  const serviceCurrency =
+    selectedServices[0]?.currency ?? servicesQuery.data?.currency ?? pricing?.currency ?? 'VND';
+  const totalServicePrice = selectedServices.reduce((total, service) => total + service.price, 0);
+  const totalPriceLabel = pricing
+    ? formatMoney(pricing.discountedTotalPrice, pricing.currency || 'VND')
+    : null;
+  const seatDetails = findSeatCellById(seatMapQuery.data?.rows, selectedSeat?.seatId ?? null);
+  const seatPriceLabel = normalizeSeatPriceText(
+    selectedSeat?.displayPrice?.text ?? seatDetails?.displayPrice?.text
+  );
+  const seatMapError =
+    !seatContext.flightId || !seatContext.fareId
+      ? 'Khong tim thay flightId/fareId trong store de tai so do ghe.'
+      : seatMapQuery.error instanceof Error
+        ? seatMapQuery.error.message
+        : seatMapQuery.isError
+          ? 'Khong the tai so do ghe luc nay.'
+          : null;
+  const servicesError =
+    !seatContext.flightId || !seatContext.fareId
+      ? 'Khong tim thay flightId/fareId trong store de tai danh sach dich vu.'
+      : servicesQuery.error instanceof Error
+        ? servicesQuery.error.message
+        : servicesQuery.isError
+          ? 'Khong the tai danh sach dich vu luc nay.'
+          : null;
 
   return (
     <div className="relative min-h-screen bg-surface font-body text-on-surface antialiased">
       <SiteHeader />
       <div className="relative z-10 mx-auto max-w-4xl px-6 pt-28" />
       <BookingStepper current="select" />
-      <main className="relative z-10 mx-auto grid max-w-400 grid-cols-1 gap-8 px-6 pb-16 lg:grid-cols-12 lg:px-12">
-        <div className="mb-8 flex flex-col space-y-6 lg:col-span-7 lg:mb-0">
-          <div className="rounded-xl border border-luxury-gold/10 bg-white/60 p-6 shadow-sm backdrop-blur-md">
+      <main className="relative z-10 mx-auto grid max-w-[92rem] grid-cols-1 gap-6 px-4 pb-16 sm:px-6 xl:grid-cols-[17rem_minmax(0,1fr)] xl:px-8">
+        <div className="mb-6 flex flex-col space-y-5 xl:mb-0">
+          <div className="rounded-xl border border-luxury-gold/10 bg-white/60 p-5 shadow-sm backdrop-blur-md">
             <p className="mb-4 text-[0.6875rem] font-bold uppercase tracking-[0.15em] text-secondary">
               Select Passenger
             </p>
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap gap-3">
               {passengers.map((p, idx) => (
                 <button
                   key={p.id}
                   type="button"
-                  className={`flex items-center space-x-3 rounded-lg border-2 px-6 py-3 ${
+                  className={`flex min-w-0 items-center space-x-3 rounded-lg border-2 px-4 py-3 ${
                     idx === 0
                       ? 'border-midnight-burgundy bg-midnight-burgundy/5'
                       : 'border-transparent bg-surface-container-low hover:border-luxury-gold/30'
@@ -74,7 +210,7 @@ export default function SeatSelection() {
                     {idx + 1}
                   </span>
                   <div className="text-left">
-                    <p className="text-sm font-bold leading-none text-midnight-burgundy">
+                    <p className="text-sm font-bold leading-tight text-midnight-burgundy">
                       {p.fullName}
                     </p>
                     {p.seat ? (
@@ -87,118 +223,149 @@ export default function SeatSelection() {
               ))}
             </div>
           </div>
-          {/* Seat Selection */}
+
           <button
-            className="rounded-xl border border-luxury-gold/10 bg-white/60 p-6 shadow-sm backdrop-blur-md flex flex-row items-center gap-6 hover:shadow-lg duration-200"
+            type="button"
+            className="flex flex-row items-center gap-4 rounded-xl border border-luxury-gold/10 bg-white/60 p-5 shadow-sm backdrop-blur-md duration-200 hover:shadow-lg"
             onClick={() => {
               setIsSeatSelecting(true);
               setIsServiceSelecting(false);
             }}
           >
             <Armchair
-              className="h-20 w-20 p-4 rounded-xl text-luxury-gold bg-midnight-burgundy"
+              className="h-16 w-16 shrink-0 rounded-xl bg-midnight-burgundy p-3 text-luxury-gold"
               strokeWidth={1.5}
             />
             <div className="flex flex-col items-start">
-              <h2 className="mb-2 font-headline text-xl font-black text-midnight-burgundy">
-                Chọn ghế ngồi
+              <h2 className="mb-1 font-headline text-lg font-black text-midnight-burgundy">
+                Chon ghe ngoi
               </h2>
               <p className="text-sm text-on-surface-variant">
-                Chọn chỗ ngồi yêu thích của bạn trên máy bay.
+                Chon cho ngoi yeu thich cua ban tren may bay.
               </p>
             </div>
-            <ChevronRight className="ml-auto h-10 w-10 text-on-surface-variant" strokeWidth={1.5} />
+            <ChevronRight
+              className="ml-auto h-7 w-7 shrink-0 text-on-surface-variant"
+              strokeWidth={1.5}
+            />
           </button>
-          {/* Additional Services */}
+
           <button
-            className="rounded-xl border border-luxury-gold/10 bg-white/60 p-6 shadow-sm backdrop-blur-md flex flex-row items-center gap-6 hover:shadow-lg duration-200"
+            type="button"
+            className="flex flex-row items-center gap-4 rounded-xl border border-luxury-gold/10 bg-white/60 p-5 shadow-sm backdrop-blur-md duration-200 hover:shadow-lg"
             onClick={() => {
               setIsServiceSelecting(true);
               setIsSeatSelecting(false);
             }}
           >
             <LuggageIcon
-              className="h-20 w-20 p-4 rounded-xl text-luxury-gold bg-midnight-burgundy"
+              className="h-16 w-16 shrink-0 rounded-xl bg-midnight-burgundy p-3 text-luxury-gold"
               strokeWidth={1.5}
             />
             <div className="flex flex-col items-start">
-              <h2 className="mb-2 font-headline text-xl font-black text-midnight-burgundy">
-                Chọn dịch vụ bổ sung
+              <h2 className="mb-1 font-headline text-lg font-black text-midnight-burgundy">
+                Chon dich vu bo sung
               </h2>
               <p className="text-sm text-on-surface-variant">
-                Thêm hành lý, bữa ăn, wifi và nhiều hơn nữa.
+                Them hanh ly, bua an, bao hiem va nhieu hon nua.
               </p>
             </div>
-            <ChevronRight className="ml-auto h-10 w-10 text-on-surface-variant" strokeWidth={1.5} />
+            <ChevronRight
+              className="ml-auto h-7 w-7 shrink-0 text-on-surface-variant"
+              strokeWidth={1.5}
+            />
           </button>
 
-          <div className=" rounded-xl border border-luxury-gold/20 bg-surface-container-lowest p-6 shadow-lg">
-            <h3 className="mb-4 font-headline text-lg font-black text-on-surface">Tóm tắt</h3>
-            <p className="text-sm text-on-surface-variant">London → Dubai • SV-204</p>
-            <p className="mt-6 text-2xl font-black text-secondary">£2,890</p>
-            <p className="text-xs text-on-surface-variant">Business • 1 khách</p>
+          <div className="rounded-xl border border-luxury-gold/20 bg-surface-container-lowest p-5 shadow-lg">
+            <h3 className="mb-4 font-headline text-lg font-black text-on-surface">Tom tat</h3>
+            <p className="text-sm text-on-surface-variant">
+              Flight #{seatContext.flightId ?? '--'}
+              {seatContext.fareCode ? ` | ${seatContext.fareCode}` : ''}
+            </p>
+            {totalPriceLabel ? (
+              <p className="mt-6 text-2xl font-black text-secondary">{totalPriceLabel}</p>
+            ) : null}
+            <p className="text-xs text-on-surface-variant">{passengers.length} khach</p>
 
-            {/* Seat Selection Summary */}
-            {selectedSeat && (
+            {selectedSeat ? (
               <div className="mt-4 rounded-lg bg-midnight-burgundy/10 p-3">
                 <p className="text-xs font-bold uppercase tracking-wider text-midnight-burgundy">
-                  Ghế đã chọn
+                  Ghe da chon
                 </p>
-                <p className="mt-1 text-lg font-black text-secondary">{selectedSeat}</p>
+                <p className="mt-1 text-lg font-black text-secondary">{selectedSeat.seatNumber}</p>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                  {seatDetails?.seatTypeDisplay?.label ??
+                    selectedSeat.seatTypeDisplay?.label ??
+                    'Seat'}{' '}
+                  |{' '}
+                  {seatDetails?.seatCategoryDisplay?.label ??
+                    selectedSeat.seatCategoryDisplay?.label ??
+                    selectedSeat.seatCategory}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {seatPriceLabel ?? 'Selected'}
+                </p>
               </div>
-            )}
+            ) : null}
 
-            {/* Services Summary */}
             {selectedServices.length > 0 && (
               <div className="mt-6 space-y-2 border-t border-outline-variant/20 pt-4">
                 <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                  Dịch vụ bổ sung
+                  Dich vu bo sung
                 </p>
-                {selectedServices.map((serviceId) => {
-                  const service = ADD_ON_SERVICES.find((s) => s.id === serviceId);
-                  return service ? (
-                    <div key={serviceId} className="flex justify-between text-sm">
-                      <span className="text-on-surface-variant">{service.name}</span>
-                      <span className="font-bold text-secondary">{service.price}</span>
-                    </div>
-                  ) : null;
-                })}
+                {selectedServices.map((service) => (
+                  <div
+                    key={`${service.serviceId}-${service.optionId}`}
+                    className="flex justify-between gap-3 text-sm"
+                  >
+                    <span className="text-on-surface-variant">{service.name}</span>
+                    <span className="text-right font-bold text-secondary">
+                      {service.priceLabel}
+                    </span>
+                  </div>
+                ))}
                 <div className="border-t border-outline-variant/20 pt-2">
                   <div className="flex justify-between font-bold text-midnight-burgundy">
-                    <span>Dịch vụ:</span>
-                    <span>£{totalServicePrice}</span>
+                    <span>Dich vu:</span>
+                    <span>{formatMoney(totalServicePrice, serviceCurrency)}</span>
                   </div>
                 </div>
               </div>
             )}
 
-            <div className="mt-8 h-15 gap-5 flex flex-row">
+            <div className="mt-8 flex h-12 flex-row gap-3">
               <Link
                 to="/home"
-                className="inline-flex w-50 items-center justify-center gap-2 rounded-md px-4 bg-cabin-silver"
+                className="inline-flex w-24 items-center justify-center gap-2 rounded-md bg-cabin-silver px-4"
               >
-                Hủy
+                Huy
               </Link>
               <Link
                 to="/booking/checkout"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md px-4 auth-primary-btn text-white hover:bg-midnight-burgundy/90 transition-all"
+                className="auth-primary-btn inline-flex w-full items-center justify-center gap-2 rounded-md px-4 text-white transition-all hover:bg-midnight-burgundy/90"
               >
-                Thanh toán
+                Thanh toan
               </Link>
             </div>
           </div>
         </div>
-        <aside className="lg:col-span-5">
+        <aside className="min-w-0">
           {isSeatSelecting && (
             <AircraftSeatsMap
-              onSeatSelect={(seatId) => setSelectedSeat(seatId)}
-              crSeatId={selectedSeat}
+              seatMap={seatMapQuery.data ?? null}
+              loading={canLoadSeatMap && seatMapQuery.isPending}
+              error={seatMapError}
+              selectedSeat={selectedSeat}
+              onSeatSelect={setSelectedSeat}
             />
           )}
           {isServiceSelecting && (
             <AdditionalService
-              onSelectServices={(serviceIds) => setSelectedServices(serviceIds)}
-              crServiceIds={selectedServices}
+              services={servicesQuery.data?.services ?? []}
+              loading={canLoadServices && servicesQuery.isPending}
+              error={servicesError}
+              selectedServices={selectedServices}
+              onSelectServices={setSelectedServices}
             />
           )}
         </aside>

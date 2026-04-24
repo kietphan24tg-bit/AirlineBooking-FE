@@ -11,7 +11,6 @@ import PasswordResetConfirm from '../pages/PasswordResetConfirm';
 import Register from '../pages/Register';
 import SeatSelection from '../pages/SeatSelection';
 import TripHistory from '../pages/TripHistory';
-import ProtectedRoute from './ProtectedRoute';
 import ManageBooking from '../pages/ManageBooking';
 
 const AppRouter = createBrowserRouter([
@@ -40,6 +39,10 @@ const AppRouter = createBrowserRouter([
     element: <PassengerInfo />,
   },
   {
+    path: '/booking/passengers/seats',
+    element: <SeatSelection />,
+  },
+  {
     path: '/booking/checkout',
     element: <Checkout />,
   },
@@ -56,37 +59,16 @@ const AppRouter = createBrowserRouter([
     element: <ManageBooking />,
   },
   {
-    element: <ProtectedRoute />,
-    children: [
-      {
-        path: '/app',
-        element: <App />,
-      },
-      {
-        path: '/home',
-        element: <Home />,
-      },
-      {
-        path: '/booking/passengers',
-        element: <PassengerInfo />,
-      },
-      {
-        path: '/booking/passengers/seats',
-        element: <SeatSelection />,
-      },
-      {
-        path: '/booking/checkout',
-        element: <Checkout />,
-      },
-      {
-        path: '/account',
-        element: <AccountManagement />,
-      },
-      {
-        path: '/trips',
-        element: <TripHistory />,
-      },
-    ],
+    path: '/app',
+    element: <App />,
+  },
+  {
+    path: '/home',
+    element: <Home />,
+  },
+  {
+    path: '/account',
+    element: <AccountManagement />,
   },
 ]);
 

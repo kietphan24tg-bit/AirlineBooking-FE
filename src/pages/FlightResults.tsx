@@ -1,13 +1,21 @@
-import { useQuery } from '@tanstack/react-query';
-import { ChevronDown } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import BookingStepper from '../components/booking/BookingStepper';
 import FlightResultCard from '../components/booking/FlightResultCard';
-import type { FlightLeg, FlightSearchCriteria, FlightSearchFilters } from '../types/flight.types';
+import FlightResultCardSkeleton from '../components/booking/FlightResultCardSkeleton';
 import SiteFooter from '../components/layout/SiteFooter';
 import SiteHeader from '../components/layout/SiteHeader';
-import BookingStepper from '../components/booking/BookingStepper';
 import { flightService } from '../services/flight.service';
+import { useBookingStore } from '../stores/useBookingStore';
+import type {
+  FlightLeg,
+  FlightRevalidateFareRequest,
+  FlightSearchCriteria,
+  FlightSearchFilters,
+} from '../types/flight.types';
 import {
   applyFlightResultsStateToSearchParams,
   buildFlightCriteriaCacheKey,
@@ -17,6 +25,30 @@ import {
   parseFlightResultsSort,
   type FlightResultsSort,
 } from '../utils/flightSearchUrl';
+
+const DEPARTURE_TIME_OPTIONS = [
+  ['ANY', 'No Preference'],
+  ['MORNING', 'Morning (12:00am - 11:59am)'],
+  ['AFTERNOON', 'Afternoon (12:00pm - 5:59pm)'],
+  ['EVENING', 'Evening (6:00pm - 11:59pm)'],
+] as const;
+
+const ARRIVAL_TIME_OPTIONS = [
+  ['ANY', 'No Preference'],
+  ['MORNING', 'Morning (12:00am - 11:59am)'],
+  ['AFTERNOON', 'Afternoon (12:00pm - 5:59pm)'],
+  ['EVENING', 'Evening (6:00pm - 11:59pm)'],
+] as const;
+
+const CABIN_CLASS_OPTIONS = [
+  ['', 'No Preference'],
+  ['ECONOMY', 'Economy'],
+  ['PREMIUM_ECONOMY', 'Premium'],
+  ['BUSINESS', 'Business'],
+  ['FIRST', 'First'],
+] as const;
+
+const LOADING_SKELETON_COUNT = 3;
 
 function formatTripDate(isoDate: string): string {
   const d = new Date(`${isoDate}T12:00:00`);
@@ -31,7 +63,7 @@ function formatTripDate(isoDate: string): string {
 function buildSummary(c: FlightSearchCriteria): { routeTitle: string; metaLine: string } {
   const fromCity = c.fromCity?.trim() || c.from;
   const toCity = c.toCity?.trim() || c.to;
-  const routeTitle = `${fromCity} (${c.from}) → ${toCity} (${c.to})`;
+  const routeTitle = `${fromCity} (${c.from}) \u2192 ${toCity} (${c.to})`;
   const bits: string[] = [];
   bits.push(formatTripDate(c.departureDate));
   if (c.tripType === 'ROUND_TRIP' && c.returnDate) {
@@ -43,29 +75,16 @@ function buildSummary(c: FlightSearchCriteria): { routeTitle: string; metaLine: 
   if (c.infant > 0) pax.push(c.infant === 1 ? '1 Infant' : `${c.infant} Infants`);
   bits.push(pax.join(', '));
   if (c.promoCode) bits.push(`Promo ${c.promoCode}`);
-  return { routeTitle, metaLine: bits.join(' • ') };
+  return { routeTitle, metaLine: bits.join(' \u2022 ') };
 }
 
-function legMinPrice(leg: FlightLeg): number {
-  if (!leg.cabinFares.length) return Number.POSITIVE_INFINITY;
-  return Math.min(...leg.cabinFares.map((x) => x.priceAmount));
-}
-
-function legMaxPrice(leg: FlightLeg): number {
-  if (!leg.cabinFares.length) return 0;
-  return Math.max(...leg.cabinFares.map((x) => x.priceAmount));
-}
-
-function applySort(legs: FlightLeg[], sort: string): FlightLeg[] {
-  const out = [...legs];
-  if (sort === 'Cheapest') {
-    out.sort((a, b) => legMinPrice(a) - legMinPrice(b));
-  } else if (sort === 'Fastest') {
-    out.sort((a, b) => a.durationMinutes - b.durationMinutes);
-  } else if (sort === 'Best Experience') {
-    out.sort((a, b) => legMaxPrice(b) - legMaxPrice(a));
-  }
-  return out;
+function deriveLegPriceRange(legs: FlightLeg[]): { minPrice: number; maxPrice: number } | null {
+  const prices = legs.flatMap((leg) => leg.cabinFares.map((fare) => fare.priceAmount));
+  if (prices.length === 0) return null;
+  return {
+    minPrice: Math.min(...prices),
+    maxPrice: Math.max(...prices),
+  };
 }
 
 function areFiltersEqual(a: FlightSearchFilters, b: FlightSearchFilters): boolean {
@@ -97,7 +116,178 @@ function formatMoneySafe(amount: number, currency: string): string {
   }
 }
 
+interface FilterPanelProps {
+  filters: FlightSearchFilters;
+  setFilters: Dispatch<SetStateAction<FlightSearchFilters>>;
+  sliderMin: number;
+  sliderMax: number;
+  sliderValue: number;
+  displayedMaxPrice: number;
+  currency: string;
+  priceDebounceTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  setDraftMaxBudget: Dispatch<SetStateAction<number | null>>;
+  namePrefix: string;
+}
+
+function FilterPanel({
+  filters,
+  setFilters,
+  sliderMin,
+  sliderMax,
+  sliderValue,
+  displayedMaxPrice,
+  currency,
+  priceDebounceTimerRef,
+  setDraftMaxBudget,
+  namePrefix,
+}: FilterPanelProps) {
+  const updateBudget = (value: string) => {
+    const numericValue = Number(value);
+    const cap = numericValue >= sliderMax ? null : numericValue;
+    setDraftMaxBudget(cap);
+    if (priceDebounceTimerRef.current) {
+      clearTimeout(priceDebounceTimerRef.current);
+    }
+    priceDebounceTimerRef.current = setTimeout(() => {
+      priceDebounceTimerRef.current = null;
+      setFilters((current) => ({
+        ...current,
+        maxBudget: cap,
+      }));
+    }, PRICE_SLIDER_DEBOUNCE_MS);
+  };
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <span className="mb-4 block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          Stops
+        </span>
+        <label className="group flex cursor-pointer items-center gap-3">
+          <input
+            type="radio"
+            name={`${namePrefix}-stops`}
+            checked={filters.connectionFilter !== 'DIRECT_ONLY'}
+            onChange={() => setFilters((current) => ({ ...current, connectionFilter: 'ANY' }))}
+            className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+          />
+          <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+            No Preference
+          </span>
+        </label>
+        <label className="group mt-3 flex cursor-pointer items-center gap-3">
+          <input
+            type="radio"
+            name={`${namePrefix}-stops`}
+            checked={filters.connectionFilter === 'DIRECT_ONLY'}
+            onChange={() =>
+              setFilters((current) => ({ ...current, connectionFilter: 'DIRECT_ONLY' }))
+            }
+            className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+          />
+          <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+            Direct only
+          </span>
+        </label>
+      </div>
+
+      <div>
+        <span className="mb-4 block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          Departure Time
+        </span>
+        {DEPARTURE_TIME_OPTIONS.map(([val, label]) => (
+          <label key={val} className="group mt-3 flex cursor-pointer items-center gap-3 first:mt-0">
+            <input
+              type="radio"
+              name={`${namePrefix}-departure-time`}
+              checked={filters.departureTimeBucket === val}
+              onChange={() => setFilters((current) => ({ ...current, departureTimeBucket: val }))}
+              className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+            />
+            <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+              {label}
+            </span>
+          </label>
+        ))}
+      </div>
+
+      <div>
+        <span className="mb-4 block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          Arrival Time
+        </span>
+        {ARRIVAL_TIME_OPTIONS.map(([val, label]) => (
+          <label key={val} className="group mt-3 flex cursor-pointer items-center gap-3 first:mt-0">
+            <input
+              type="radio"
+              name={`${namePrefix}-arrival-time`}
+              checked={filters.arrivalTimeBucket === val}
+              onChange={() => setFilters((current) => ({ ...current, arrivalTimeBucket: val }))}
+              className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+            />
+            <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+              {label}
+            </span>
+          </label>
+        ))}
+      </div>
+
+      <div>
+        <span className="mb-4 block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          Cabin Class
+        </span>
+        {CABIN_CLASS_OPTIONS.map(([val, label]) => (
+          <label
+            key={label}
+            className="group mt-3 flex cursor-pointer items-center gap-3 first:mt-0"
+          >
+            <input
+              type="radio"
+              name={`${namePrefix}-cabin-class`}
+              checked={
+                val === ''
+                  ? filters.cabinClasses.length === 0
+                  : filters.cabinClasses[0] === val && filters.cabinClasses.length === 1
+              }
+              onChange={() =>
+                setFilters((current) => ({
+                  ...current,
+                  cabinClasses: val ? [val] : [],
+                }))
+              }
+              className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
+            />
+            <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
+              {label}
+            </span>
+          </label>
+        ))}
+      </div>
+
+      <div>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            Price Range
+          </span>
+          <span className="text-xs font-bold text-secondary">
+            Up to {formatMoneySafe(displayedMaxPrice, currency)}
+          </span>
+        </div>
+        <input
+          type="range"
+          min={sliderMin}
+          max={sliderMax}
+          step={Math.max(1_000, Math.round((sliderMax - sliderMin) / 1000))}
+          value={sliderValue}
+          onChange={(e) => updateBudget(e.target.value)}
+          className="h-1.5 w-full cursor-pointer accent-primary"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function FlightResults() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const criteria = useMemo(() => parseFlightSearchCriteria(searchParams), [searchParams]);
   const parsedUrlFilters = useMemo(() => parseFlightResultsFilters(searchParams), [searchParams]);
@@ -113,11 +303,16 @@ export default function FlightResults() {
   const [filters, setFilters] = useState<FlightSearchFilters>(() =>
     parseFlightResultsFilters(initialSearchParams)
   );
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [pendingFareKey, setPendingFareKey] = useState<string | null>(null);
+  const [fareSelectionError, setFareSelectionError] = useState<string | null>(null);
   /** UI value while dragging; `null` = no cap (slider at max). Committed to `filters.maxBudget` after debounce. */
   const [draftMaxBudget, setDraftMaxBudget] = useState<number | null>(
     () => parseFlightResultsFilters(initialSearchParams).maxBudget
   );
   const priceDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearBooking = useBookingStore((state) => state.clearBooking);
+  const setRevalidationDraft = useBookingStore((state) => state.setRevalidationDraft);
   const priceRangeFilters = useMemo<FlightSearchFilters>(
     () => ({
       ...filters,
@@ -143,6 +338,7 @@ export default function FlightResults() {
     setFilters(parsedUrlFilters);
     setDraftMaxBudget(parsedUrlFilters.maxBudget);
     setSort(parsedUrlSort);
+    setMobileFiltersOpen(false);
   }, [criteria, criteriaKey, parsedUrlFilters, parsedUrlSort]);
 
   useEffect(() => {
@@ -162,43 +358,48 @@ export default function FlightResults() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!mobileFiltersOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileFiltersOpen]);
+
   const summary = criteria ? buildSummary(criteria) : null;
 
   const searchQuery = useQuery({
     queryKey: criteria
-      ? buildFlightSearchQueryKey(criteria, filters)
+      ? buildFlightSearchQueryKey(criteria, filters, sort)
       : ['flight-search', 'invalid'],
     queryFn: () => {
       if (!criteria) throw new Error('Missing search criteria');
-      return flightService.searchFlights(criteria, filters);
+      return flightService.searchFlights(criteria, filters, sort);
     },
     enabled: !!criteria,
+  });
+  const revalidateFareMutation = useMutation({
+    mutationFn: (payload: FlightRevalidateFareRequest) => flightService.revalidateFare(payload),
   });
 
   const priceRangeQuery = useQuery({
     queryKey: criteria
-      ? (['flight-price-range', ...buildFlightSearchQueryKey(criteria, priceRangeFilters)] as const)
+      ? ([
+          'flight-price-range',
+          ...buildFlightSearchQueryKey(criteria, priceRangeFilters, sort),
+        ] as const)
       : ['flight-price-range', 'invalid'],
     queryFn: () => {
       if (!criteria) throw new Error('Missing search criteria');
-      return flightService.searchFlights(criteria, priceRangeFilters);
+      return flightService.searchFlights(criteria, priceRangeFilters, sort);
     },
     enabled: !!criteria,
     placeholderData: (previousData) => previousData,
   });
 
-  const outboundRange =
-    priceRangeQuery.data?.outboundPriceRange ?? searchQuery.data?.outboundPriceRange;
-
-  const sortedOutbound = useMemo(() => {
-    const legs = searchQuery.data?.outbound ?? [];
-    return applySort(legs, sort);
-  }, [searchQuery.data?.outbound, sort]);
-
-  const sortedInbound = useMemo(() => {
-    const legs = searchQuery.data?.inbound ?? [];
-    return applySort(legs, sort);
-  }, [searchQuery.data?.inbound, sort]);
+  const sortedOutbound = searchQuery.data?.outbound ?? [];
+  const sortedInbound = searchQuery.data?.inbound ?? [];
 
   const loading = searchQuery.isPending;
   const searchError =
@@ -208,14 +409,80 @@ export default function FlightResults() {
         ? 'Search failed'
         : null;
 
-  const sliderMin = outboundRange?.minPrice ?? FALLBACK_SLIDER_MIN;
-  const sliderMax = outboundRange?.maxPrice ?? FALLBACK_SLIDER_MAX;
-  const currency = outboundRange?.currency ?? FALLBACK_CURRENCY;
+  const availableOutboundRange = useMemo(
+    () =>
+      deriveLegPriceRange(priceRangeQuery.data?.outbound ?? []) ??
+      priceRangeQuery.data?.outboundPriceRange ??
+      deriveLegPriceRange(searchQuery.data?.outbound ?? []) ??
+      searchQuery.data?.outboundPriceRange,
+    [
+      priceRangeQuery.data?.outbound,
+      priceRangeQuery.data?.outboundPriceRange,
+      searchQuery.data?.outbound,
+      searchQuery.data?.outboundPriceRange,
+    ]
+  );
+  const currentOutboundRange = useMemo(
+    () =>
+      deriveLegPriceRange(searchQuery.data?.outbound ?? []) ?? searchQuery.data?.outboundPriceRange,
+    [searchQuery.data?.outbound, searchQuery.data?.outboundPriceRange]
+  );
+
+  const sliderMin = availableOutboundRange?.minPrice ?? FALLBACK_SLIDER_MIN;
+  const sliderMax = availableOutboundRange?.maxPrice ?? FALLBACK_SLIDER_MAX;
+  const currency =
+    searchQuery.data?.outboundPriceRange?.currency ??
+    priceRangeQuery.data?.outboundPriceRange?.currency ??
+    FALLBACK_CURRENCY;
   const rawSliderValue = draftMaxBudget ?? sliderMax;
   const sliderValue = Math.min(Math.max(rawSliderValue, sliderMin), sliderMax);
 
-  const rangeMin = outboundRange?.minPrice;
-  const rangeMax = outboundRange?.maxPrice;
+  const rangeMin = availableOutboundRange?.minPrice;
+  const rangeMax = availableOutboundRange?.maxPrice;
+  const displayedMaxPrice = currentOutboundRange?.maxPrice ?? sliderValue;
+  const activeFiltersCount =
+    (filters.connectionFilter === 'DIRECT_ONLY' ? 1 : 0) +
+    (filters.departureTimeBucket !== 'ANY' ? 1 : 0) +
+    (filters.arrivalTimeBucket !== 'ANY' ? 1 : 0) +
+    (filters.cabinClasses.length > 0 ? 1 : 0) +
+    (filters.maxBudget != null ? 1 : 0);
+  const filterSummary =
+    activeFiltersCount === 0
+      ? 'No filters applied'
+      : `${activeFiltersCount} filter${activeFiltersCount === 1 ? '' : 's'} active`;
+
+  const handleSelectFare = async (payload: { leg: FlightLeg; fareId: number; fareKey: string }) => {
+    if (!criteria || pendingFareKey) return;
+    const flightId = Number(payload.leg.id);
+    if (!Number.isFinite(flightId) || flightId <= 0) {
+      setFareSelectionError('Unable to select this fare. Please try another option.');
+      return;
+    }
+    setFareSelectionError(null);
+    setPendingFareKey(payload.fareKey);
+    try {
+      const revalidated = await revalidateFareMutation.mutateAsync({
+        flightId,
+        fareId: payload.fareId,
+        promoCode: criteria.promoCode?.trim() ?? '',
+        passengerSummary: {
+          adult: criteria.adult,
+          child: criteria.child,
+          infant: criteria.infant,
+        },
+      });
+      clearBooking();
+      setRevalidationDraft(revalidated);
+      navigate('/booking/passengers');
+    } catch (error) {
+      setFareSelectionError(
+        error instanceof Error ? error.message : 'Could not verify latest fare. Please try again.'
+      );
+    } finally {
+      setPendingFareKey(null);
+    }
+  };
+
   useEffect(() => {
     if (rangeMin == null || rangeMax == null) return;
     if (priceDebounceTimerRef.current) return;
@@ -227,15 +494,15 @@ export default function FlightResults() {
       return v;
     };
 
-    setFilters((f) => {
-      const c = clamp(f.maxBudget);
-      if (c === f.maxBudget) return f;
-      return { ...f, maxBudget: c };
+    setFilters((current) => {
+      const clamped = clamp(current.maxBudget);
+      if (clamped === current.maxBudget) return current;
+      return { ...current, maxBudget: clamped };
     });
-    setDraftMaxBudget((d) => {
-      const c = clamp(d);
-      if (c === d) return d;
-      return c;
+    setDraftMaxBudget((current) => {
+      const clamped = clamp(current);
+      if (clamped === current) return current;
+      return clamped;
     });
   }, [rangeMin, rangeMax]);
 
@@ -275,204 +542,139 @@ export default function FlightResults() {
   return (
     <div className="relative min-h-screen bg-surface text-on-surface antialiased">
       <SiteHeader />
-      <main className="relative z-10 mx-auto max-w-480 px-4 pb-20 pt-28 md:px-12">
+      <main className="relative z-10 mx-auto max-w-480 px-4 pb-16 pt-24 sm:px-6 md:px-12 md:pb-20 md:pt-28">
         <BookingStepper current="search" />
-        <div className="mb-8 flex flex-col items-end justify-between gap-6 md:flex-row">
-          <div>
-            <h1 className="mb-2 text-4xl font-black uppercase tracking-tight text-on-surface">
+
+        <div className="mb-8 flex flex-col gap-5 lg:mb-10 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-5xl">
+            <h1 className="mb-2 text-3xl font-black uppercase leading-none tracking-tight text-on-surface sm:text-4xl lg:text-5xl">
               {summary.routeTitle}
             </h1>
-            <p className="font-medium text-on-surface-variant">{summary.metaLine}</p>
+            <p className="max-w-3xl text-sm font-medium text-on-surface-variant sm:text-base">
+              {summary.metaLine}
+            </p>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-              Sort by:
-            </span>
-            <div className="relative">
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as FlightResultsSort)}
-                className="cursor-pointer appearance-none rounded-xl border-none bg-surface-container-lowest py-3 pl-6 pr-10 text-sm font-bold text-on-surface shadow-sm outline-none focus:ring-2 focus:ring-secondary-fixed"
-              >
-                <option>Recommended</option>
-                <option>Cheapest</option>
-                <option>Fastest</option>
-                <option>Best Experience</option>
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:w-auto lg:justify-end">
+            <button
+              type="button"
+              onClick={() => setMobileFiltersOpen(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-surface-container-high bg-surface-container-low px-4 py-3 text-sm font-bold text-on-surface shadow-sm lg:hidden"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filters
+              {activeFiltersCount > 0 ? (
+                <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-on-primary">
+                  {activeFiltersCount}
+                </span>
+              ) : null}
+            </button>
+
+            <div className="flex items-center justify-between gap-3 sm:justify-end">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                Sort by:
+              </span>
+              <div className="relative w-full sm:w-auto">
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as FlightResultsSort)}
+                  className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-lowest py-3 pl-4 pr-10 text-sm font-bold text-on-surface shadow-sm outline-none focus:ring-2 focus:ring-secondary-fixed sm:min-w-56 sm:pl-6"
+                >
+                  <option>Recommended</option>
+                  <option>Cheapest</option>
+                  <option>Fastest</option>
+                  <option>Best Experience</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+              </div>
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
-          <aside className="space-y-8 lg:col-span-3">
+
+        {mobileFiltersOpen ? (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <button
+              type="button"
+              aria-label="Close filters"
+              className="absolute inset-0 bg-black/45"
+              onClick={() => setMobileFiltersOpen(false)}
+            />
+            <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-[28px] border border-surface-container-high bg-surface px-4 pb-6 pt-4 shadow-2xl">
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                    Filters
+                  </p>
+                  <p className="text-sm font-semibold text-on-surface">{filterSummary}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileFiltersOpen(false)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-on-surface"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <FilterPanel
+                filters={filters}
+                setFilters={setFilters}
+                sliderMin={sliderMin}
+                sliderMax={sliderMax}
+                sliderValue={sliderValue}
+                displayedMaxPrice={displayedMaxPrice}
+                currency={currency}
+                priceDebounceTimerRef={priceDebounceTimerRef}
+                setDraftMaxBudget={setDraftMaxBudget}
+                namePrefix="mobile"
+              />
+
+              <div className="sticky bottom-0 mt-6 bg-surface pt-4">
+                <button
+                  type="button"
+                  onClick={() => setMobileFiltersOpen(false)}
+                  className="w-full rounded-xl bg-primary px-5 py-3 text-sm font-bold text-on-primary"
+                >
+                  Show results
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-10">
+          <aside className="hidden lg:col-span-3 lg:block">
             <div className="sticky top-28 rounded-xl border border-surface-variant/30 bg-surface-container-low/90 p-8 backdrop-blur-sm">
               <h3 className="mb-6 text-sm font-black uppercase tracking-widest text-on-surface">
                 Filters
               </h3>
-              <div className="mb-8">
-                <span className="mb-4 block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                  Stops
-                </span>
-                <label className="group flex cursor-pointer items-center gap-3">
-                  <input
-                    type="radio"
-                    name="stops"
-                    checked={filters.connectionFilter !== 'DIRECT_ONLY'}
-                    onChange={() => setFilters((f) => ({ ...f, connectionFilter: 'ANY' }))}
-                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
-                    No Preference
-                  </span>
-                </label>
-                <label className="group mt-3 flex cursor-pointer items-center gap-3">
-                  <input
-                    type="radio"
-                    name="stops"
-                    checked={filters.connectionFilter === 'DIRECT_ONLY'}
-                    onChange={() => setFilters((f) => ({ ...f, connectionFilter: 'DIRECT_ONLY' }))}
-                    className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
-                    Direct only
-                  </span>
-                </label>
-              </div>
-              <div className="mb-8">
-                <span className="mb-4 block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                  Departure Time
-                </span>
-                {(
-                  [
-                    ['ANY', 'No Preference'],
-                    ['MORNING', 'Morning (5am - 12pm)'],
-                    ['AFTERNOON', 'Afternoon (12pm - 6pm)'],
-                    ['EVENING', 'Evening (6pm - 12am)'],
-                  ] as const
-                ).map(([val, label]) => (
-                  <label
-                    key={val}
-                    className="group mt-3 flex cursor-pointer items-center gap-3 first:mt-0"
-                  >
-                    <input
-                      type="radio"
-                      name="departure-time"
-                      checked={filters.departureTimeBucket === val}
-                      onChange={() => setFilters((f) => ({ ...f, departureTimeBucket: val }))}
-                      className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
-                      {label}
-                    </span>
-                  </label>
-                ))}
-              </div>
-              <div className="mb-8">
-                <span className="mb-4 block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                  Arrival Time
-                </span>
-                {(
-                  [
-                    ['ANY', 'No Preference'],
-                    ['MORNING', 'Morning (5am - 12pm)'],
-                    ['AFTERNOON', 'Afternoon (12pm - 6pm)'],
-                    ['EVENING', 'Evening (6pm - 12am)'],
-                  ] as const
-                ).map(([val, label]) => (
-                  <label
-                    key={val}
-                    className="group mt-3 flex cursor-pointer items-center gap-3 first:mt-0"
-                  >
-                    <input
-                      type="radio"
-                      name="arrival-time"
-                      checked={filters.arrivalTimeBucket === val}
-                      onChange={() => setFilters((f) => ({ ...f, arrivalTimeBucket: val }))}
-                      className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
-                      {label}
-                    </span>
-                  </label>
-                ))}
-              </div>
-              <div className="mb-8">
-                <span className="mb-4 block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                  Cabin Class
-                </span>
-                {(
-                  [
-                    ['', 'No Preference'],
-                    ['ECONOMY', 'Economy'],
-                    ['PREMIUM', 'Premium'],
-                    ['BUSINESS', 'Business'],
-                    ['FIRST', 'First'],
-                  ] as const
-                ).map(([val, label]) => (
-                  <label
-                    key={label}
-                    className="group mt-3 flex cursor-pointer items-center gap-3 first:mt-0"
-                  >
-                    <input
-                      type="radio"
-                      name="cabin-class"
-                      checked={
-                        val === ''
-                          ? filters.cabinClasses.length === 0
-                          : filters.cabinClasses[0] === val && filters.cabinClasses.length === 1
-                      }
-                      onChange={() =>
-                        setFilters((f) => ({
-                          ...f,
-                          cabinClasses: val ? [val] : [],
-                        }))
-                      }
-                      className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm font-semibold text-on-surface transition-colors group-hover:text-primary">
-                      {label}
-                    </span>
-                  </label>
-                ))}
-              </div>
-              <div className="mb-8">
-                <div className="mb-4 flex justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                    Price Range
-                  </span>
-                  <span className="text-xs font-bold text-secondary">
-                    Up to {formatMoneySafe(sliderValue, currency)}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={sliderMin}
-                  max={sliderMax}
-                  step={Math.max(1, Math.round((sliderMax - sliderMin) / 200))}
-                  value={sliderValue}
-                  onChange={(e) => {
-                    const v = Number(e.target.value);
-                    const cap = v >= sliderMax ? null : v;
-                    setDraftMaxBudget(cap);
-                    if (priceDebounceTimerRef.current) {
-                      clearTimeout(priceDebounceTimerRef.current);
-                    }
-                    priceDebounceTimerRef.current = setTimeout(() => {
-                      priceDebounceTimerRef.current = null;
-                      setFilters((f) => ({
-                        ...f,
-                        maxBudget: cap,
-                      }));
-                    }, PRICE_SLIDER_DEBOUNCE_MS);
-                  }}
-                  className="h-1.5 w-full cursor-pointer accent-primary"
-                />
-              </div>
+              <FilterPanel
+                filters={filters}
+                setFilters={setFilters}
+                sliderMin={sliderMin}
+                sliderMax={sliderMax}
+                sliderValue={sliderValue}
+                displayedMaxPrice={displayedMaxPrice}
+                currency={currency}
+                priceDebounceTimerRef={priceDebounceTimerRef}
+                setDraftMaxBudget={setDraftMaxBudget}
+                namePrefix="desktop"
+              />
             </div>
           </aside>
-          <div className="space-y-10 lg:col-span-9">
+
+          <div className="space-y-8 lg:col-span-9 lg:space-y-10">
+            {fareSelectionError ? (
+              <div className="rounded-xl border border-error/30 bg-error/5 p-4 text-sm text-error">
+                {fareSelectionError}
+              </div>
+            ) : null}
             {loading ? (
-              <p className="text-center text-on-surface-variant">Searching flights…</p>
+              <section aria-label="Loading flight results" className="space-y-6 lg:space-y-8">
+                {Array.from({ length: LOADING_SKELETON_COUNT }).map((_, index) => (
+                  <FlightResultCardSkeleton key={index} />
+                ))}
+              </section>
             ) : searchError ? (
               <div className="rounded-xl border border-error/30 bg-error/5 p-6 text-center">
                 <p className="mb-3 text-on-surface">{searchError}</p>
@@ -495,13 +697,19 @@ export default function FlightResults() {
                       No outbound flights match your filters.
                     </p>
                   ) : (
-                    <div className="space-y-8">
+                    <div className="space-y-6 lg:space-y-8">
                       {sortedOutbound.map((leg) => (
-                        <FlightResultCard key={leg.id} leg={leg} />
+                        <FlightResultCard
+                          key={leg.id}
+                          leg={leg}
+                          pendingFareKey={pendingFareKey}
+                          onSelectFare={handleSelectFare}
+                        />
                       ))}
                     </div>
                   )}
                 </section>
+
                 {criteria.tripType === 'ROUND_TRIP' ? (
                   <section>
                     <h2 className="mb-4 text-sm font-black uppercase tracking-widest text-on-surface-variant">
@@ -512,9 +720,14 @@ export default function FlightResults() {
                         No return flights for this search yet.
                       </p>
                     ) : (
-                      <div className="space-y-8">
+                      <div className="space-y-6 lg:space-y-8">
                         {sortedInbound.map((leg) => (
-                          <FlightResultCard key={`in-${leg.id}`} leg={leg} />
+                          <FlightResultCard
+                            key={`in-${leg.id}`}
+                            leg={leg}
+                            pendingFareKey={pendingFareKey}
+                            onSelectFare={handleSelectFare}
+                          />
                         ))}
                       </div>
                     )}

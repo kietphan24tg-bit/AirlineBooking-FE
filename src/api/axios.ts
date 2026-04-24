@@ -26,11 +26,18 @@ const api = axios.create({
   withCredentials: true,
 });
 
+function isPublicRequest(url: string | undefined): boolean {
+  if (!url) return false;
+  return url.startsWith('/api/services') || url.includes('/api/services?');
+}
+
 // Auth + client timezone (backend uses X-Timezone for market/locale logic)
 api.interceptors.request.use((config) => {
   const accessToken = useAuthStore.getState().accessToken;
-  if (accessToken) {
+  if (accessToken && !isPublicRequest(config.url)) {
     config.headers.Authorization = `Bearer ${accessToken}`;
+  } else if (isPublicRequest(config.url)) {
+    delete config.headers.Authorization;
   }
   config.headers['X-Timezone'] = getClientTimezone();
   return config;

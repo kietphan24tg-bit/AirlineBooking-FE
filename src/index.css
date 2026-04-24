@@ -176,6 +176,16 @@
     background: transparent;
   }
 
+  .search-widget-date-input--empty::-webkit-datetime-edit,
+  .search-widget-date-input--empty::-webkit-datetime-edit-fields-wrapper,
+  .search-widget-date-input--empty::-webkit-datetime-edit-text,
+  .search-widget-date-input--empty::-webkit-datetime-edit-month-field,
+  .search-widget-date-input--empty::-webkit-datetime-edit-day-field,
+  .search-widget-date-input--empty::-webkit-datetime-edit-year-field {
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+
   .search-widget-date-input::-webkit-datetime-edit-text {
     color: inherit;
   }
@@ -193,6 +203,48 @@
 
   .search-widget-date-input::-moz-calendar-picker-indicator {
     display: none;
+  }
+
+  @media (max-width: 359px) {
+    .landing-hero-title {
+      margin-bottom: 0.5rem;
+      font-size: 2.15rem;
+    }
+
+    .landing-hero-booking-panel {
+      margin-top: 0 !important;
+    }
+
+    .landing-booking-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    .landing-booking-grid > .booking-field {
+      min-height: 0;
+      padding: 0.75rem;
+    }
+
+    .landing-booking-grid .booking-field--from,
+    .landing-booking-grid .booking-field--to,
+    .landing-booking-grid .booking-field--depart,
+    .landing-booking-grid .booking-field--travelers,
+    .landing-booking-grid .booking-field--return {
+      border-bottom: 1px solid rgb(212 175 55 / 0.1) !important;
+    }
+
+    .landing-booking-grid .booking-field--actions {
+      grid-column: 1 / -1;
+      border-top: 0 !important;
+      gap: 0.5rem;
+      padding-top: 0.5rem;
+    }
+
+    .landing-booking-grid .booking-field--actions [data-booking-search-submit] {
+      height: 2.375rem !important;
+      min-height: 2.375rem !important;
+      padding-top: 0.5rem !important;
+      padding-bottom: 0.5rem !important;
+    }
   }
 }
 

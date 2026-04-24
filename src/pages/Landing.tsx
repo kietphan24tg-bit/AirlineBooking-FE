@@ -59,11 +59,8 @@ function canBumpTraveler(p: TravelerCounts, field: keyof TravelerCounts, delta: 
 }
 
 function formatTravelerSummary(p: TravelerCounts): string {
-  const bits: string[] = [];
-  bits.push(p.adults === 1 ? '1 Adult' : `${p.adults} Adults`);
-  if (p.children > 0) bits.push(p.children === 1 ? '1 Child' : `${p.children} Children`);
-  if (p.infants > 0) bits.push(p.infants === 1 ? '1 Infant' : `${p.infants} Infants`);
-  return bits.join(', ');
+  const total = p.adults + p.children + p.infants;
+  return total === 1 ? '1 Passenger' : `${total} Passengers`;
 }
 
 const destinations = [
@@ -109,6 +106,11 @@ function filterAirports(list: Airport[], query: string) {
       a.name.toLowerCase().includes(q) ||
       a.code.toLowerCase().includes(q)
   );
+}
+
+function excludeAirport(list: Airport[], excluded: Airport | null): Airport[] {
+  if (!excluded) return list;
+  return list.filter((airport) => airport.id !== excluded.id && airport.code !== excluded.code);
 }
 
 function toDateInputValue(d: Date): string {
@@ -425,6 +427,10 @@ export default function Landing() {
   });
   const [promoCode, setPromoCode] = useState('');
 
+  const activePickerContext = isFromPicking ? 'from' : isToPicking ? 'to' : null;
+  const airportExcludedFromPicker =
+    activePickerContext === 'from' ? toAirport : activePickerContext === 'to' ? fromAirport : null;
+
   const travelerSummaryLabel = useMemo(
     () => formatTravelerSummary(travelerCounts),
     [travelerCounts]
@@ -450,6 +456,7 @@ export default function Landing() {
     if (
       !fromAirport ||
       !toAirport ||
+      fromAirport.code === toAirport.code ||
       !departDate ||
       (tripType === 'round-trip' && !returnDate) ||
       travelerCounts.adults < 1 ||
@@ -492,14 +499,17 @@ export default function Landing() {
 
   const filteredAirports = filterAirports(airportList, airportSearchQuery);
   const mainPickerAirports = useMemo(() => {
-    if (airportSearchQuery.trim()) return filteredAirports;
-    return pickerSuggestions;
-  }, [airportSearchQuery, filteredAirports, pickerSuggestions]);
+    const source = airportSearchQuery.trim() ? filteredAirports : pickerSuggestions;
+    return excludeAirport(source, airportExcludedFromPicker);
+  }, [airportSearchQuery, filteredAirports, pickerSuggestions, airportExcludedFromPicker]);
   const regionKeys = useMemo(() => Object.keys(airportsByRegion), [airportsByRegion]);
-  const airportsInSelectedRegion =
-    selectedRegionKey && airportsByRegion[selectedRegionKey]
-      ? airportsByRegion[selectedRegionKey]
-      : [];
+  const airportsInSelectedRegion = useMemo(() => {
+    const source =
+      selectedRegionKey && airportsByRegion[selectedRegionKey]
+        ? airportsByRegion[selectedRegionKey]
+        : [];
+    return excludeAirport(source, airportExcludedFromPicker);
+  }, [selectedRegionKey, airportsByRegion, airportExcludedFromPicker]);
 
   const resetAirportPickerUi = () => {
     setIsFromPicking(false);
@@ -662,11 +672,11 @@ export default function Landing() {
           aria-hidden
         />
         <section
-          className={`relative flex h-screen min-h-screen w-full items-stretch ${
+          className={`relative flex w-full items-stretch ${
             isFromPicking || isToPicking || travelersMenuOpen
               ? 'overflow-visible'
               : 'overflow-hidden'
-          }`}
+          } min-h-[max(46rem,calc(100svh-4.5rem))] pt-18 md:min-h-[max(52rem,calc(100svh-5rem))] md:pt-20 lg:min-h-[calc(100svh-5rem)]`}
         >
           <div className="absolute inset-0 z-0 overflow-hidden">
             <div className="sky-flow-track" aria-hidden>
@@ -686,28 +696,28 @@ export default function Landing() {
             <img
               alt="clouds"
               src="/src/assets/cloud.png"
-              className="absolute inset-0 w-full object-cover animate-clouds"
+              className="absolute inset-0 h-full w-full object-cover object-center animate-clouds"
             />
             <img
               alt="clouds"
               src="/src/assets/cloud.png"
-              className="absolute inset-0 w-full object-cover animate-clouds delay-neg-10"
+              className="absolute inset-0 h-full w-full object-cover object-center animate-clouds delay-neg-10"
             />
             <img
               alt="clouds"
               src="/src/assets/cloud.png"
-              className="absolute inset-0 w-full object-cover animate-clouds delay-neg-20"
+              className="absolute inset-0 h-full w-full object-cover object-center animate-clouds delay-neg-20"
             />
             <img
               alt="plane"
               src="/src/assets/plane.png"
-              className="absolute inset-0 h-full w-full scale-70 object-cover"
+              className="absolute inset-0 h-full w-full scale-[1.08] object-cover object-[58%_60%] sm:scale-100 sm:object-[60%_58%] md:object-[62%_56%] lg:scale-95 lg:object-center"
             />
-            <div className="absolute inset-0 bg-linear-to-t from-black/25 to-white/20" />
+            <div className="absolute inset-0 bg-linear-to-t from-black/40 via-black/10 to-white/20" />
           </div>
-          <div className="relative mx-auto flex h-full w-full min-w-0 max-w-480 flex-col px-4 pb-0 pt-24 sm:px-6 md:px-20 md:pb-0">
-            <div className="max-w-3xl pt-4 md:pt-6">
-              <h1 className="mb-4 font-headline text-4xl font-black leading-[0.92] tracking-tighter text-white md:mb-5 md:text-7xl drop-shadow-xl">
+          <div className="relative mx-auto flex w-full min-w-0 max-w-480 flex-1 flex-col px-4 pb-4 pt-4 sm:px-6 sm:pb-8 sm:pt-6 md:px-10 md:pb-10 lg:px-20 lg:pb-0 lg:pt-8">
+            <div className="max-w-[15rem] sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
+              <h1 className="landing-hero-title mb-3 font-headline text-[2.35rem] font-black leading-[0.88] tracking-[-0.07em] text-white drop-shadow-xl sm:text-[3.5rem] md:mb-5 md:text-[4.75rem] lg:text-7xl">
                 REDEFINING <br />
                 THE <span className="text-luxury-gold">EXCEPTIONAL</span>
               </h1>
@@ -716,11 +726,11 @@ export default function Landing() {
               ref={glassPanelRef}
               onFocusCapture={() => queueMicrotask(syncBookingPanelBlur)}
               onBlurCapture={() => queueMicrotask(syncBookingPanelBlur)}
-              className="glass-panel relative z-[55] mt-auto w-full min-w-0 max-w-400 rounded-xl border border-luxury-gold/20 p-1 shadow-2xl"
+              className="landing-hero-booking-panel glass-panel relative z-[55] mt-4 w-full min-w-0 rounded-[1.25rem] border border-luxury-gold/20 p-1 shadow-2xl sm:mt-6 md:mt-auto md:max-w-400"
             >
               {/* Trip Type Toggle */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-luxury-gold/10 p-3 sm:p-4">
-                <label className="flex items-center gap-2 cursor-pointer">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-luxury-gold/10 px-4 py-2.5 sm:px-5 sm:py-4">
+                <label className="flex cursor-pointer items-center gap-2">
                   <input
                     type="radio"
                     name="tripType"
@@ -731,7 +741,7 @@ export default function Landing() {
                   />
                   <span className="font-headline font-bold text-midnight-burgundy">One-Way</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex cursor-pointer items-center gap-2">
                   <input
                     type="radio"
                     name="tripType"
@@ -746,16 +756,20 @@ export default function Landing() {
 
               {/* Search Form Grid: stack on small screens; tablet3×2 for round-trip; full row from xl / lg */}
               <div
-                className={`grid min-w-0 gap-0 p-3 sm:p-4 [&>*]:min-w-0 ${
+                className={`landing-booking-grid ${tripType === 'round-trip' ? 'landing-booking-grid--roundtrip' : 'landing-booking-grid--oneway'} grid min-w-0 gap-0 p-2.5 sm:p-4 [&>*]:min-w-0 ${
                   tripType === 'round-trip'
-                    ? 'grid-cols-1 divide-y divide-luxury-gold/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0 lg:divide-luxury-gold/10 xl:grid-cols-6'
-                    : 'grid-cols-1 divide-y divide-luxury-gold/10 lg:grid-cols-5 lg:divide-x lg:divide-y-0 lg:divide-luxury-gold/10'
+                    ? 'grid-cols-1 divide-y divide-luxury-gold/10 sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:[grid-template-columns:repeat(5,minmax(0,1fr))_1.28fr]'
+                    : 'grid-cols-1 divide-y divide-luxury-gold/10 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-5'
                 }`}
               >
                 {/* From */}
                 <div
                   ref={fromFieldRef}
-                  className={`relative space-y-1 p-4 ${isFromPicking ? 'z-30' : ''}`}
+                  className={`booking-field booking-field--from relative space-y-1 p-3 sm:min-h-[9rem] sm:p-4 ${isFromPicking ? 'z-30' : ''} ${
+                    tripType === 'round-trip'
+                      ? 'sm:border-b sm:border-luxury-gold/10 xl:border-b-0'
+                      : 'sm:border-b sm:border-luxury-gold/10 lg:border-b-0'
+                  }`}
                 >
                   <label
                     htmlFor="from"
@@ -787,7 +801,7 @@ export default function Landing() {
                       strokeWidth={1.75}
                     />
                     <p
-                      className={`font-headline text-lg font-bold ${
+                      className={`font-headline text-base font-bold sm:text-lg ${
                         fromAirport ? 'text-midnight-burgundy' : 'text-midnight-burgundy/45'
                       }`}
                     >
@@ -820,7 +834,11 @@ export default function Landing() {
                 {/* To */}
                 <div
                   ref={toFieldRef}
-                  className={`relative space-y-1 p-4 ${isToPicking ? 'z-30' : ''}`}
+                  className={`booking-field booking-field--to relative space-y-1 p-3 sm:min-h-[9rem] sm:p-4 ${isToPicking ? 'z-30' : ''} ${
+                    tripType === 'round-trip'
+                      ? 'sm:border-b sm:border-luxury-gold/10 xl:border-b-0'
+                      : 'sm:border-b sm:border-luxury-gold/10 lg:border-b-0'
+                  }`}
                 >
                   <label
                     htmlFor="to"
@@ -852,7 +870,7 @@ export default function Landing() {
                       strokeWidth={1.75}
                     />
                     <p
-                      className={`font-headline text-lg font-bold ${
+                      className={`font-headline text-base font-bold sm:text-lg ${
                         toAirport ? 'text-midnight-burgundy' : 'text-midnight-burgundy/45'
                       }`}
                     >
@@ -883,14 +901,20 @@ export default function Landing() {
                 </div>
 
                 {/* Depart Date */}
-                <div className="space-y-1 p-4">
+                <div
+                  className={`booking-field booking-field--depart space-y-1 p-3 sm:min-h-[9rem] sm:p-4 ${
+                    tripType === 'round-trip'
+                      ? 'sm:border-b sm:border-luxury-gold/10 xl:border-b-0'
+                      : 'sm:border-b sm:border-luxury-gold/10 lg:border-b-0'
+                  }`}
+                >
                   <label
                     htmlFor="depart-date"
                     className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
                   >
                     {tripType === 'round-trip' ? 'Depart' : 'Date'}
                   </label>
-                  <div className="flex w-full items-center gap-2 rounded-lg border-2 border-transparent px-2 py-2 text-midnight-burgundy transition-[box-shadow,border-color] focus-within:border-midnight-burgundy/25 focus-within:bg-white focus-within:shadow-[0_0_8px_rgba(125,6,51,0.15)]">
+                  <div className="flex min-h-10 w-full items-center gap-2 rounded-lg border-2 border-transparent px-2 py-1.5 text-midnight-burgundy transition-[box-shadow,border-color] focus-within:border-midnight-burgundy/25 focus-within:bg-white focus-within:shadow-[0_0_8px_rgba(125,6,51,0.15)] sm:min-h-12 sm:py-2">
                     <button
                       type="button"
                       className="inline-flex shrink-0 rounded-md p-0.5 text-midnight-burgundy transition-opacity hover:opacity-80 focus-visible:outline focus-visible:ring-2 focus-visible:ring-midnight-burgundy/30"
@@ -910,12 +934,15 @@ export default function Landing() {
                         type="date"
                         min={todayMin}
                         value={departDate}
-                        placeholder="mm/dd/yyyy"
                         onChange={(e) => setDepartDate(e.target.value)}
-                        className="search-widget-date-input relative z-[1] min-w-0 w-full border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy shadow-none outline-none focus:border-transparent focus:shadow-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+                        className={`search-widget-date-input relative z-[1] min-w-0 w-full border-none bg-transparent p-0 font-headline text-lg font-bold shadow-none outline-none focus:border-transparent focus:shadow-none focus:outline-none focus:ring-0 focus-visible:outline-none ${
+                          departDate
+                            ? 'text-midnight-burgundy'
+                            : 'search-widget-date-input--empty text-transparent'
+                        }`}
                       />
                       {!departDate ? (
-                        <span className="pointer-events-none absolute left-0 top-1/2 z-0 -translate-y-1/2 font-headline text-lg font-bold text-midnight-burgundy/45 group-focus-within:hidden">
+                        <span className="pointer-events-none absolute left-0 top-1/2 z-0 -translate-y-1/2 font-headline text-base font-bold text-midnight-burgundy/45 group-focus-within:hidden sm:text-lg">
                           mm/dd/yyyy
                         </span>
                       ) : null}
@@ -925,14 +952,14 @@ export default function Landing() {
 
                 {/* Return Date (only for round-trip) */}
                 {tripType === 'round-trip' && (
-                  <div className="space-y-1 p-4">
+                  <div className="booking-field booking-field--return space-y-1 border-t border-luxury-gold/10 p-3 sm:min-h-[9rem] sm:border-t-0 sm:border-b sm:border-luxury-gold/10 sm:p-4 xl:border-b-0">
                     <label
                       htmlFor="return-date"
                       className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
                     >
                       Return
                     </label>
-                    <div className="flex w-full items-center gap-2 rounded-lg border-2 border-transparent px-2 py-2 text-midnight-burgundy transition-[box-shadow,border-color] focus-within:border-midnight-burgundy/25 focus-within:bg-white focus-within:shadow-[0_0_8px_rgba(125,6,51,0.15)]">
+                    <div className="flex min-h-10 w-full items-center gap-2 rounded-lg border-2 border-transparent px-2 py-1.5 text-midnight-burgundy transition-[box-shadow,border-color] focus-within:border-midnight-burgundy/25 focus-within:bg-white focus-within:shadow-[0_0_8px_rgba(125,6,51,0.15)] sm:min-h-12 sm:py-2">
                       <button
                         type="button"
                         className="inline-flex shrink-0 rounded-md p-0.5 text-midnight-burgundy transition-opacity hover:opacity-80 focus-visible:outline focus-visible:ring-2 focus-visible:ring-midnight-burgundy/30"
@@ -952,12 +979,15 @@ export default function Landing() {
                           type="date"
                           min={returnDateMin}
                           value={returnDate}
-                          placeholder="mm/dd/yyyy"
                           onChange={(e) => setReturnDate(e.target.value)}
-                          className="search-widget-date-input relative z-[1] min-w-0 w-full border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy shadow-none outline-none focus:border-transparent focus:shadow-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+                          className={`search-widget-date-input relative z-[1] min-w-0 w-full border-none bg-transparent p-0 font-headline text-lg font-bold shadow-none outline-none focus:border-transparent focus:shadow-none focus:outline-none focus:ring-0 focus-visible:outline-none ${
+                            returnDate
+                              ? 'text-midnight-burgundy'
+                              : 'search-widget-date-input--empty text-transparent'
+                          }`}
                         />
                         {!returnDate ? (
-                          <span className="pointer-events-none absolute left-0 top-1/2 z-0 -translate-y-1/2 font-headline text-lg font-bold text-midnight-burgundy/45 group-focus-within:hidden">
+                          <span className="pointer-events-none absolute left-0 top-1/2 z-0 -translate-y-1/2 font-headline text-base font-bold text-midnight-burgundy/45 group-focus-within:hidden sm:text-lg">
                             mm/dd/yyyy
                           </span>
                         ) : null}
@@ -969,13 +999,13 @@ export default function Landing() {
                 {/* Travelers */}
                 <div
                   ref={travelersFieldRef}
-                  className={`relative space-y-1 p-4 ${travelersMenuOpen ? 'z-[60]' : ''}`}
+                  className={`booking-field booking-field--travelers relative space-y-1 p-3 sm:min-h-[9rem] sm:p-4 ${travelersMenuOpen ? 'z-[60]' : ''}`}
                 >
                   <label
                     htmlFor="travelers-trigger"
                     className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
                   >
-                    Travelers
+                    Passengers
                   </label>
                   <button
                     id="travelers-trigger"
@@ -993,7 +1023,7 @@ export default function Landing() {
                       className="h-5 w-5 shrink-0 stroke-midnight-burgundy text-midnight-burgundy"
                       strokeWidth={1.75}
                     />
-                    <span className="min-w-0 flex-1 font-headline text-lg font-bold text-midnight-burgundy">
+                    <span className="min-w-0 flex-1 font-headline text-base font-bold text-midnight-burgundy sm:text-lg">
                       {travelerSummaryLabel}
                     </span>
                     <ChevronDown
@@ -1007,11 +1037,11 @@ export default function Landing() {
 
                   {travelersMenuOpen ? (
                     <div
-                      className="absolute left-0 top-full z-[80] mt-2 w-[min(calc(100vw-2rem),22rem)] overflow-hidden rounded-xl border border-luxury-gold/20 bg-white shadow-[0_12px_40px_rgba(26,28,28,0.12)]"
+                      className="absolute left-0 top-full z-[80] mt-2 max-h-[min(28rem,calc(100dvh-9rem))] w-[min(100%,22rem)] min-w-[16rem] overflow-hidden rounded-xl border border-luxury-gold/20 bg-white shadow-[0_12px_40px_rgba(26,28,28,0.12)]"
                       role="dialog"
                       aria-label="Select number of travelers"
                     >
-                      <div className="divide-y divide-luxury-gold/10 px-4">
+                      <div className="max-h-[min(24rem,calc(100dvh-13rem))] divide-y divide-luxury-gold/10 overflow-y-auto px-4">
                         <div className="flex items-center gap-3 py-4">
                           <button
                             type="button"
@@ -1135,8 +1165,14 @@ export default function Landing() {
                 </div>
 
                 {/* Promo + Search (same column) */}
-                <div className="flex min-h-0 flex-col gap-4 p-4 lg:h-full lg:justify-between">
-                  <div className="flex items-center gap-2 py-2">
+                <div
+                  className={`booking-field booking-field--actions flex min-h-0 flex-col gap-3 p-3 sm:gap-4 sm:p-4 ${
+                    tripType === 'round-trip'
+                      ? 'border-t border-luxury-gold/10 sm:col-span-2 xl:col-span-1 xl:h-full xl:justify-between xl:border-t-0'
+                      : 'border-t border-luxury-gold/10 sm:col-span-2 lg:col-span-1 lg:h-full lg:justify-between lg:border-t-0'
+                  }`}
+                >
+                  <div className="flex min-h-10 items-center gap-2 rounded-lg border border-midnight-burgundy/10 px-3 py-1.5 sm:min-h-12 sm:border-0 sm:px-0 sm:py-2">
                     <Gift
                       className="h-5 w-5 shrink-0 text-midnight-burgundy"
                       strokeWidth={1.75}
@@ -1150,7 +1186,7 @@ export default function Landing() {
                       placeholder={'Promo code'}
                       autoComplete="off"
                       aria-label={'Promo code'}
-                      className="min-w-0 flex-1 border-0 border-none bg-transparent p-0 font-headline text-lg font-bold text-midnight-burgundy shadow-none outline-none ring-0 placeholder:text-midnight-burgundy/45 focus:border-0 focus:ring-0 focus:outline-none"
+                      className="min-w-0 flex-1 border-0 border-none bg-transparent p-0 font-headline text-base font-bold text-midnight-burgundy shadow-none outline-none ring-0 placeholder:text-midnight-burgundy/45 focus:border-0 focus:ring-0 focus:outline-none sm:text-lg"
                     />
                   </div>
                   <button
@@ -1159,7 +1195,7 @@ export default function Landing() {
                     type="submit"
                     onFocus={() => setSearchSubmitFocused(true)}
                     onBlur={() => setSearchSubmitFocused(false)}
-                    className="flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-midnight-burgundy py-4 font-headline font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-95"
+                    className="flex min-h-11 w-full shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-midnight-burgundy px-4 py-3 font-headline text-sm font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-95 sm:min-h-13 sm:py-4 sm:text-base"
                   >
                     SEARCH FLIGHTS
                     <ArrowRight className="h-5 w-5" strokeWidth={2} />

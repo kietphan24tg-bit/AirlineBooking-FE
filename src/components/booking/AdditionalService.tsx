@@ -19,7 +19,9 @@ export interface AdditionalServiceProps {
   loading?: boolean;
   error?: string | null;
   selectedServices?: SelectedServiceOption[];
-  onSelectServices?: (services: SelectedServiceOption[]) => void;
+  confirmLoading?: boolean;
+  onSelectedServicesChange?: (services: SelectedServiceOption[]) => void;
+  onConfirm?: () => void;
 }
 
 function fallbackIconForServiceType(serviceType: string): LucideIcon {
@@ -97,26 +99,22 @@ export default function AdditionalService({
   services,
   loading = false,
   error = null,
-  selectedServices: confirmedServices = [],
-  onSelectServices,
+  selectedServices = [],
+  confirmLoading = false,
+  onSelectedServicesChange,
+  onConfirm,
 }: AdditionalServiceProps) {
   const activeServices = useMemo(() => getActiveServices(services), [services]);
-  const [selectedServices, setSelectedServices] =
-    useState<SelectedServiceOption[]>(confirmedServices);
   const [activeServiceId, setActiveServiceId] = useState<number | null>(
     activeServices[0]?.serviceId ?? null
   );
-
-  useEffect(() => {
-    setSelectedServices(confirmedServices);
-  }, [confirmedServices]);
 
   useEffect(() => {
     if (activeServices.length === 0) {
       setActiveServiceId(null);
       return;
     }
-    const selectedService = confirmedServices.find((service) =>
+    const selectedService = selectedServices.find((service) =>
       activeServices.some((activeService) => activeService.serviceId === service.serviceId)
     );
     const nextActiveId = selectedService?.serviceId ?? activeServices[0].serviceId;
@@ -125,7 +123,7 @@ export default function AdditionalService({
         ? current
         : nextActiveId
     );
-  }, [activeServices, confirmedServices]);
+  }, [activeServices, selectedServices]);
 
   const activeService =
     activeServices.find((service) => service.serviceId === activeServiceId) ??
@@ -264,8 +262,8 @@ export default function AdditionalService({
                 key={`${option.serviceId}-${option.optionId}`}
                 type="button"
                 onClick={() =>
-                  setSelectedServices((previous) =>
-                    selectOption(previous, option, activeService.selectionMode)
+                  onSelectedServicesChange?.(
+                    selectOption(selectedServices, option, activeService.selectionMode)
                   )
                 }
                 className={`group flex h-full min-h-44 flex-col rounded-[1.35rem] border p-4 text-left transition-all duration-200 ${
@@ -312,8 +310,8 @@ export default function AdditionalService({
         </div>
       </section>
 
-      <Button onClick={() => onSelectServices?.(selectedServices)} className="mt-1">
-        Xac nhan
+      <Button onClick={onConfirm} disabled={confirmLoading} className="mt-1">
+        {confirmLoading ? 'Dang luu...' : 'Xac nhan'}
       </Button>
     </div>
   );

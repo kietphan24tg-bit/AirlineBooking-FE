@@ -1,19 +1,23 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Armchair, ChevronRight, LuggageIcon } from 'lucide-react';
+import { toast } from 'sonner';
 import type {
+  BookingPassengerWithId,
+  BookingServiceSelectionInput,
   PassengerBookingDetails,
   PassengerInfoNavigationState,
   PassengerProfile,
 } from '../types/booking.types';
-import type { SeatMapCell, SelectedServiceOption } from '../types/flight.types';
+import type { SeatMapCell, SelectedServiceOption, ServiceGroup } from '../types/flight.types';
 import SiteHeader from '../components/layout/SiteHeader';
 import BookingStepper from '../components/booking/BookingStepper';
 import SiteFooter from '../components/layout/SiteFooter';
 import AircraftSeatsMap, { type SeatSelectionValue } from '../components/booking/AircraftSeatsMap';
 import AdditionalService from '../components/booking/AdditionalService';
 import { useBookingStore } from '../stores/useBookingStore';
+import { bookingService } from '../services/booking.service';
 import { flightService } from '../services/flight.service';
 
 const MOCK_PASSENGERS: PassengerProfile[] = [
@@ -26,6 +30,10 @@ type SeatContext = {
   fareId: number | null;
   fareCode: string | null;
 };
+
+type ServiceSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+type ServicesByPassengerId = Record<number, SelectedServiceOption[]>;
+type ServiceSaveStatusByPassengerId = Record<number, ServiceSaveStatus>;
 
 function passengersFromNavigationState(
   list: PassengerBookingDetails[] | undefined
@@ -112,10 +120,102 @@ function findSeatCellById(
   return null;
 }
 
+function resolveStorePassengerId(passenger: BookingPassengerWithId | undefined): number | null {
+  if (!passenger) return null;
+  return pickNumericId(passenger.passengerId) ?? pickNumericId(passenger.id);
+}
+
+function buildSelectionsFromSelectedServices(
+  services: SelectedServiceOption[]
+): BookingServiceSelectionInput[] {
+  const byOption = new Map<number, number>();
+  for (const s of services) {
+    byOption.set(s.optionId, (byOption.get(s.optionId) ?? 0) + 1);
+  }
+  return Array.from(byOption.entries()).map(([optionId, quantity]) => ({ optionId, quantity }));
+}
+
+function createSelectedServicesLookup(
+  services: ServiceGroup[] | undefined
+): Map<number, SelectedServiceOption> {
+  const lookup = new Map<number, SelectedServiceOption>();
+  for (const service of services ?? []) {
+    for (const option of service.options ?? []) {
+      lookup.set(option.optionId, option);
+    }
+  }
+  return lookup;
+}
+
+function hydrateServicesByPassengerId(
+  services: ServiceGroup[] | undefined,
+  confirmedServicesByPassengerId: Record<number, { optionId: number; quantity: number }[]>
+): ServicesByPassengerId {
+  const optionLookup = createSelectedServicesLookup(services);
+  const next: ServicesByPassengerId = {};
+
+  for (const [passengerIdText, selections] of Object.entries(confirmedServicesByPassengerId)) {
+    const passengerId = Number(passengerIdText);
+    if (!Number.isFinite(passengerId)) continue;
+    const hydrated: SelectedServiceOption[] = [];
+
+    for (const selection of selections) {
+      const option = optionLookup.get(selection.optionId);
+      if (!option) continue;
+      const quantity =
+        Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1;
+      for (let index = 0; index < quantity; index += 1) {
+        hydrated.push(option);
+      }
+    }
+
+    next[passengerId] = hydrated;
+  }
+
+  return next;
+}
+
+function createInitialServiceStatusMap(
+  confirmedServicesByPassengerId: Record<number, unknown>
+): ServiceSaveStatusByPassengerId {
+  const next: ServiceSaveStatusByPassengerId = {};
+  for (const passengerIdText of Object.keys(confirmedServicesByPassengerId)) {
+    const passengerId = Number(passengerIdText);
+    if (!Number.isFinite(passengerId)) continue;
+    next[passengerId] = 'saved';
+  }
+  return next;
+}
+
+function getServiceStatusLabel(status: ServiceSaveStatus): string {
+  if (status === 'saved') return 'Da luu';
+  if (status === 'saving') return 'Dang luu';
+  if (status === 'error') return 'Loi';
+  return 'Chua luu';
+}
+
+function getBookingSessionExpiredMessage(error: unknown): string | null {
+  const status =
+    error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    error.response &&
+    typeof error.response === 'object' &&
+    'status' in error.response
+      ? error.response.status
+      : null;
+
+  return status === 409 ? 'Your booking session has expired.\nPlease search again.' : null;
+}
+
 export default function SeatSelection() {
   const location = useLocation();
   const bookingDraft = useBookingStore((state) => state.bookingDraft);
   const bookingResponse = useBookingStore((state) => state.bookingResponse);
+  const applySeatAssignmentResult = useBookingStore((state) => state.applySeatAssignmentResult);
+  const applyServicesAssignmentResult = useBookingStore(
+    (state) => state.applyServicesAssignmentResult
+  );
   const navPassengers = passengersFromNavigationState(
     (location.state as Partial<PassengerInfoNavigationState> | null)?.passengers
   );
@@ -128,10 +228,24 @@ export default function SeatSelection() {
     : null;
   const passengers = storePassengers ?? navPassengers ?? MOCK_PASSENGERS;
 
-  const [selectedServices, setSelectedServices] = useState<SelectedServiceOption[]>([]);
+  const [activePassengerIndex, setActivePassengerIndex] = useState(0);
   const [selectedSeat, setSelectedSeat] = useState<SeatSelectionValue | null>(null);
   const [isSeatSelecting, setIsSeatSelecting] = useState(true);
   const [isServiceSelecting, setIsServiceSelecting] = useState(false);
+  const [servicesByPassengerId, setServicesByPassengerId] = useState<ServicesByPassengerId>({});
+  const [serviceSaveStatusByPassengerId, setServiceSaveStatusByPassengerId] =
+    useState<ServiceSaveStatusByPassengerId>(() =>
+      createInitialServiceStatusMap(bookingResponse?.confirmedServicesByPassengerId ?? {})
+    );
+  const hydratedPassengersRef = useRef<Set<number>>(new Set());
+  const assignInFlight = useRef(false);
+
+  useEffect(() => {
+    if (activePassengerIndex >= passengers.length) {
+      setActivePassengerIndex(0);
+    }
+  }, [activePassengerIndex, passengers.length]);
+
   const seatContext = useMemo(() => {
     const responseContext = resolveSeatContext(bookingResponse);
     if (responseContext.flightId && responseContext.fareId) return responseContext;
@@ -139,6 +253,72 @@ export default function SeatSelection() {
   }, [bookingDraft, bookingResponse]);
   const canLoadSeatMap = isSeatSelecting && !!seatContext.flightId && !!seatContext.fareId;
   const canLoadServices = isServiceSelecting && !!seatContext.flightId && !!seatContext.fareId;
+
+  const activePassenger = bookingResponse?.passengers?.[activePassengerIndex];
+  const activePassengerId = useMemo(
+    () => resolveStorePassengerId(activePassenger),
+    [activePassenger]
+  );
+
+  const assignSeatMutation = useMutation({
+    mutationFn: (vars: { bookingId: string | number; passengerId: number; seatId: number }) =>
+      bookingService.putSeatAssignments(vars.bookingId, {
+        assignments: [{ passengerId: vars.passengerId, seatId: vars.seatId }],
+      }),
+    onSuccess: (data) => {
+      applySeatAssignmentResult(data);
+      toast.success('Da xac nhan ghe ngoi.');
+    },
+    onError: (error) => {
+      toast.error(
+        getBookingSessionExpiredMessage(error) ??
+          (error instanceof Error ? error.message : 'Khong the gan ghe. Vui long thu lai.')
+      );
+    },
+  });
+
+  const cancelSeatMutation = useMutation({
+    mutationFn: (vars: { bookingId: string | number; passengerId: number; seatId: number }) =>
+      bookingService.deleteSeatAssignments(vars.bookingId, {
+        assignments: [{ passengerId: vars.passengerId, seatId: vars.seatId }],
+      }),
+    onSuccess: (data) => {
+      applySeatAssignmentResult(data);
+      toast.success('Da huy ghe ngoi.');
+    },
+    onError: (error) => {
+      toast.error(
+        getBookingSessionExpiredMessage(error) ??
+          (error instanceof Error ? error.message : 'Khong the huy ghe. Vui long thu lai.')
+      );
+    },
+  });
+
+  const servicesMutation = useMutation({
+    mutationFn: (vars: {
+      bookingId: string | number;
+      passengerId: number;
+      selections: BookingServiceSelectionInput[];
+    }) =>
+      bookingService.putBookingServices(vars.bookingId, {
+        passengers: [{ passengerId: vars.passengerId, selections: vars.selections }],
+      }),
+  });
+
+  const assignedSeatMetaBySeatId = useMemo(() => {
+    const assignments = bookingResponse?.lastSeatAssignment?.assignments;
+    if (!assignments?.length) return new Map<number, { label: string; isYours: boolean }>();
+    const next = new Map<number, { label: string; isYours: boolean }>();
+    const pax = bookingResponse?.passengers ?? [];
+    for (const a of assignments) {
+      if (a.seatId == null || a.seatId <= 0) continue;
+      const idx = pax.findIndex((p) => resolveStorePassengerId(p) === a.passengerId);
+      const label = idx >= 0 ? `Da chon (HK ${idx + 1})` : 'Da chon';
+      const isYours = activePassengerId != null && a.passengerId === activePassengerId;
+      next.set(a.seatId, { label, isYours });
+    }
+    return next;
+  }, [bookingResponse?.lastSeatAssignment, bookingResponse?.passengers, activePassengerId]);
 
   const seatMapQuery = useQuery({
     queryKey: ['seat-map', seatContext.flightId, seatContext.fareId],
@@ -156,10 +336,73 @@ export default function SeatSelection() {
     staleTime: 60_000,
   });
 
+  useEffect(() => {
+    const confirmedServicesByPassengerId = bookingResponse?.confirmedServicesByPassengerId ?? {};
+    if (
+      !servicesQuery.data?.services?.length ||
+      !Object.keys(confirmedServicesByPassengerId).length
+    ) {
+      return;
+    }
+
+    const hydratedServices = hydrateServicesByPassengerId(
+      servicesQuery.data.services,
+      confirmedServicesByPassengerId
+    );
+
+    if (!Object.keys(hydratedServices).length) {
+      return;
+    }
+
+    setServicesByPassengerId((current) => {
+      let changed = false;
+      const next = { ...current };
+
+      for (const [passengerIdText, services] of Object.entries(hydratedServices)) {
+        const passengerId = Number(passengerIdText);
+        if (!Number.isFinite(passengerId) || hydratedPassengersRef.current.has(passengerId)) {
+          continue;
+        }
+        next[passengerId] = services;
+        hydratedPassengersRef.current.add(passengerId);
+        changed = true;
+      }
+
+      return changed ? next : current;
+    });
+
+    setServiceSaveStatusByPassengerId((current) => {
+      const next = { ...current };
+      let changed = false;
+
+      for (const passengerIdText of Object.keys(confirmedServicesByPassengerId)) {
+        const passengerId = Number(passengerIdText);
+        if (!Number.isFinite(passengerId) || next[passengerId] === 'saved') continue;
+        next[passengerId] = 'saved';
+        changed = true;
+      }
+
+      return changed ? next : current;
+    });
+  }, [bookingResponse?.confirmedServicesByPassengerId, servicesQuery.data?.services]);
+
+  const activePassengerServices = activePassengerId
+    ? (servicesByPassengerId[activePassengerId] ?? [])
+    : [];
+  const activePassengerServiceStatus =
+    activePassengerId != null
+      ? (serviceSaveStatusByPassengerId[activePassengerId] ?? 'idle')
+      : 'idle';
   const pricing = bookingResponse?.pricing ?? bookingDraft.pricing;
   const serviceCurrency =
-    selectedServices[0]?.currency ?? servicesQuery.data?.currency ?? pricing?.currency ?? 'VND';
-  const totalServicePrice = selectedServices.reduce((total, service) => total + service.price, 0);
+    activePassengerServices[0]?.currency ??
+    servicesQuery.data?.currency ??
+    pricing?.currency ??
+    'VND';
+  const totalServicePrice = activePassengerServices.reduce(
+    (total, service) => total + service.price,
+    0
+  );
   const totalPriceLabel = pricing
     ? formatMoney(pricing.discountedTotalPrice, pricing.currency || 'VND')
     : null;
@@ -184,6 +427,102 @@ export default function SeatSelection() {
           ? 'Khong the tai danh sach dich vu luc nay.'
           : null;
 
+  const handleSeatPreview = (seat: SeatSelectionValue) => {
+    setSelectedSeat(seat);
+  };
+
+  const handleSeatConfirm = (seat: SeatSelectionValue) => {
+    setSelectedSeat(seat);
+    const bookingIdNumeric = pickNumericId(bookingResponse?.bookingId);
+    if (bookingIdNumeric == null) return;
+    const passengerId = resolveStorePassengerId(
+      bookingResponse?.passengers?.[activePassengerIndex]
+    );
+    if (passengerId == null) return;
+    if (assignInFlight.current) return;
+    assignInFlight.current = true;
+    assignSeatMutation.mutate(
+      { bookingId: bookingIdNumeric, passengerId, seatId: seat.seatId },
+      {
+        onSettled: () => {
+          assignInFlight.current = false;
+        },
+      }
+    );
+  };
+
+  const handleSeatCancel = (seat: SeatSelectionValue) => {
+    setSelectedSeat(seat);
+    const bookingIdNumeric = pickNumericId(bookingResponse?.bookingId);
+    if (bookingIdNumeric == null) return;
+    const passengerId = resolveStorePassengerId(
+      bookingResponse?.passengers?.[activePassengerIndex]
+    );
+    if (passengerId == null) return;
+    if (assignInFlight.current) return;
+    assignInFlight.current = true;
+    cancelSeatMutation.mutate(
+      { bookingId: bookingIdNumeric, passengerId, seatId: seat.seatId },
+      {
+        onSettled: () => {
+          assignInFlight.current = false;
+        },
+      }
+    );
+  };
+
+  const handleActivePassengerServicesChange = (services: SelectedServiceOption[]) => {
+    if (activePassengerId == null) return;
+    hydratedPassengersRef.current.add(activePassengerId);
+    setServicesByPassengerId((current) => ({
+      ...current,
+      [activePassengerId]: services,
+    }));
+    setServiceSaveStatusByPassengerId((current) => ({
+      ...current,
+      [activePassengerId]: 'idle',
+    }));
+  };
+
+  const handleServicesConfirm = () => {
+    const bookingIdNumeric = pickNumericId(bookingResponse?.bookingId);
+    if (bookingIdNumeric == null || activePassengerId == null) return;
+    const services = servicesByPassengerId[activePassengerId] ?? [];
+    const selections = buildSelectionsFromSelectedServices(services);
+
+    hydratedPassengersRef.current.add(activePassengerId);
+    setServiceSaveStatusByPassengerId((current) => ({
+      ...current,
+      [activePassengerId]: 'saving',
+    }));
+
+    servicesMutation.mutate(
+      { bookingId: bookingIdNumeric, passengerId: activePassengerId, selections },
+      {
+        onSuccess: (data, variables) => {
+          applyServicesAssignmentResult(data, [variables.passengerId]);
+          setServiceSaveStatusByPassengerId((current) => ({
+            ...current,
+            [variables.passengerId]: 'saved',
+          }));
+          toast.success(`Da luu dich vu cho hanh khach ${activePassengerIndex + 1}.`);
+        },
+        onError: (error, variables) => {
+          setServiceSaveStatusByPassengerId((current) => ({
+            ...current,
+            [variables.passengerId]: 'error',
+          }));
+          toast.error(
+            getBookingSessionExpiredMessage(error) ??
+              (error instanceof Error
+                ? error.message
+                : 'Khong the cap nhat dich vu. Vui long thu lai.')
+          );
+        },
+      }
+    );
+  };
+
   return (
     <div className="relative min-h-screen bg-surface font-body text-on-surface antialiased">
       <SiteHeader />
@@ -196,31 +535,43 @@ export default function SeatSelection() {
               Select Passenger
             </p>
             <div className="flex flex-wrap gap-3">
-              {passengers.map((p, idx) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={`flex min-w-0 items-center space-x-3 rounded-lg border-2 px-4 py-3 ${
-                    idx === 0
-                      ? 'border-midnight-burgundy bg-midnight-burgundy/5'
-                      : 'border-transparent bg-surface-container-low hover:border-luxury-gold/30'
-                  }`}
-                >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-midnight-burgundy text-xs font-bold text-white">
-                    {idx + 1}
-                  </span>
-                  <div className="text-left">
-                    <p className="text-sm font-bold leading-tight text-midnight-burgundy">
-                      {p.fullName}
-                    </p>
-                    {p.seat ? (
-                      <p className="mt-1 text-[0.625rem] font-bold uppercase tracking-tighter text-luxury-gold">
-                        Seat: {p.seat}
+              {passengers.map((p, idx) => {
+                const passengerId = resolveStorePassengerId(bookingResponse?.passengers?.[idx]);
+                const serviceStatus =
+                  passengerId != null
+                    ? (serviceSaveStatusByPassengerId[passengerId] ?? 'idle')
+                    : 'idle';
+
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setActivePassengerIndex(idx)}
+                    className={`flex min-w-0 items-center space-x-3 rounded-lg border-2 px-4 py-3 ${
+                      idx === activePassengerIndex
+                        ? 'border-midnight-burgundy bg-midnight-burgundy/5'
+                        : 'border-transparent bg-surface-container-low hover:border-luxury-gold/30'
+                    }`}
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-midnight-burgundy text-xs font-bold text-white">
+                      {idx + 1}
+                    </span>
+                    <div className="text-left">
+                      <p className="text-sm font-bold leading-tight text-midnight-burgundy">
+                        {p.fullName}
                       </p>
-                    ) : null}
-                  </div>
-                </button>
-              ))}
+                      <p className="mt-1 text-[0.625rem] font-bold uppercase tracking-tighter text-luxury-gold">
+                        {getServiceStatusLabel(serviceStatus)}
+                      </p>
+                      {p.seat ? (
+                        <p className="mt-1 text-[0.625rem] font-bold uppercase tracking-tighter text-luxury-gold">
+                          Seat: {p.seat}
+                        </p>
+                      ) : null}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -286,6 +637,9 @@ export default function SeatSelection() {
               <p className="mt-6 text-2xl font-black text-secondary">{totalPriceLabel}</p>
             ) : null}
             <p className="text-xs text-on-surface-variant">{passengers.length} khach</p>
+            <p className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-secondary">
+              HK {activePassengerIndex + 1} | {getServiceStatusLabel(activePassengerServiceStatus)}
+            </p>
 
             {selectedSeat ? (
               <div className="mt-4 rounded-lg bg-midnight-burgundy/10 p-3">
@@ -308,14 +662,14 @@ export default function SeatSelection() {
               </div>
             ) : null}
 
-            {selectedServices.length > 0 && (
+            {activePassengerServices.length > 0 && (
               <div className="mt-6 space-y-2 border-t border-outline-variant/20 pt-4">
                 <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                   Dich vu bo sung
                 </p>
-                {selectedServices.map((service) => (
+                {activePassengerServices.map((service, index) => (
                   <div
-                    key={`${service.serviceId}-${service.optionId}`}
+                    key={`${service.serviceId}-${service.optionId}-${index}`}
                     className="flex justify-between gap-3 text-sm"
                   >
                     <span className="text-on-surface-variant">{service.name}</span>
@@ -356,7 +710,11 @@ export default function SeatSelection() {
               loading={canLoadSeatMap && seatMapQuery.isPending}
               error={seatMapError}
               selectedSeat={selectedSeat}
-              onSeatSelect={setSelectedSeat}
+              assignedSeatBySeatId={assignedSeatMetaBySeatId}
+              seatConfirmLoading={assignSeatMutation.isPending || cancelSeatMutation.isPending}
+              onSeatPreview={handleSeatPreview}
+              onSeatConfirm={handleSeatConfirm}
+              onSeatCancel={handleSeatCancel}
             />
           )}
           {isServiceSelecting && (
@@ -364,8 +722,10 @@ export default function SeatSelection() {
               services={servicesQuery.data?.services ?? []}
               loading={canLoadServices && servicesQuery.isPending}
               error={servicesError}
-              selectedServices={selectedServices}
-              onSelectServices={setSelectedServices}
+              selectedServices={activePassengerServices}
+              confirmLoading={activePassengerServiceStatus === 'saving'}
+              onSelectedServicesChange={handleActivePassengerServicesChange}
+              onConfirm={handleServicesConfirm}
             />
           )}
         </aside>

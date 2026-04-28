@@ -294,7 +294,7 @@ function DetailPanel({
 }) {
   if (!seat) {
     return (
-      <div className="rounded-xl border border-outline-variant/20 bg-white/85 p-5 shadow-sm backdrop-blur-md">
+      <div className="rounded-xl border border-outline-variant/20 bg-white/85 p-5 shadow-sm backdrop-blur-md w-82">
         <p className="text-xs font-black uppercase tracking-[0.16em] text-midnight-burgundy">
           Select seat to view details
         </p>
@@ -318,7 +318,7 @@ function DetailPanel({
   );
 
   return (
-    <div className="rounded-xl border border-outline-variant/20 bg-white/90 p-5 shadow-sm backdrop-blur-md">
+    <div className="rounded-xl border border-outline-variant/20 bg-white/90 p-5 shadow-sm backdrop-blur-md w-82">
       <p className="text-xs font-black uppercase tracking-[0.16em] text-midnight-burgundy">
         Selected seat
       </p>
@@ -406,6 +406,14 @@ function DetailPanel({
           {confirmLoading ? 'Dang xu ly...' : 'Select seat'}
         </button>
       )}
+      <button
+        type="button"
+        onClick={onClose}
+        disabled={confirmLoading}
+        className="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md border border-slate-400/30 bg-slate-100/90 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        Return to select
+      </button>
     </div>
   );
 }

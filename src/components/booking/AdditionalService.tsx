@@ -230,15 +230,18 @@ export default function AdditionalService({
             );
           })}
         </div>
-        <Button
-          onClick={() => {
-            //onSelectServices?.(selectedServices);
-            onClose?.();
-          }}
-          className="mt-1 h-15"
-        >
-          Xác nhận
-        </Button>
+        <div className="flex flex-row justify-between items-center gap-5 mt-4">
+          <button
+            onClick={onClose}
+            disabled={confirmLoading}
+            className="inline-flex h-15 w-full items-center justify-center gap-2 rounded-md border border-slate-400/30 bg-slate-100/90 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Return to select
+          </button>
+          <Button onClick={onConfirm} disabled={confirmLoading} className=" h-15">
+            {confirmLoading ? 'Đang lưu...' : 'Xác nhận'}
+          </Button>
+        </div>
       </div>
       <section className="rounded-2xl border border-luxury-gold/15 bg-white flex flex-col w-full flex-1 overflow-hidden">
         <header className="border-b border-luxury-gold/10 bg-[linear-gradient(180deg,rgba(125,6,51,0.06),rgba(255,255,255,0.96))] px-5 py-4 md:px-6">
@@ -321,10 +324,6 @@ export default function AdditionalService({
           })}
         </div>
       </section>
-
-      <Button onClick={onConfirm} disabled={confirmLoading} className="mt-1">
-        {confirmLoading ? 'Dang luu...' : 'Xac nhan'}
-      </Button>
     </div>
   );
 }

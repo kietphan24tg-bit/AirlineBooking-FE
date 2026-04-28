@@ -25,11 +25,18 @@ export interface AircraftSeatsMapProps {
   loading?: boolean;
   error?: string | null;
   selectedSeat?: SeatSelectionValue | null;
-  onSeatSelect?: (seat: SeatSelectionValue | null) => void;
+  /** Click a seat on the map — update preview only; no API. */
+  onSeatPreview?: (seat: SeatSelectionValue) => void;
+  /** "Select seat" in the side panel / bottom bar — parent commits and may call the API. */
+  onSeatConfirm?: (seat: SeatSelectionValue) => void;
+  onSeatCancel?: (seat: SeatSelectionValue) => void;
   onClose?: () => void;
+  /** From last successful seat-assignment API — key is `seatId`. */
+  assignedSeatBySeatId?: ReadonlyMap<number, { label: string; isYours: boolean }> | null;
+  seatConfirmLoading?: boolean;
 }
 
-type SeatVisualState = 'free' | 'paid' | 'unavailable' | 'not_allowed' | 'selected';
+type SeatVisualState = 'free' | 'paid' | 'unavailable' | 'not_allowed' | 'selected' | 'assigned';
 
 type SeatCellViewModel = {
   title: string;
@@ -49,6 +56,7 @@ type SeatDetailViewModel = {
   surchargeText: string;
   farePolicy: string;
   canSelect: boolean;
+  canCancel: boolean;
 };
 
 function normalizeSeatPriceText(value: string): string {
@@ -84,7 +92,20 @@ function getDisplayPriceText(cell: SeatMapCell): string {
   return 'Free';
 }
 
-function getSeatCellViewModel(cell: SeatMapCell, isSelected: boolean): SeatCellViewModel {
+function getSeatCellViewModel(
+  cell: SeatMapCell,
+  isSelected: boolean,
+  assigned: { label: string; isYours: boolean } | null
+): SeatCellViewModel {
+  if (assigned) {
+    return {
+      title: cell.seatNumber,
+      subtitle: assigned.isYours ? 'Da chon (ban)' : assigned.label,
+      appearance: 'assigned',
+      disabled: true,
+    };
+  }
+
   const subtitle = getDisplayPriceText(cell);
   if (isSelected) {
     return {
@@ -127,6 +148,9 @@ function getSeatClasses(variant: SeatVisualState): string {
   if (variant === 'selected') {
     return 'border-midnight-burgundy bg-midnight-burgundy text-white shadow-md ring-2 ring-midnight-burgundy/20';
   }
+  if (variant === 'assigned') {
+    return ' border-slate-500 bg-slate-200/95 text-slate-800 shadow-sm ring-1 ring-slate-400/40';
+  }
   if (variant === 'free') {
     return 'border-emerald-300 bg-emerald-50 text-emerald-950 hover:border-emerald-500 hover:bg-emerald-100';
   }
@@ -141,17 +165,21 @@ function getSeatClasses(variant: SeatVisualState): string {
 
 function handleSeatClick({
   seat,
+  isAssigned,
   isSelected,
   onSelect,
-  showSeatHint,
 }: {
   seat: SeatMapCell;
+  isAssigned: boolean;
   isSelected: boolean;
   onSelect: (seat: SeatMapCell | null) => void;
-  showSeatHint: (message: string) => void;
 }) {
+  if (isAssigned) {
+    onSelect(seat);
+    return;
+  }
   if (!seat.selectable) {
-    showSeatHint(getDisplayPriceText(seat));
+    toast.info(getDisplayPriceText(seat));
     return;
   }
 
@@ -181,11 +209,31 @@ function buildSelection(cell: SeatMapCell): SeatSelectionValue {
 function getSeatDetailViewModel(
   seat: SeatMapCell,
   policyDisplay: SeatMapDisplayItem | undefined,
-  fallbackPolicy: string
+  fallbackPolicy: string,
+  assigned: { label: string; isYours: boolean } | null
 ): SeatDetailViewModel {
   const typeDisplay = seat.seatTypeDisplay ?? fallbackDisplayItem(seat.seatType);
   const categoryDisplay = seat.seatCategoryDisplay ?? fallbackDisplayItem(seat.seatCategory);
   const statusDisplay = seat.statusDisplay ?? fallbackDisplayItem(seat.status);
+
+  if (assigned) {
+    return {
+      heading: `Seat ${seat.seatNumber}`,
+      priceText: getDisplayPriceText(seat),
+      seatType: typeDisplay.label,
+      seatCategory: categoryDisplay.label,
+      description: categoryDisplay.description || typeDisplay.description || '',
+      status: assigned.isYours ? 'Da xac nhan cho ban' : 'Da xac nhan (hanh khach khac)',
+      includedInFare: seat.included ? 'Yes' : 'No',
+      surchargeText:
+        seat.extraPrice == null || seat.currency == null
+          ? '-'
+          : `${seat.extraPrice.toLocaleString('vi-VN')} ${seat.currency}`,
+      farePolicy: policyDisplay?.label ?? fallbackPolicy,
+      canSelect: false,
+      canCancel: assigned.isYours,
+    };
+  }
 
   return {
     heading: `Seat ${seat.seatNumber}`,
@@ -201,6 +249,7 @@ function getSeatDetailViewModel(
         : `${seat.extraPrice.toLocaleString('vi-VN')} ${seat.currency}`,
     farePolicy: policyDisplay?.label ?? fallbackPolicy,
     canSelect: seat.selectable,
+    canCancel: false,
   };
 }
 
@@ -231,11 +280,17 @@ function DetailPanel({
   seat,
   onConfirm,
   onClose,
+  onCancel,
+  assigned,
+  confirmLoading = false,
 }: {
   seatMap: SeatMapResponse;
   seat: SeatMapCell | null;
   onConfirm?: (seat: SeatMapCell) => void;
   onClose?: () => void;
+  onCancel?: (seat: SeatMapCell) => void;
+  assigned: { label: string; isYours: boolean } | null;
+  confirmLoading?: boolean;
 }) {
   if (!seat) {
     return (
@@ -255,7 +310,12 @@ function DetailPanel({
     );
   }
 
-  const vm = getSeatDetailViewModel(seat, seatMap.policyDisplay, seatMap.seatSelectionPolicy);
+  const vm = getSeatDetailViewModel(
+    seat,
+    seatMap.policyDisplay,
+    seatMap.seatSelectionPolicy,
+    assigned
+  );
 
   return (
     <div className="rounded-xl border border-outline-variant/20 bg-white/90 p-5 shadow-sm backdrop-blur-md">
@@ -318,15 +378,34 @@ function DetailPanel({
         </div>
       </div>
 
-      <button
-        type="button"
-        disabled={!vm.canSelect}
-        onClick={() => onConfirm?.(seat)}
-        className="auth-primary-btn mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <Check className="h-4 w-4" />
-        Select seat
-      </button>
+      {assigned ? (
+        vm.canCancel ? (
+          <button
+            type="button"
+            disabled={confirmLoading}
+            onClick={() => onCancel?.(seat)}
+            className="mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md border border-rose-300 bg-rose-50 px-4 text-sm font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Check className="h-4 w-4" />
+            {confirmLoading ? 'Dang xu ly...' : 'Cancel seat'}
+          </button>
+        ) : (
+          <div className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-md border border-slate-400/30 bg-slate-100/90 text-sm font-bold text-slate-800">
+            <Check className="h-4 w-4" />
+            Ghe da duoc giao
+          </div>
+        )
+      ) : (
+        <button
+          type="button"
+          disabled={!vm.canSelect || confirmLoading}
+          onClick={() => onConfirm?.(seat)}
+          className="auth-primary-btn mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Check className="h-4 w-4" />
+          {confirmLoading ? 'Dang xu ly...' : 'Select seat'}
+        </button>
+      )}
     </div>
   );
 }
@@ -335,12 +414,23 @@ function CompactSelectionBar({
   seatMap,
   seat,
   onConfirm,
+  onCancel,
+  assigned,
+  confirmLoading = false,
 }: {
   seatMap: SeatMapResponse;
   seat: SeatMapCell;
   onConfirm?: (seat: SeatMapCell) => void;
+  onCancel?: (seat: SeatMapCell) => void;
+  assigned: { label: string; isYours: boolean } | null;
+  confirmLoading?: boolean;
 }) {
-  const vm = getSeatDetailViewModel(seat, seatMap.policyDisplay, seatMap.seatSelectionPolicy);
+  const vm = getSeatDetailViewModel(
+    seat,
+    seatMap.policyDisplay,
+    seatMap.seatSelectionPolicy,
+    assigned
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 rounded-xl border border-outline-variant/20 bg-white/95 p-4 shadow-2xl backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
@@ -359,15 +449,34 @@ function CompactSelectionBar({
         </p>
       </div>
 
-      <button
-        type="button"
-        disabled={!vm.canSelect}
-        onClick={() => onConfirm?.(seat)}
-        className="auth-primary-btn inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md px-5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <Check className="h-4 w-4" />
-        Select seat
-      </button>
+      {assigned ? (
+        vm.canCancel ? (
+          <button
+            type="button"
+            disabled={confirmLoading}
+            onClick={() => onCancel?.(seat)}
+            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md border border-rose-300 bg-rose-50 px-5 text-sm font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Check className="h-4 w-4" />
+            {confirmLoading ? 'Dang xu ly...' : 'Cancel seat'}
+          </button>
+        ) : (
+          <div className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md border border-slate-400/30 bg-slate-100/90 px-5 text-sm font-bold text-slate-800">
+            <Check className="h-4 w-4" />
+            Da chon
+          </div>
+        )
+      ) : (
+        <button
+          type="button"
+          disabled={!vm.canSelect || confirmLoading}
+          onClick={() => onConfirm?.(seat)}
+          className="auth-primary-btn inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md px-5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Check className="h-4 w-4" />
+          {confirmLoading ? 'Dang xu ly...' : 'Select seat'}
+        </button>
+      )}
     </div>
   );
 }
@@ -386,13 +495,21 @@ export default function AircraftSeatsMap({
   loading = false,
   error = null,
   selectedSeat = null,
-  onSeatSelect,
+  assignedSeatBySeatId = null,
+  seatConfirmLoading = false,
+  onSeatPreview,
+  onSeatConfirm,
+  onSeatCancel,
   onClose,
 }: AircraftSeatsMapProps) {
   const columns = seatMap?.layout.columns ?? [];
   const aisleAfter = new Set(seatMap?.layout.aisleAfterColumns ?? []);
   const zones = seatMap?.layout.seatClassZones ?? [];
   const activeSeatCell = findSeatCellById(seatMap, selectedSeat?.seatId);
+  const activePanelAssigned =
+    activeSeatCell && assignedSeatBySeatId
+      ? (assignedSeatBySeatId.get(activeSeatCell.seatId) ?? null)
+      : null;
 
   return (
     <div className="flex flex-row gap-4 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
@@ -453,6 +570,7 @@ export default function AircraftSeatsMap({
                       label="Unavailable"
                     />
                     <LegendSwatch className="border-rose-200 bg-rose-50" label="Not allowed" />
+                    <LegendSwatch className="border-slate-500 bg-slate-200" label="Your booking" />
                   </div>
                 </div>
                 <div>
@@ -538,8 +656,14 @@ export default function AircraftSeatsMap({
                                   const seat = cellByColumn.get(column);
                                   const parts: ReactElement[] = [];
                                   if (seat) {
+                                    const assignedMeta =
+                                      assignedSeatBySeatId?.get(seat.seatId) ?? null;
                                     const isSelected = selectedSeat?.seatId === seat.seatId;
-                                    const viewModel = getSeatCellViewModel(seat, isSelected);
+                                    const viewModel = getSeatCellViewModel(
+                                      seat,
+                                      isSelected,
+                                      assignedMeta
+                                    );
                                     parts.push(
                                       <button
                                         key={`seat-${row.rowNumber}-${column}`}
@@ -550,14 +674,14 @@ export default function AircraftSeatsMap({
                                           handleSeatClick({
                                             seat,
                                             isSelected,
+                                            isAssigned: assignedMeta != null,
                                             onSelect: (nextSeat) =>
-                                              onSeatSelect?.(
-                                                nextSeat ? buildSelection(nextSeat) : null
-                                              ),
-                                            showSeatHint: (message) => toast.info(message),
+                                              nextSeat
+                                                ? onSeatPreview?.(buildSelection(nextSeat))
+                                                : null,
                                           });
                                         }}
-                                        className={`flex h-18.5 w-26 flex-col items-start justify-center rounded-lg border px-2.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${getSeatClasses(
+                                        className={`flex h-[4.625rem] w-26 flex-col items-start justify-center rounded-lg border px-2.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${getSeatClasses(
                                           viewModel.appearance
                                         )}`}
                                       >
@@ -573,7 +697,7 @@ export default function AircraftSeatsMap({
                                     parts.push(
                                       <div
                                         key={`empty-${row.rowNumber}-${column}`}
-                                        className="h-18.5 w-26 rounded-lg border border-dashed border-outline-variant/10 bg-transparent"
+                                        className="h-[4.625rem] w-26 rounded-lg border border-dashed border-outline-variant/10 bg-transparent"
                                       />
                                     );
                                   }
@@ -581,7 +705,7 @@ export default function AircraftSeatsMap({
                                     parts.push(
                                       <div
                                         key={`aisle-${row.rowNumber}-${column}`}
-                                        className="flex h-18.5 w-26 items-center justify-center"
+                                        className="flex h-[4.625rem] w-26 items-center justify-center"
                                       >
                                         <span className="h-full w-px bg-outline-variant/10" />
                                       </div>
@@ -605,7 +729,10 @@ export default function AircraftSeatsMap({
                 <CompactSelectionBar
                   seatMap={seatMap}
                   seat={activeSeatCell}
-                  onConfirm={(seat) => onSeatSelect?.(buildSelection(seat))}
+                  assigned={activePanelAssigned}
+                  confirmLoading={seatConfirmLoading}
+                  onConfirm={(seat) => onSeatConfirm?.(buildSelection(seat))}
+                  onCancel={(seat) => onSeatCancel?.(buildSelection(seat))}
                 />
               </div>
             ) : (
@@ -619,15 +746,15 @@ export default function AircraftSeatsMap({
       </div>
 
       {seatMap && (
-        <aside className="hidden xl:block w-80">
+        <aside className="hidden xl:block">
           <div className="sticky top-28">
             <DetailPanel
               seatMap={seatMap}
               seat={activeSeatCell}
-              onConfirm={(seat) => {
-                onSeatSelect?.(buildSelection(seat));
-                onClose?.();
-              }}
+              assigned={activePanelAssigned}
+              confirmLoading={seatConfirmLoading}
+              onConfirm={(seat) => onSeatConfirm?.(buildSelection(seat))}
+              onCancel={(seat) => onSeatCancel?.(buildSelection(seat))}
               onClose={onClose}
             />
           </div>

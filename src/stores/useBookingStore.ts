@@ -2,8 +2,13 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type {
   BookingContactPayload,
+  BookingContactWithId,
   BookingCreateResponse,
   BookingPassengerPayload,
+  BookingPassengerWithId,
+  BookingServiceSelectionItem,
+  PutBookingServicesResponse,
+  SeatAssignmentResponse,
 } from '../types/booking.types';
 import type {
   FlightRevalidateFareResponse,
@@ -31,8 +36,13 @@ export interface BookingSession {
   fareCode: string | null;
   pricing: FlightRevalidatePricing | null;
   passengerSummary: FlightRevalidatePassengerSummary | null;
-  contacts: BookingContactPayload[];
-  passengers: BookingPassengerPayload[];
+  contacts: BookingContactWithId[];
+  passengers: BookingPassengerWithId[];
+  confirmedServicesByPassengerId: Record<number, BookingServiceSelectionItem[]>;
+  /** Last successful `PUT /api/bookings/{id}/services` (full response). */
+  lastServicesResult: PutBookingServicesResponse | null;
+  /** Last successful `PUT /api/bookings/{id}/seat-assignments` — used to lock seats on the map. */
+  lastSeatAssignment: SeatAssignmentResponse | null;
   raw: BookingCreateResponse;
 }
 
@@ -45,6 +55,11 @@ interface BookingStore {
     passengers: BookingPassengerPayload[];
   }) => void;
   setBookingResponse: (data: BookingCreateResponse) => void;
+  applySeatAssignmentResult: (data: SeatAssignmentResponse) => void;
+  applyServicesAssignmentResult: (
+    data: PutBookingServicesResponse,
+    submittedPassengerIds: number[]
+  ) => void;
   clearBooking: () => void;
   isRevalidateExpired: () => boolean;
 }
@@ -68,6 +83,46 @@ function pickNumericId(value: unknown): number | null {
 
 function pickText(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function mergeSessionPricingFromTotal(
+  bookingResponse: BookingSession,
+  totalAmount: number
+): Pick<BookingSession, 'pricing' | 'raw'> | null {
+  if (!bookingResponse.pricing) return null;
+  const nextPricing = {
+    ...bookingResponse.pricing,
+    discountedTotalPrice: totalAmount,
+  };
+  return {
+    pricing: nextPricing,
+    raw: bookingResponse.raw
+      ? {
+          ...bookingResponse.raw,
+          pricing: bookingResponse.raw.pricing
+            ? { ...bookingResponse.raw.pricing, discountedTotalPrice: totalAmount }
+            : nextPricing,
+        }
+      : bookingResponse.raw,
+  };
+}
+
+function mergeConfirmedServicesByPassengerId(
+  previous: Record<number, BookingServiceSelectionItem[]>,
+  data: PutBookingServicesResponse,
+  submittedPassengerIds: number[]
+): Record<number, BookingServiceSelectionItem[]> {
+  const next = { ...previous };
+
+  for (const passengerId of submittedPassengerIds) {
+    next[passengerId] = [];
+  }
+
+  for (const passenger of data.passengers ?? []) {
+    next[passenger.passengerId] = passenger.selections ?? [];
+  }
+
+  return next;
 }
 
 function normalizeBookingResponse(
@@ -95,6 +150,9 @@ function normalizeBookingResponse(
     passengerSummary: data.passengerSummary ?? currentDraft.passengerSummary,
     contacts: data.contacts?.length ? data.contacts : currentDraft.contacts,
     passengers: data.passengers?.length ? data.passengers : currentDraft.passengers,
+    confirmedServicesByPassengerId: {},
+    lastServicesResult: null,
+    lastSeatAssignment: null,
     raw: data,
   };
 }
@@ -129,6 +187,43 @@ export const useBookingStore = create<BookingStore>()(
         set((state) => ({
           bookingResponse: normalizeBookingResponse(state.bookingDraft, data),
         })),
+      applySeatAssignmentResult: (data) =>
+        set((state) => {
+          const { bookingResponse } = state;
+          if (!bookingResponse) return state;
+          const merged = mergeSessionPricingFromTotal(bookingResponse, data.totalAmount);
+          if (!merged) {
+            return {
+              bookingResponse: { ...bookingResponse, lastSeatAssignment: data },
+            };
+          }
+          return {
+            bookingResponse: {
+              ...bookingResponse,
+              ...merged,
+              lastSeatAssignment: data,
+            },
+          };
+        }),
+      applyServicesAssignmentResult: (data, submittedPassengerIds) =>
+        set((state) => {
+          const { bookingResponse } = state;
+          if (!bookingResponse) return state;
+          const merged = mergeSessionPricingFromTotal(bookingResponse, data.totalAmount);
+          if (!merged) return state;
+          return {
+            bookingResponse: {
+              ...bookingResponse,
+              ...merged,
+              confirmedServicesByPassengerId: mergeConfirmedServicesByPassengerId(
+                bookingResponse.confirmedServicesByPassengerId,
+                data,
+                submittedPassengerIds
+              ),
+              lastServicesResult: data,
+            },
+          };
+        }),
       clearBooking: () =>
         set({
           bookingDraft: initialDraftState,
@@ -158,7 +253,15 @@ export const useBookingStore = create<BookingStore>()(
         const state = persistedState as Partial<BookingStore>;
         return {
           bookingDraft: state.bookingDraft ?? initialDraftState,
-          bookingResponse: state.bookingResponse ?? null,
+          bookingResponse: state.bookingResponse
+            ? {
+                ...state.bookingResponse,
+                confirmedServicesByPassengerId:
+                  state.bookingResponse.confirmedServicesByPassengerId ?? {},
+                lastServicesResult: state.bookingResponse.lastServicesResult ?? null,
+                lastSeatAssignment: state.bookingResponse.lastSeatAssignment ?? null,
+              }
+            : null,
         };
       },
     }

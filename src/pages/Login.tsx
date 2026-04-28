@@ -64,7 +64,7 @@ export default function Login() {
     clearErrors('root.serverError');
     try {
       await signIn(values.email, values.password);
-      navigate('/home', { replace: true });
+      navigate('/', { replace: true });
     } catch (error) {
       applyBackendFieldErrors<LoginFormValues>(error, setError, ['email', 'password']);
     }
@@ -167,7 +167,7 @@ export default function Login() {
           <Button
             type="button"
             variant="ghost"
-            className="!w-auto border border-outline-variant/30"
+            className="w-auto! border border-outline-variant/30"
             icon={
               <img
                 alt="Google"
@@ -181,7 +181,7 @@ export default function Login() {
           <Button
             type="button"
             variant="ghost"
-            className="!w-auto border border-outline-variant/30"
+            className="w-auto! border border-outline-variant/30"
             icon={<Smartphone className="h-5 w-5 text-on-surface" aria-hidden strokeWidth={1.75} />}
           >
             Apple
@@ -202,7 +202,7 @@ export default function Login() {
             className="absolute inset-0 cursor-default border-0 bg-black/45 p-0"
             onClick={() => setForgotOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-md rounded-xl border border-[rgba(230,189,184,0.25)] bg-surface-lowest p-6 shadow-[var(--shadow-ambient)]">
+          <div className="relative z-10 w-full max-w-md rounded-xl border border-[rgba(230,189,184,0.25)] bg-surface-lowest p-6 shadow-(--shadow-ambient)">
             <h2
               id="forgot-password-title"
               className="font-headline text-xl font-bold tracking-[-0.02em] text-on-surface"

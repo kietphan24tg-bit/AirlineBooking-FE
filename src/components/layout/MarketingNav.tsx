@@ -77,9 +77,9 @@ export default function MarketingNav({ active = 'book', showSignIn = true }: Mar
             <span className="block truncate not-italic">The Sovereign</span>
           </Link>
           <div className="hidden items-center gap-6 md:flex md:gap-8">
-            {item('book', 'Book', '/')}
+            {item('book', 'Home', '/')}
             {item('manage', 'Manage', '/manage-booking')}
-            {item('experience', 'Experience', '/')}
+            {item('experience', 'Experience', '/experience')}
             {item('loyalty', 'Loyalty', '/')}
           </div>
         </div>

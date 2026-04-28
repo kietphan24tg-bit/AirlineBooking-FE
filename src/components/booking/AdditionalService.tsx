@@ -20,6 +20,7 @@ export interface AdditionalServiceProps {
   error?: string | null;
   selectedServices?: SelectedServiceOption[];
   onSelectServices?: (services: SelectedServiceOption[]) => void;
+  onClose?: () => void;
 }
 
 function fallbackIconForServiceType(serviceType: string): LucideIcon {
@@ -99,6 +100,7 @@ export default function AdditionalService({
   error = null,
   selectedServices: confirmedServices = [],
   onSelectServices,
+  onClose,
 }: AdditionalServiceProps) {
   const activeServices = useMemo(() => getActiveServices(services), [services]);
   const [selectedServices, setSelectedServices] =
@@ -143,7 +145,7 @@ export default function AdditionalService({
             />
           ))}
         </div>
-        <div className="h-72 animate-pulse rounded-[1.5rem] bg-white" />
+        <div className="h-72 animate-pulse rounded-3xl bg-white" />
       </div>
     );
   }
@@ -172,65 +174,75 @@ export default function AdditionalService({
   const ActiveIcon = fallbackIconForServiceType(activeService.serviceType);
 
   return (
-    <div className="flex flex-col gap-5 rounded-[1.75rem] border border-luxury-gold/15 bg-surface-container-lowest p-5 shadow-[0_18px_45px_rgba(62,16,30,0.08)] md:p-6">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-        {activeServices.map((service) => {
-          const Icon = fallbackIconForServiceType(service.serviceType);
-          const hasSelection = selectedServices.some(
-            (selectedService) => selectedService.serviceId === service.serviceId
-          );
-          const isActive = service.serviceId === activeService.serviceId;
+    <div className="flex flex-row gap-5 rounded-[1.75rem] border border-luxury-gold/15 bg-surface-container-lowest p-5 shadow-[0_18px_45px_rgba(62,16,30,0.08)] md:p-6 h-170">
+      <div className=" w-100 flex flex-col justify-between">
+        <div className="flex flex-col flex-1 gap-y-4 overflow-y-auto">
+          {activeServices.map((service) => {
+            const Icon = fallbackIconForServiceType(service.serviceType);
+            const hasSelection = selectedServices.some(
+              (selectedService) => selectedService.serviceId === service.serviceId
+            );
+            const isActive = service.serviceId === activeService.serviceId;
 
-          return (
-            <button
-              key={service.serviceId}
-              type="button"
-              onClick={() => setActiveServiceId(service.serviceId)}
-              className={`group flex items-start gap-4 rounded-2xl border p-4 text-left transition-all duration-200 ${
-                isActive
-                  ? 'border-midnight-burgundy bg-midnight-burgundy/[0.06] shadow-[0_10px_30px_rgba(125,6,51,0.12)]'
-                  : 'border-luxury-gold/15 bg-white hover:border-midnight-burgundy/30 hover:bg-surface-container-low'
-              }`}
-            >
-              <ServiceIcon
-                iconUrl={service.iconUrl}
-                icon={Icon}
-                className={`relative mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl ${
+            return (
+              <button
+                key={service.serviceId}
+                type="button"
+                onClick={() => setActiveServiceId(service.serviceId)}
+                className={`group h-25 w-full flex items-start gap-4 rounded-2xl border p-4 text-left transition-all duration-200 ${
                   isActive
-                    ? 'bg-midnight-burgundy text-luxury-gold'
-                    : 'bg-luxury-gold/10 text-luxury-gold'
+                    ? 'border-midnight-burgundy bg-midnight-burgundy/6'
+                    : 'border-luxury-gold/15 bg-white hover:border-midnight-burgundy/30 hover:bg-surface-container-low'
                 }`}
-                imageClassName="absolute h-7 w-7 object-contain"
-              />
-              <span className="min-w-0 flex-1">
-                <span className="flex items-start justify-between gap-3">
-                  <span>
-                    <span className="block font-headline text-[1.05rem] font-black text-midnight-burgundy">
-                      {service.serviceName}
+              >
+                <ServiceIcon
+                  iconUrl={service.iconUrl}
+                  icon={Icon}
+                  className={`relative mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl ${
+                    isActive
+                      ? 'bg-midnight-burgundy text-luxury-gold'
+                      : 'bg-luxury-gold/10 text-luxury-gold'
+                  }`}
+                  imageClassName="absolute h-7 w-7 object-contain"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-start justify-between gap-3">
+                    <span>
+                      <span className="block font-headline text-[1.05rem] font-black text-midnight-burgundy">
+                        {service.serviceName}
+                      </span>
+                      <span className="mt-1 block text-sm text-on-surface-variant">
+                        {service.selectionMode === 'MULTIPLE'
+                          ? 'Chon nhieu tuy chon'
+                          : 'Chon mot tuy chon'}
+                      </span>
                     </span>
-                    <span className="mt-1 block text-sm text-on-surface-variant">
-                      {service.selectionMode === 'MULTIPLE'
-                        ? 'Chon nhieu tuy chon'
-                        : 'Chon mot tuy chon'}
+                    <span
+                      className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border transition-colors ${
+                        hasSelection
+                          ? 'border-midnight-burgundy bg-midnight-burgundy text-white'
+                          : 'border-outline/40 bg-white'
+                      }`}
+                    >
+                      {hasSelection ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : null}
                     </span>
-                  </span>
-                  <span
-                    className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border transition-colors ${
-                      hasSelection
-                        ? 'border-midnight-burgundy bg-midnight-burgundy text-white'
-                        : 'border-outline/40 bg-white'
-                    }`}
-                  >
-                    {hasSelection ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : null}
                   </span>
                 </span>
-              </span>
-            </button>
-          );
-        })}
+              </button>
+            );
+          })}
+        </div>
+        <Button
+          onClick={() => {
+            onSelectServices?.(selectedServices);
+            onClose?.();
+          }}
+          className="mt-1 h-15"
+        >
+          Xác nhận
+        </Button>
       </div>
-
-      <section className="overflow-hidden rounded-[1.5rem] border border-luxury-gold/15 bg-white">
+      <section className="rounded-2xl border border-luxury-gold/15 bg-white flex flex-col w-full flex-1 overflow-hidden">
         <header className="border-b border-luxury-gold/10 bg-[linear-gradient(180deg,rgba(125,6,51,0.06),rgba(255,255,255,0.96))] px-5 py-4 md:px-6">
           <p className="text-[0.7rem] font-bold uppercase tracking-[0.24em] text-secondary/80">
             {activeService.serviceType.replace(/_/g, ' ')}
@@ -255,7 +267,7 @@ export default function AdditionalService({
           </div>
         </header>
 
-        <div className="grid gap-4 px-5 py-5 md:grid-cols-2 md:px-6 xl:grid-cols-2">
+        <div className="grid gap-4 px-5 py-5 md:grid-cols-2 md:px-6 xl:grid-cols-2 overflow-y-auto">
           {activeService.options.map((option) => {
             const selected = isSelected(selectedServices, option.serviceId, option.optionId);
 
@@ -268,9 +280,9 @@ export default function AdditionalService({
                     selectOption(previous, option, activeService.selectionMode)
                   )
                 }
-                className={`group flex h-full min-h-44 flex-col rounded-[1.35rem] border p-4 text-left transition-all duration-200 ${
+                className={`group flex h-full flex-col rounded-[1.35rem] border p-4 text-left transition-all duration-200 ${
                   selected
-                    ? 'border-midnight-burgundy bg-midnight-burgundy/[0.05] shadow-[0_14px_30px_rgba(125,6,51,0.08)]'
+                    ? 'border-midnight-burgundy bg-midnight-burgundy/5 shadow-[0_14px_30px_rgba(125,6,51,0.08)]'
                     : 'border-outline-variant/20 bg-surface-container-lowest hover:border-luxury-gold/35 hover:shadow-sm'
                 }`}
               >
@@ -311,10 +323,6 @@ export default function AdditionalService({
           })}
         </div>
       </section>
-
-      <Button onClick={() => onSelectServices?.(selectedServices)} className="mt-1">
-        Xac nhan
-      </Button>
     </div>
   );
 }

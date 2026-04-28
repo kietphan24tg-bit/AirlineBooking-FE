@@ -2,7 +2,7 @@ import type { User } from './user.type';
 
 export type RegisterPayload = Pick<
   User,
-  'email' | 'password' | 'firstName' | 'lastName' | 'phone' | 'nationality'
+  'email' | 'password' | 'firstName' | 'lastName' | 'phone' | 'nationality' | 'acceptTerms'
 > & {
   username?: string;
 };

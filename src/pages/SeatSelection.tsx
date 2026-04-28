@@ -130,7 +130,7 @@ export default function SeatSelection() {
 
   const [selectedServices, setSelectedServices] = useState<SelectedServiceOption[]>([]);
   const [selectedSeat, setSelectedSeat] = useState<SeatSelectionValue | null>(null);
-  const [isSeatSelecting, setIsSeatSelecting] = useState(true);
+  const [isSeatSelecting, setIsSeatSelecting] = useState(false);
   const [isServiceSelecting, setIsServiceSelecting] = useState(false);
   const seatContext = useMemo(() => {
     const responseContext = resolveSeatContext(bookingResponse);
@@ -189,186 +189,191 @@ export default function SeatSelection() {
       <SiteHeader />
       <div className="relative z-10 mx-auto max-w-4xl px-6 pt-28" />
       <BookingStepper current="select" />
-      <main className="relative z-10 mx-auto grid max-w-[92rem] grid-cols-1 gap-6 px-4 pb-16 sm:px-6 xl:grid-cols-[17rem_minmax(0,1fr)] xl:px-8">
-        <div className="mb-6 flex flex-col space-y-5 xl:mb-0">
-          <div className="rounded-xl border border-luxury-gold/10 bg-white/60 p-5 shadow-sm backdrop-blur-md">
-            <p className="mb-4 text-[0.6875rem] font-bold uppercase tracking-[0.15em] text-secondary">
-              Select Passenger
-            </p>
-            <div className="flex flex-wrap gap-3">
-              {passengers.map((p, idx) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={`flex min-w-0 items-center space-x-3 rounded-lg border-2 px-4 py-3 ${
-                    idx === 0
-                      ? 'border-midnight-burgundy bg-midnight-burgundy/5'
-                      : 'border-transparent bg-surface-container-low hover:border-luxury-gold/30'
-                  }`}
-                >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-midnight-burgundy text-xs font-bold text-white">
-                    {idx + 1}
-                  </span>
-                  <div className="text-left">
-                    <p className="text-sm font-bold leading-tight text-midnight-burgundy">
-                      {p.fullName}
-                    </p>
-                    {p.seat ? (
-                      <p className="mt-1 text-[0.625rem] font-bold uppercase tracking-tighter text-luxury-gold">
-                        Seat: {p.seat}
-                      </p>
-                    ) : null}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="flex flex-row items-center gap-4 rounded-xl border border-luxury-gold/10 bg-white/60 p-5 shadow-sm backdrop-blur-md duration-200 hover:shadow-lg"
-            onClick={() => {
-              setIsSeatSelecting(true);
-              setIsServiceSelecting(false);
-            }}
-          >
-            <Armchair
-              className="h-16 w-16 shrink-0 rounded-xl bg-midnight-burgundy p-3 text-luxury-gold"
-              strokeWidth={1.5}
-            />
-            <div className="flex flex-col items-start">
-              <h2 className="mb-1 font-headline text-lg font-black text-midnight-burgundy">
-                Chon ghe ngoi
-              </h2>
-              <p className="text-sm text-on-surface-variant">
-                Chon cho ngoi yeu thich cua ban tren may bay.
-              </p>
-            </div>
-            <ChevronRight
-              className="ml-auto h-7 w-7 shrink-0 text-on-surface-variant"
-              strokeWidth={1.5}
-            />
-          </button>
-
-          <button
-            type="button"
-            className="flex flex-row items-center gap-4 rounded-xl border border-luxury-gold/10 bg-white/60 p-5 shadow-sm backdrop-blur-md duration-200 hover:shadow-lg"
-            onClick={() => {
-              setIsServiceSelecting(true);
-              setIsSeatSelecting(false);
-            }}
-          >
-            <LuggageIcon
-              className="h-16 w-16 shrink-0 rounded-xl bg-midnight-burgundy p-3 text-luxury-gold"
-              strokeWidth={1.5}
-            />
-            <div className="flex flex-col items-start">
-              <h2 className="mb-1 font-headline text-lg font-black text-midnight-burgundy">
-                Chon dich vu bo sung
-              </h2>
-              <p className="text-sm text-on-surface-variant">
-                Them hanh ly, bua an, bao hiem va nhieu hon nua.
-              </p>
-            </div>
-            <ChevronRight
-              className="ml-auto h-7 w-7 shrink-0 text-on-surface-variant"
-              strokeWidth={1.5}
-            />
-          </button>
-
-          <div className="rounded-xl border border-luxury-gold/20 bg-surface-container-lowest p-5 shadow-lg">
-            <h3 className="mb-4 font-headline text-lg font-black text-on-surface">Tom tat</h3>
-            <p className="text-sm text-on-surface-variant">
-              Flight #{seatContext.flightId ?? '--'}
-              {seatContext.fareCode ? ` | ${seatContext.fareCode}` : ''}
-            </p>
-            {totalPriceLabel ? (
-              <p className="mt-6 text-2xl font-black text-secondary">{totalPriceLabel}</p>
-            ) : null}
-            <p className="text-xs text-on-surface-variant">{passengers.length} khach</p>
-
-            {selectedSeat ? (
-              <div className="mt-4 rounded-lg bg-midnight-burgundy/10 p-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-midnight-burgundy">
-                  Ghe da chon
+      <main className="relative z-10 mx-auto min-h-svh max-w-7xl gap-6 px-4 pb-16 sm:px-6 xl:grid-cols-[17rem_minmax(0,1fr)] xl:px-8">
+        {!isSeatSelecting && !isServiceSelecting && (
+          <div className="mb-6 flex flex-row space-y-5 xl:mb-0 gap-5">
+            <div className="flex flex-col w-full gap-5">
+              <div className="rounded-xl border border-luxury-gold/10 bg-white/60 p-5 shadow-sm backdrop-blur-md">
+                <p className="mb-4 text-[0.6875rem] font-bold uppercase tracking-[0.15em] text-secondary">
+                  Select Passenger
                 </p>
-                <p className="mt-1 text-lg font-black text-secondary">{selectedSeat.seatNumber}</p>
-                <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
-                  {seatDetails?.seatTypeDisplay?.label ??
-                    selectedSeat.seatTypeDisplay?.label ??
-                    'Seat'}{' '}
-                  |{' '}
-                  {seatDetails?.seatCategoryDisplay?.label ??
-                    selectedSeat.seatCategoryDisplay?.label ??
-                    selectedSeat.seatCategory}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-on-surface">
-                  {seatPriceLabel ?? 'Selected'}
-                </p>
-              </div>
-            ) : null}
-
-            {selectedServices.length > 0 && (
-              <div className="mt-6 space-y-2 border-t border-outline-variant/20 pt-4">
-                <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                  Dich vu bo sung
-                </p>
-                {selectedServices.map((service) => (
-                  <div
-                    key={`${service.serviceId}-${service.optionId}`}
-                    className="flex justify-between gap-3 text-sm"
-                  >
-                    <span className="text-on-surface-variant">{service.name}</span>
-                    <span className="text-right font-bold text-secondary">
-                      {service.priceLabel}
-                    </span>
-                  </div>
-                ))}
-                <div className="border-t border-outline-variant/20 pt-2">
-                  <div className="flex justify-between font-bold text-midnight-burgundy">
-                    <span>Dich vu:</span>
-                    <span>{formatMoney(totalServicePrice, serviceCurrency)}</span>
-                  </div>
+                <div className="flex flex-wrap gap-3">
+                  {passengers.map((p, idx) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`flex min-w-0 items-center space-x-3 rounded-lg border-2 px-4 py-3 ${
+                        idx === 0
+                          ? 'border-midnight-burgundy bg-midnight-burgundy/5'
+                          : 'border-transparent bg-surface-container-low hover:border-luxury-gold/30'
+                      }`}
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-midnight-burgundy text-xs font-bold text-white">
+                        {idx + 1}
+                      </span>
+                      <div className="text-left">
+                        <p className="text-sm font-bold leading-tight text-midnight-burgundy">
+                          {p.fullName}
+                        </p>
+                        {p.seat ? (
+                          <p className="mt-1 text-[0.625rem] font-bold uppercase tracking-tighter text-luxury-gold">
+                            Seat: {p.seat}
+                          </p>
+                        ) : null}
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
-            )}
 
-            <div className="mt-8 flex h-12 flex-row gap-3">
-              <Link
-                to="/home"
-                className="inline-flex w-24 items-center justify-center gap-2 rounded-md bg-cabin-silver px-4"
+              <button
+                type="button"
+                className="flex flex-row items-center gap-4 rounded-xl border border-luxury-gold/10 bg-white/60 p-5 shadow-sm backdrop-blur-md duration-200 hover:shadow-lg h-40"
+                onClick={() => {
+                  setIsSeatSelecting(true);
+                }}
               >
-                Huy
-              </Link>
-              <Link
-                to="/booking/checkout"
-                className="auth-primary-btn inline-flex w-full items-center justify-center gap-2 rounded-md px-4 text-white transition-all hover:bg-midnight-burgundy/90"
+                <Armchair
+                  className="h-30 w-30 shrink-0 rounded-xl bg-midnight-burgundy p-3 text-luxury-gold"
+                  strokeWidth={1}
+                />
+                <div className="flex flex-col items-start">
+                  <h2 className="mb-1 font-headline text-lg font-black text-midnight-burgundy">
+                    Chọn ghế ngồi
+                  </h2>
+                  <p className="text-sm text-on-surface-variant">
+                    Chọn chỗ ngồi yêu thích của bạn trên máy bay.
+                  </p>
+                </div>
+                <ChevronRight
+                  className="ml-auto h-7 w-7 shrink-0 text-on-surface-variant"
+                  strokeWidth={2}
+                />
+              </button>
+
+              <button
+                type="button"
+                className="flex flex-row items-center gap-4 rounded-xl border border-luxury-gold/10 bg-white/60 p-5 shadow-sm backdrop-blur-md duration-200 hover:shadow-lg h-40"
+                onClick={() => {
+                  setIsServiceSelecting(true);
+                }}
               >
-                Thanh toan
-              </Link>
+                <LuggageIcon
+                  className="h-30 w-30 shrink-0 rounded-xl bg-midnight-burgundy p-3 text-luxury-gold"
+                  strokeWidth={1}
+                />
+                <div className="flex flex-col items-start">
+                  <h2 className="mb-1 font-headline text-lg font-black text-midnight-burgundy">
+                    Chọn dịch vụ bổ sung
+                  </h2>
+                  <p className="text-sm text-on-surface-variant">
+                    Thêm hành lý, bữa ăn, bảo hiểm và nhiều hơn nữa.
+                  </p>
+                </div>
+                <ChevronRight
+                  className="ml-auto h-7 w-7 shrink-0 text-on-surface-variant"
+                  strokeWidth={2}
+                />
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-luxury-gold/20 bg-surface-container-lowest p-5 shadow-lg w-150 h-full">
+              <h3 className="mb-4 font-headline text-lg font-black text-on-surface">Tóm tắt</h3>
+              <p className="text-sm text-on-surface-variant">
+                Flight #{seatContext.flightId ?? '--'}
+                {seatContext.fareCode ? ` | ${seatContext.fareCode}` : ''}
+              </p>
+              {totalPriceLabel ? (
+                <p className="mt-6 text-2xl font-black text-secondary">{totalPriceLabel}</p>
+              ) : null}
+              <p className="text-xs text-on-surface-variant">{passengers.length} khach</p>
+
+              {selectedSeat ? (
+                <div className="mt-4 rounded-lg bg-midnight-burgundy/10 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wider text-midnight-burgundy">
+                    Ghe da chon
+                  </p>
+                  <p className="mt-1 text-lg font-black text-secondary">
+                    {selectedSeat.seatNumber}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                    {seatDetails?.seatTypeDisplay?.label ??
+                      selectedSeat.seatTypeDisplay?.label ??
+                      'Seat'}{' '}
+                    |{' '}
+                    {seatDetails?.seatCategoryDisplay?.label ??
+                      selectedSeat.seatCategoryDisplay?.label ??
+                      selectedSeat.seatCategory}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-on-surface">
+                    {seatPriceLabel ?? 'Selected'}
+                  </p>
+                </div>
+              ) : null}
+
+              {selectedServices.length > 0 && (
+                <div className="mt-6 space-y-2 border-t border-outline-variant/20 pt-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    Dich vu bo sung
+                  </p>
+                  {selectedServices.map((service) => (
+                    <div
+                      key={`${service.serviceId}-${service.optionId}`}
+                      className="flex justify-between gap-3 text-sm"
+                    >
+                      <span className="text-on-surface-variant">{service.name}</span>
+                      <span className="text-right font-bold text-secondary">
+                        {service.priceLabel}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="border-t border-outline-variant/20 pt-2">
+                    <div className="flex justify-between font-bold text-midnight-burgundy">
+                      <span>Dich vu:</span>
+                      <span>{formatMoney(totalServicePrice, serviceCurrency)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-8 flex h-12 flex-row gap-3">
+                <Link
+                  to="/home"
+                  className="inline-flex w-24 items-center justify-center gap-2 rounded-md bg-cabin-silver px-4"
+                >
+                  Huy
+                </Link>
+                <Link
+                  to="/booking/checkout"
+                  className="auth-primary-btn inline-flex w-full items-center justify-center gap-2 rounded-md px-4 text-white transition-all hover:bg-midnight-burgundy/90"
+                >
+                  Thanh toan
+                </Link>
+              </div>
             </div>
           </div>
-        </div>
-        <aside className="min-w-0">
-          {isSeatSelecting && (
-            <AircraftSeatsMap
-              seatMap={seatMapQuery.data ?? null}
-              loading={canLoadSeatMap && seatMapQuery.isPending}
-              error={seatMapError}
-              selectedSeat={selectedSeat}
-              onSeatSelect={setSelectedSeat}
-            />
-          )}
-          {isServiceSelecting && (
-            <AdditionalService
-              services={servicesQuery.data?.services ?? []}
-              loading={canLoadServices && servicesQuery.isPending}
-              error={servicesError}
-              selectedServices={selectedServices}
-              onSelectServices={setSelectedServices}
-            />
-          )}
-        </aside>
+        )}
+
+        {isSeatSelecting && (
+          <AircraftSeatsMap
+            seatMap={seatMapQuery.data ?? null}
+            loading={canLoadSeatMap && seatMapQuery.isPending}
+            error={seatMapError}
+            selectedSeat={selectedSeat}
+            onSeatSelect={setSelectedSeat}
+            onClose={() => setIsSeatSelecting(false)}
+          />
+        )}
+        {isServiceSelecting && (
+          <AdditionalService
+            services={servicesQuery.data?.services ?? []}
+            loading={canLoadServices && servicesQuery.isPending}
+            error={servicesError}
+            selectedServices={selectedServices}
+            onSelectServices={setSelectedServices}
+            onClose={() => setIsServiceSelecting(false)}
+          />
+        )}
       </main>
       <SiteFooter />
     </div>

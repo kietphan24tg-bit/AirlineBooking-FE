@@ -672,61 +672,50 @@ export default function Landing() {
           aria-hidden
         />
         <section
-          className={`relative flex w-full items-stretch ${
+          className={`relative flex h-260 w-full items-stretch ${
             isFromPicking || isToPicking || travelersMenuOpen
               ? 'overflow-visible'
               : 'overflow-hidden'
-          } min-h-[max(46rem,calc(100svh-4.5rem))] pt-18 md:min-h-[max(52rem,calc(100svh-5rem))] md:pt-20 lg:min-h-[calc(100svh-5rem)]`}
+          }`}
         >
           <div className="absolute inset-0 z-0 overflow-hidden">
-            <div className="sky-flow-track" aria-hidden>
-              <img alt="" src="/src/assets/sky.jpg" className="sky-flow-tile" />
-              <img
-                alt=""
-                src="/src/assets/sky.jpg"
-                className="sky-flow-tile sky-flow-tile--mirror"
-              />
-              <img alt="" src="/src/assets/sky.jpg" className="sky-flow-tile" />
-              <img
-                alt=""
-                src="/src/assets/sky.jpg"
-                className="sky-flow-tile sky-flow-tile--mirror"
-              />
-            </div>
+            <img alt="" src="/src/assets/sky4.jpg" className="sky-flow-track" />
+            <div className="absolute inset-0 bg-linear-to-t from-black/30 to-white/10" />
             <img
-              alt="clouds"
-              src="/src/assets/cloud.png"
-              className="absolute inset-0 h-full w-full object-cover object-center animate-clouds"
+              alt=""
+              src="/src/assets/wing.png"
+              className="absolute inset-0 pl-70 h-full w-full object-cover"
             />
             <img
-              alt="clouds"
-              src="/src/assets/cloud.png"
-              className="absolute inset-0 h-full w-full object-cover object-center animate-clouds delay-neg-10"
+              alt=""
+              src="/src/assets/wing1.png"
+              className="absolute inset-0 pl-70 h-full w-full object-cover opacity-0 animate-wing-flash"
             />
             <img
-              alt="clouds"
-              src="/src/assets/cloud.png"
-              className="absolute inset-0 h-full w-full object-cover object-center animate-clouds delay-neg-20"
+              alt=""
+              src="/src/assets/window.png"
+              className="absolute inset-0 h-full w-full object-cover"
             />
-            <img
-              alt="plane"
-              src="/src/assets/plane.png"
-              className="absolute inset-0 h-full w-full scale-[1.08] object-cover object-[58%_60%] sm:scale-100 sm:object-[60%_58%] md:object-[62%_56%] lg:scale-95 lg:object-center"
-            />
-            <div className="absolute inset-0 bg-linear-to-t from-black/40 via-black/10 to-white/20" />
           </div>
-          <div className="relative mx-auto flex w-full min-w-0 max-w-480 flex-1 flex-col px-4 pb-4 pt-4 sm:px-6 sm:pb-8 sm:pt-6 md:px-10 md:pb-10 lg:px-20 lg:pb-0 lg:pt-8">
-            <div className="max-w-[15rem] sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
-              <h1 className="landing-hero-title mb-3 font-headline text-[2.35rem] font-black leading-[0.88] tracking-[-0.07em] text-white drop-shadow-xl sm:text-[3.5rem] md:mb-5 md:text-[4.75rem] lg:text-7xl">
+          <div className="relative mx-auto flex h-220 w-full min-w-0 max-w-480 flex-col px-4 pb-0 pt-24 sm:px-6 md:px-20 md:pb-0">
+            <div className="max-w-full mt-50 pt-4 md:pt-6">
+              <h1 className="mb-4 font-headline text-4xl font-black leading-[0.92] tracking-tighter text-white md:mb-5 md:text-7xl drop-shadow-2xl">
                 REDEFINING <br />
                 THE <span className="text-luxury-gold">EXCEPTIONAL</span>
               </h1>
+              <div className="mt-12 flex items-center gap-4">
+                <div className="h-px w-20 bg-luxury-gold" />
+                <span className="font-label text-xs font-bold uppercase tracking-[0.2em] text-luxury-gold">
+                  Make it an incredible journey
+                </span>
+                <div className="h-px w-20 bg-luxury-gold" />
+              </div>
             </div>
             <div
               ref={glassPanelRef}
               onFocusCapture={() => queueMicrotask(syncBookingPanelBlur)}
               onBlurCapture={() => queueMicrotask(syncBookingPanelBlur)}
-              className="landing-hero-booking-panel glass-panel relative z-[55] mt-4 w-full min-w-0 rounded-[1.25rem] border border-luxury-gold/20 p-1 shadow-2xl sm:mt-6 md:mt-auto md:max-w-400"
+              className="glass-panel relative z-55 mt-auto w-full min-w-0 max-w-500 rounded-xl border border-luxury-gold/20 p-1 shadow-2xl"
             >
               {/* Trip Type Toggle */}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-luxury-gold/10 px-4 py-2.5 sm:px-5 sm:py-4">

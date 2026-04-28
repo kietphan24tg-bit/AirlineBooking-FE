@@ -12,6 +12,7 @@ import Register from '../pages/Register';
 import SeatSelection from '../pages/SeatSelection';
 import TripHistory from '../pages/TripHistory';
 import ManageBooking from '../pages/ManageBooking';
+import Experience from '../pages/Experience';
 
 const AppRouter = createBrowserRouter([
   {
@@ -25,6 +26,10 @@ const AppRouter = createBrowserRouter([
   {
     path: '/register',
     element: <Register />,
+  },
+  {
+    path: '/experience',
+    element: <Experience />,
   },
   {
     path: '/flights',

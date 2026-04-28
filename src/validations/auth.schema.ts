@@ -17,6 +17,7 @@ export const registerSchema = z
     email: z.email('Email không đúng định dạng.'),
     firstName: z.string().min(1, 'Vui lòng nhập tên.'),
     lastName: z.string().min(1, 'Vui lòng nhập họ.'),
+    acceptTerms: z.literal(true, 'Vui lòng chấp nhận điều khoản.'),
     phone: z.string().min(1, 'Vui lòng nhập số điện thoại.'),
     nationality: nationalityEnum,
     password: z

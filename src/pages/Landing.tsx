@@ -18,8 +18,9 @@ import {
   MapPin,
   Gift,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { toast } from 'sonner';
 import MarketingNav from '../components/layout/MarketingNav';
 import SiteFooter from '../components/layout/SiteFooter';
 import { airportService, type Airport } from '../services/airport.service';
@@ -391,6 +392,7 @@ function LandingAirportSearchPanel({
 
 export default function Landing() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [airportList, setAirportList] = useState<Airport[]>([]);
   const [airportsByRegion, setAirportsByRegion] = useState<Record<string, Airport[]>>({});
   const [isFromPicking, setIsFromPicking] = useState(false);
@@ -438,6 +440,13 @@ export default function Landing() {
 
   const todayMin = toDateInputValue(new Date());
   const returnDateMin = departDate && departDate >= todayMin ? departDate : todayMin;
+
+  useEffect(() => {
+    const state = location.state as { paymentExpired?: boolean } | null;
+    if (!state?.paymentExpired) return;
+    toast.error('Phiên thanh toán đã hết hạn. Ghế/đặt chỗ không còn được giữ. Vui lòng đặt lại.');
+    navigate('/', { replace: true, state: null });
+  }, [location.state, navigate]);
 
   useEffect(() => {
     if (!departDate) return;
@@ -566,7 +575,7 @@ export default function Landing() {
     if (!isFromPicking && !isToPicking) return;
     const id = requestAnimationFrame(() => airportSearchInputRef.current?.focus());
     return () => cancelAnimationFrame(id);
-  }, [isFromPicking, isToPicking]);
+  }, [isFromPicking, isToPicking, closeAirportPicker]);
 
   useEffect(() => {
     if (!isFromPicking && !isToPicking) return;
@@ -625,7 +634,7 @@ export default function Landing() {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [isFromPicking, isToPicking, regionsModalOpen, travelersMenuOpen]);
+  }, [isFromPicking, isToPicking, regionsModalOpen, travelersMenuOpen, closeAirportPicker]);
 
   const updateairports = async () => {
     try {

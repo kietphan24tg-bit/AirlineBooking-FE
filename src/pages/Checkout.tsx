@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import AmbientSweep from '../components/layout/AmbientSweep';
 import BookingStepper from '../components/booking/BookingStepper';
 import Button from '../components/ui/Button';
@@ -70,6 +71,17 @@ function paymentMethodsErrorMessage(status: number | undefined, data: unknown): 
 function resolvePaymentId(payment: CreatePaymentResponse | null): string | number | null {
   const id = payment?.payment?.id ?? payment?.payment?.paymentId;
   return id == null ? null : id;
+}
+
+function isStripeMethod(method?: PaymentMethod | null): boolean {
+  return !!method && (method.provider ?? '').trim().toUpperCase() === 'STRIPE';
+}
+
+function resolveRedirectUrl(res: CreatePaymentResponse): string | null {
+  const url = res.action?.paymentUrl ?? res.payment?.paymentUrl ?? null;
+  if (typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function MethodIconButton({
@@ -190,6 +202,32 @@ export default function Checkout() {
     }
   }, [hasBooking, navigate]);
 
+  useEffect(() => {
+    const resetTransientPaymentState = () => {
+      setCreatingPayment(false);
+      setRegeneratingPayment(false);
+      setCheckingStatus(false);
+      setCancelingPayment(false);
+    };
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        resetTransientPaymentState();
+      }
+    };
+
+    const handleFocus = () => {
+      resetTransientPaymentState();
+    };
+
+    window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
   const acceptTerms = watch('acceptTerms');
 
   const errorStatus = axios.isAxiosError(paymentMethodsQuery.error)
@@ -234,8 +272,24 @@ export default function Checkout() {
       setPaymentError(null);
       setStatusOverride(null);
       setCreatingPayment(true);
+      const selectedMethod = flatMethods.find((m) => m.code === selectedCode) ?? null;
+      const stripeFlow = isStripeMethod(selectedMethod);
       try {
         const res = await createPaymentLink({ bookingId, method: selectedCode });
+        if (stripeFlow) {
+          const redirectUrl = resolveRedirectUrl(res);
+          if (redirectUrl) {
+            setCreatingPayment(false);
+            window.location.assign(redirectUrl);
+            return;
+          }
+          const fallbackMsg = 'Không nhận được liên kết thanh toán Stripe. Vui lòng thử lại.';
+          setPaymentError(fallbackMsg);
+          setQrPayment(null);
+          toast.error(fallbackMsg);
+          setCreatingPayment(false);
+          return;
+        }
         setQrPayment(res);
       } catch (err) {
         const status = axios.isAxiosError(err) ? err.response?.status : undefined;
@@ -249,9 +303,10 @@ export default function Checkout() {
               : 'Không thể tạo mã thanh toán. Vui lòng thử lại.');
         setPaymentError(msg);
         setQrPayment(null);
-      } finally {
         setCreatingPayment(false);
+        return;
       }
+      setCreatingPayment(false);
     })();
   };
 

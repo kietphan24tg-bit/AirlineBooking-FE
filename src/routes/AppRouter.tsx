@@ -13,6 +13,7 @@ import SeatSelection from '../pages/SeatSelection';
 import TripHistory from '../pages/TripHistory';
 import ManageBooking from '../pages/ManageBooking';
 import Experience from '../pages/Experience';
+import CheckoutResult from '../pages/CheckoutResult';
 
 const AppRouter = createBrowserRouter([
   {
@@ -50,6 +51,10 @@ const AppRouter = createBrowserRouter([
   {
     path: '/booking/checkout',
     element: <Checkout />,
+  },
+  {
+    path: '/booking/checkout/result',
+    element: <CheckoutResult />,
   },
   {
     path: '/trips',

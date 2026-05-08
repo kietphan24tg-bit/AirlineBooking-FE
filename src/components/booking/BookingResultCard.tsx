@@ -9,6 +9,7 @@ import {
   CircleX,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export interface BookingResultCardProps {
   trip: TripRecord;
@@ -88,6 +89,7 @@ function PassengerCard({ passenger }: { passenger: PassengerBookingDetails }) {
 }
 
 export default function BookingResultCard({ trip }: BookingResultCardProps) {
+  const navigate = useNavigate();
   return (
     <div className=" flex flex-row overflow-hidden bg-surface-container-lowest/90 gap-4">
       <div className="flex flex-1 flex-col gap-4">
@@ -214,7 +216,10 @@ export default function BookingResultCard({ trip }: BookingResultCardProps) {
 
       <div className="flex flex-col p-7 rounded-xl w-full bg-white">
         <p className="font-bold text-xl mb-2">Quản lý đặt chỗ</p>
-        <button className="flex flex-row justify-between items-center border-cabin-silver border-2 rounded-xl p-5 mb-4 shadow-sm backdrop-blur-sm transition-all duration-200 hover:shadow-xl">
+        <button
+          className="flex flex-row justify-between items-center border-cabin-silver border-2 rounded-xl p-5 mb-4 shadow-sm backdrop-blur-sm transition-all duration-200 hover:shadow-xl"
+          onClick={() => navigate('/manage-booking/check-in')}
+        >
           <div className="flex flex-row items-center">
             <SquareCheckBig className="size-12 bg-midnight-burgundy stroke-luxury-gold p-2 rounded-md" />
             <div className="flex flex-col items-start ml-3">
@@ -238,7 +243,10 @@ export default function BookingResultCard({ trip }: BookingResultCardProps) {
           <ChevronRight />
         </button>
 
-        <button className="flex flex-row justify-between items-center border-cabin-silver border-2 rounded-xl p-5 mb-4 shadow-sm backdrop-blur-sm transition-all duration-200 hover:shadow-xl">
+        <button
+          className="flex flex-row justify-between items-center border-cabin-silver border-2 rounded-xl p-5 mb-4 shadow-sm backdrop-blur-sm transition-all duration-200 hover:shadow-xl"
+          onClick={() => navigate('/manage-booking/cancel')}
+        >
           <div className="flex flex-row items-center">
             <CircleX className="size-12 bg-midnight-burgundy stroke-luxury-gold p-2 rounded-md" />
             <div className="flex flex-col items-start ml-3">

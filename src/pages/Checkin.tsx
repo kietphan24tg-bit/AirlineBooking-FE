@@ -1,464 +1,2118 @@
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
-  AlertTriangle,
+  AlertCircle,
+  Armchair,
   ArrowRight,
   Briefcase,
+  Check,
   CheckCircle2,
+  ChevronRight,
   ClipboardList,
-  Clock,
   Download,
+  Headphones,
+  HelpCircle,
   Home,
+  Info,
+  Loader2,
+  MessageSquare,
   Plane,
-  ShieldCheck,
-  SquareCheckBig,
   Ticket,
+  User,
+  X,
 } from 'lucide-react';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import AircraftSeatsMap, { type SeatSelectionValue } from '../components/booking/AircraftSeatsMap';
 import SiteFooter from '../components/layout/SiteFooter';
 import SiteHeader from '../components/layout/SiteHeader';
+import { bookingService } from '../services/booking.service';
+import { flightService } from '../services/flight.service';
+import { useBookingStore } from '../stores/useBookingStore';
+import type { BookingLookupResponse, BookingManageOptionsResponse } from '../types/booking.types';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+type FlightWindowStatus = 'OPEN' | 'NOT_OPEN' | 'CLOSED';
+type SegmentStatus = 'READY' | 'SEAT_SELECTION_REQUIRED' | 'BLOCKED';
 
-interface MockPassenger {
-  id: string;
-  name: string;
-  type: 'Người lớn' | 'Trẻ em' | 'Em bé';
-  dob: string;
-  seat: string;
+interface DerivedPassengerSegment {
+  flightId: string;
+  eligible: boolean;
+  checkInStatus: string;
+  seatAssigned: boolean;
+  seatNumber: string | null;
+  warnings: string[];
 }
 
-// ─── Mock data ───────────────────────────────────────────────────────────────
+interface DerivedPassenger {
+  id: string;
+  name: string;
+  type: string;
+  dob: string;
+  segments: Record<string, DerivedPassengerSegment>;
+}
 
-const MOCK_FLIGHT = {
-  flightNumber: 'VJ123',
-  aircraft: 'AIRBUS A321 · Bay thẳng',
-  departureTime: '08:30',
-  departureCode: 'SGN',
-  departureCity: 'TP. Hồ Chí Minh',
-  departureAirport: 'Tân Sơn Nhất',
-  arrivalTime: '10:05',
-  arrivalCode: 'HAN',
-  arrivalCity: 'Hà Nội',
-  arrivalAirport: 'Nội Bài',
-  duration: '1h 35m',
-  dateLabel: 'Thứ 3, 28/05/2024',
-  cabin: 'Eco Economy',
-  checkinAvailable: true,
-  checkinOpen: '00:00 · 26/05/2024',
-  checkinClose: '07:30 · 28/05/2024',
-};
+interface DerivedFlight {
+  id: string;
+  numericId: number;
+  flightNumber: string;
+  departureCode: string;
+  departureCity: string;
+  departureTime: string;
+  departureTerminal: string | null;
+  arrivalCode: string;
+  arrivalCity: string;
+  arrivalTime: string;
+  arrivalTerminal: string | null;
+  dateLabel: string;
+  shortDate: string;
+  durationLabel: string;
+  cabin: string;
+  baggageHandKg: number | null;
+  segmentLabel: string;
+  journeyType: string;
+  segmentStatus: SegmentStatus;
+  checkInWindow: {
+    status: FlightWindowStatus;
+    opensAt: string;
+    closesAt: string;
+    message: string;
+  };
+}
 
-const MOCK_BOOKING = {
-  pnr: 'ABC123',
-  lastName: 'NGUYỄN',
-  totalPassengers: 3,
-};
+interface CheckinNavigationState {
+  bookingId?: number;
+  pnrCode?: string;
+  lastName?: string;
+  expiresAt?: string | null;
+}
 
-const MOCK_PASSENGERS: MockPassenger[] = [
-  { id: 'p1', name: 'NGUYỄN VĂN A', type: 'Người lớn', dob: '01/01/1990', seat: '10A' },
-  { id: 'p2', name: 'TRẦN THỊ B', type: 'Người lớn', dob: '15/05/1992', seat: '10B' },
-  { id: 'p3', name: 'NGUYỄN BẢO C', type: 'Trẻ em', dob: '10/10/2015', seat: '10C' },
-];
+interface BookingDetailFlightItem {
+  id: string;
+  segmentLabel: string;
+  dateLabel: string;
+  departureCode: string;
+  arrivalCode: string;
+  departureTime: string;
+  arrivalTime: string;
+  flightNumber: string;
+  cabinLabel: string;
+  statusLabel: string;
+}
+
+interface BookingDetailPassengerItem {
+  id: string;
+  orderLabel: string;
+  name: string;
+  statusLabel: string;
+  seatLabels: string[];
+  serviceLabels: string[];
+}
+
+interface BookingDetailModalData {
+  pnr: string;
+  statusLabel: string;
+  totalPassengers: number;
+  totalAmountLabel: string;
+  contactLabel: string;
+  flights: BookingDetailFlightItem[];
+  passengers: BookingDetailPassengerItem[];
+}
+
+interface SeatConfirmModalProps {
+  open: boolean;
+  seat: SeatSelectionValue | null;
+  passengerName: string | null;
+  flight: DerivedFlight | null;
+  assigned: { label: string; isYours: boolean } | null;
+  loading: boolean;
+  onClose: () => void;
+  onConfirm: (seat: SeatSelectionValue) => void;
+  onCancelSeat: (seat: SeatSelectionValue) => void;
+}
 
 const NOTES = [
-  {
-    icon: Clock,
-    text: 'Quầy làm thủ tục tại sân bay sẽ đóng 40 phút trước giờ khởi hành.',
-  },
-  {
-    icon: ShieldCheck,
-    text: 'Hành khách đã check-in trực tuyến vẫn cần đến cửa an ninh theo giờ quy định.',
-  },
-  {
-    icon: Briefcase,
-    text: 'Bạn chỉ được mang 01 kiện hành lý xách tay (7kg) và 01 phụ kiện nhỏ.',
-  },
+  'Check-in online thường mở trước giờ khởi hành 24 đến 48 giờ và đóng trước 40 đến 60 phút.',
+  'Sau khi check-in, hành khách vẫn cần có mặt đúng giờ tại khu vực kiểm tra an ninh và cửa ra máy bay.',
+  'Hành lý xách tay và hành lý ký gửi tiếp tục áp dụng theo điều kiện vé đã đặt.',
 ];
 
 const BENEFITS = [
   {
-    icon: Ticket,
+    icon: CheckCircle2,
     title: 'Tiết kiệm thời gian',
-    desc: 'Không cần xếp hàng chờ làm thủ tục tại sân bay',
+    desc: 'Không cần xếp hàng chờ làm thủ tục tại sân bay.',
+  },
+  {
+    icon: Ticket,
+    title: 'Rõ trạng thái check-in',
+    desc: 'Biết ngay chuyến nào đã mở check-in và hành khách nào đủ điều kiện.',
+  },
+  {
+    icon: Briefcase,
+    title: 'Kiểm tra ghế ngồi',
+    desc: 'Phát hiện sớm trường hợp cần chọn ghế trước khi tiếp tục.',
   },
   {
     icon: ClipboardList,
-    title: 'Chọn ghế ngồi yêu thích',
-    desc: 'Miễn phí hoặc trả phí tùy theo loại vé',
-  },
-  {
-    icon: ArrowRight,
-    title: 'Chủ động hơn',
-    desc: 'Bạn có thể check-in mọi lúc, mọi nơi',
-  },
-  {
-    icon: Plane,
-    title: 'Thẻ lên máy bay',
-    desc: 'Nhận thẻ lên máy bay để đi thẳng ra cửa lên máy bay',
+    title: 'Chuẩn bị bước xác nhận',
+    desc: 'Tạo payload chuẩn cho bước tiếp tục check-in với backend.',
   },
 ];
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+const CHECKIN_STEPS = [
+  { id: 1, label: 'Chọn chuyến bay' },
+  { id: 2, label: 'Chọn hành khách' },
+  { id: 3, label: 'Xác nhận điều kiện' },
+];
 
-function FlightInfoCard() {
+const CHECKIN_STEP_ITEMS = [
+  { id: 1, label: 'Chọn chuyến bay' },
+  { id: 2, label: 'Chọn hành khách' },
+  { id: 3, label: 'Chọn ghế ngồi' },
+  { id: 4, label: 'Xác nhận thông tin' },
+  { id: 5, label: 'Nhận thẻ lên máy bay' },
+];
+
+const CHECKIN_BENEFITS = [
+  {
+    icon: CheckCircle2,
+    title: 'Tiết kiệm thời gian',
+    desc: 'Không cần xếp hàng chờ làm thủ tục tại sân bay.',
+  },
+  {
+    icon: Armchair,
+    title: 'Chọn ghế ngồi yêu thích',
+    desc: 'Điều hướng nhanh sang trang chọn ghế khi hành khách chưa có chỗ ngồi.',
+  },
+  {
+    icon: Briefcase,
+    title: 'Chủ động hơn',
+    desc: 'Bạn có thể check-in mọi lúc, mọi nơi.',
+  },
+  {
+    icon: Ticket,
+    title: 'Thẻ lên máy bay',
+    desc: 'Nhận thẻ lên máy bay để đi thẳng ra cửa khởi hành.',
+  },
+];
+
+function formatDateLabel(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('vi-VN', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+function formatShortDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+function formatTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatDuration(start: string, end: string): string {
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return '';
+  }
+  const diff = Math.max(0, endDate.getTime() - startDate.getTime());
+  const hours = Math.floor(diff / 3_600_000);
+  const minutes = Math.floor((diff % 3_600_000) / 60_000);
+  return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
+}
+
+function formatTerminalLabel(terminal: string | null | undefined): string | null {
+  if (!terminal) return null;
+  const trimmed = terminal.trim();
+  if (!trimmed) return null;
+  return /^nhà ga/i.test(trimmed) ? trimmed : `Nhà ga ${trimmed}`;
+}
+
+function formatDisplayName(lastName?: string | null, firstName?: string | null): string {
+  return [lastName, firstName].filter(Boolean).join(' ').trim();
+}
+
+function formatCurrency(amount: number | null | undefined, currency = 'VND'): string {
+  if (typeof amount !== 'number' || Number.isNaN(amount)) return '--';
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function formatStatusText(value: string | null | undefined): string {
+  if (!value) return 'Chưa xác định';
+  if (value.includes('_')) {
+    return value
+      .toLowerCase()
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  }
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
+function formatPassengerTypeLabel(type: string): string {
+  switch (type.toUpperCase()) {
+    case 'ADULT':
+      return 'Người lớn';
+    case 'CHILD':
+      return 'Trẻ em';
+    case 'INFANT':
+      return 'Em bé';
+    default:
+      return type;
+  }
+}
+
+function formatCheckInStatusLabel(status: string): string {
+  switch (status) {
+    case 'READY':
+      return 'Sẵn sàng check-in';
+    case 'SEAT_SELECTION_REQUIRED':
+      return 'Cần chọn ghế';
+    case 'ALREADY_CHECKED_IN':
+      return 'Đã check-in';
+    case 'CHECKIN_NOT_OPEN':
+      return 'Chưa mở check-in';
+    case 'CHECKIN_CLOSED':
+      return 'Đã đóng check-in';
+    case 'BOOKING_NOT_CONFIRMED':
+      return 'Booking chưa xác nhận';
+    case 'TICKET_NOT_ISSUED':
+      return 'Vé chưa xuất';
+    case 'TICKET_NOT_FOUND':
+      return 'Không tìm thấy vé';
+    default:
+      return status;
+  }
+}
+
+function formatWindowStatusLabel(status: FlightWindowStatus): string {
+  switch (status) {
+    case 'OPEN':
+      return 'Đã mở check-in';
+    case 'NOT_OPEN':
+      return 'Chưa mở check-in';
+    case 'CLOSED':
+      return 'Đã đóng check-in';
+    default:
+      return status;
+  }
+}
+
+function formatWindowMessage(flight: DerivedFlight): string {
+  if (flight.checkInWindow.status === 'OPEN') {
+    return 'Có thể tiếp tục chọn hành khách cho chuyến bay này.';
+  }
+  if (flight.checkInWindow.status === 'NOT_OPEN') {
+    return `Mở từ ${formatTime(flight.checkInWindow.opensAt)} ${formatShortDate(flight.checkInWindow.opensAt)}.`;
+  }
+  return `Đóng lúc ${formatTime(flight.checkInWindow.closesAt)} ${formatShortDate(flight.checkInWindow.closesAt)}.`;
+}
+
+function statusTone(status: string): string {
+  switch (status) {
+    case 'READY':
+      return 'text-emerald-600';
+    case 'SEAT_SELECTION_REQUIRED':
+      return 'text-amber-600';
+    default:
+      return 'text-stone-500';
+  }
+}
+
+function formatServiceLabel(service: {
+  serviceType?: string | null;
+  serviceName?: string | null;
+  optionName?: string | null;
+  quantity?: number;
+}): string {
+  const rawType = service.serviceType?.toUpperCase() ?? '';
+  const rawName = service.serviceName?.trim() || service.optionName?.trim() || 'Dịch vụ';
+  const quantity = service.quantity && service.quantity > 1 ? ` x${service.quantity}` : '';
+
+  if (rawType.includes('MEAL') || rawName.toLowerCase().includes('meal')) {
+    return `Suất ăn: ${rawName}${quantity}`;
+  }
+  if (rawType.includes('BAG') || rawName.toLowerCase().includes('bag')) {
+    return `Hành lý: ${rawName}${quantity}`;
+  }
+  return `${rawName}${quantity}`;
+}
+
+function formatPassengerStatus(
+  segments: Array<{ checkInStatus: string }> | undefined
+): string {
+  if (!segments?.length) return 'Đã xác nhận';
+  if (segments.every((segment) => segment.checkInStatus === 'ALREADY_CHECKED_IN')) {
+    return 'Đã check-in';
+  }
+  if (
+    segments.some((segment) =>
+      ['READY', 'SEAT_SELECTION_REQUIRED', 'ALREADY_CHECKED_IN'].includes(segment.checkInStatus)
+    )
+  ) {
+    return 'Đã xác nhận';
+  }
+  return formatCheckInStatusLabel(segments[0]?.checkInStatus ?? 'UNKNOWN');
+}
+
+function buildBookingDetailModalData(
+  bookingLookup: BookingLookupResponse | null,
+  manageOptions: BookingManageOptionsResponse | null,
+  fallbackPnr: string
+): BookingDetailModalData | null {
+  if (!bookingLookup) return null;
+
+  const manageItinerariesByFlightId = new Map(
+    (manageOptions?.itineraries ?? []).map((itinerary, index) => [itinerary.flightId, { itinerary, index }])
+  );
+  const manageSegmentsByPassengerId = new Map(
+    (manageOptions?.passengers ?? []).map((passenger) => [passenger.passengerId, passenger.segments ?? []])
+  );
+  const seatAssignmentsByPassengerId = new Map<number, Array<{ flightId: number; seatNumber: string }>>();
+  for (const assignment of manageOptions?.seatAssignments ?? []) {
+    const bucket = seatAssignmentsByPassengerId.get(assignment.passengerId) ?? [];
+    bucket.push({ flightId: assignment.flightId, seatNumber: assignment.seatNumber });
+    seatAssignmentsByPassengerId.set(assignment.passengerId, bucket);
+  }
+
+  const servicesByPassengerId = new Map<
+    number,
+    Array<{
+      serviceType?: string | null;
+      serviceName?: string | null;
+      optionName?: string | null;
+      quantity?: number;
+    }>
+  >();
+  for (const service of manageOptions?.serviceSelections ?? []) {
+    const bucket = servicesByPassengerId.get(service.passengerId) ?? [];
+    bucket.push(service);
+    servicesByPassengerId.set(service.passengerId, bucket);
+  }
+
+  const flights = bookingLookup.itineraries.map((lookupItinerary, index) => {
+    const managed = manageItinerariesByFlightId.get(lookupItinerary.flightId);
+    const segmentLabel =
+      managed?.index === 0 || index === 0
+        ? 'Chiều đi'
+        : managed?.index === 1 || index === 1
+          ? 'Chiều về'
+          : `Chặng ${index + 1}`;
+
+    return {
+      id: String(lookupItinerary.flightId),
+      segmentLabel,
+      dateLabel: formatShortDate(lookupItinerary.departureTime),
+      departureCode: lookupItinerary.departureAirportCode,
+      arrivalCode: lookupItinerary.arrivalAirportCode,
+      departureTime: formatTime(lookupItinerary.departureTime),
+      arrivalTime: formatTime(lookupItinerary.arrivalTime),
+      flightNumber: lookupItinerary.flightNumber,
+      cabinLabel:
+        managed?.itinerary.fareName ??
+        managed?.itinerary.cabinClass ??
+        lookupItinerary.fareName ??
+        lookupItinerary.cabinClass,
+      statusLabel: lookupItinerary.flightStatus
+        ? formatStatusText(lookupItinerary.flightStatus)
+        : managed?.itinerary.segmentStatus
+          ? formatCheckInStatusLabel(managed.itinerary.segmentStatus)
+          : 'Chưa xác định',
+    } satisfies BookingDetailFlightItem;
+  });
+
+  const passengers = bookingLookup.passengers.map((passenger, index) => {
+    const managedSegments = manageSegmentsByPassengerId.get(passenger.passengerId) ?? passenger.segments ?? [];
+    const seatEntries =
+      seatAssignmentsByPassengerId.get(passenger.passengerId) ??
+      passenger.selections?.seats?.map((seat) => ({
+        flightId: seat.flightId,
+        seatNumber: seat.seatNumber,
+      })) ??
+      passenger.seatAssignments?.map((seat) => ({
+        flightId: seat.flightId,
+        seatNumber: seat.seatNumber,
+      })) ??
+      [];
+    const serviceEntries =
+      servicesByPassengerId.get(passenger.passengerId) ??
+      passenger.selections?.services ??
+      passenger.serviceSelections ??
+      [];
+
+    return {
+      id: String(passenger.passengerId),
+      orderLabel: `${String(index + 1).padStart(2, '0')}`,
+      name: formatDisplayName(passenger.lastName, passenger.firstName),
+      statusLabel: formatPassengerStatus(managedSegments),
+      seatLabels: flights.map((flight) => {
+        const matchedSeat = seatEntries.find((seat) => String(seat.flightId) === flight.id);
+        return `${flight.segmentLabel}: ${matchedSeat?.seatNumber ?? 'Chưa chọn'}`;
+      }),
+      serviceLabels: serviceEntries.length
+        ? serviceEntries.map(formatServiceLabel)
+        : ['Dịch vụ: Chưa chọn'],
+    } satisfies BookingDetailPassengerItem;
+  });
+
+  return {
+    pnr: bookingLookup.booking.pnrCode || fallbackPnr,
+    statusLabel: bookingLookup.booking.statusLabel || formatStatusText(bookingLookup.booking.status),
+    totalPassengers: bookingLookup.passengers.length,
+    totalAmountLabel: formatCurrency(
+      bookingLookup.booking.totalAmount ?? bookingLookup.paymentDetails.price.total,
+      bookingLookup.booking.currency || bookingLookup.paymentDetails.price.currency
+    ),
+    contactLabel: [bookingLookup.primaryContact.email, bookingLookup.primaryContact.phone]
+      .filter(Boolean)
+      .join(' • '),
+    flights,
+    passengers,
+  };
+}
+
+function CheckinStepper({ currentStepId }: { currentStepId: number }) {
+  const steps = CHECKIN_STEP_ITEMS.length ? CHECKIN_STEP_ITEMS : CHECKIN_STEPS;
+
   return (
-    <div className="glass-panel mb-4 rounded-2xl border border-surface-container-high p-5 shadow-sm">
-      <p className="mb-4 text-base font-bold text-on-surface">Thông tin chuyến bay</p>
-      <div className="flex flex-wrap items-center gap-4">
-        {/* Flight number & aircraft */}
-        <div className="min-w-24">
-          <p className="text-lg font-black text-on-surface">{MOCK_FLIGHT.flightNumber}</p>
-          <p className="text-[11px] text-on-surface-variant">{MOCK_FLIGHT.aircraft}</p>
-        </div>
-
-        {/* Divider */}
-        <div className="hidden h-10 w-px bg-surface-container-high sm:block" />
-
-        {/* Route */}
-        <div className="flex flex-1 items-center gap-2">
-          {/* Departure */}
-          <div className="text-left">
-            <p className="text-2xl font-black text-on-surface">{MOCK_FLIGHT.departureTime}</p>
-            <p className="text-sm font-bold text-on-surface">{MOCK_FLIGHT.departureCode}</p>
-            <p className="text-[11px] text-on-surface-variant">{MOCK_FLIGHT.departureCity}</p>
-          </div>
-
-          {/* Duration arrow */}
-          <div className="flex flex-1 flex-col items-center gap-1">
-            <div className="flex w-full items-center gap-1">
-              <div className="h-px flex-1 border-t-2 border-dashed border-gray-300" />
-              <Plane className="h-4 w-4 rotate-0 text-primary" />
-              <div className="h-px flex-1 border-t-2 border-dashed border-gray-300" />
+    <div className="mb-8 overflow-x-auto pb-2">
+      <div className="flex min-w-max items-center gap-4 border-b border-stone-200 pb-4">
+        {steps.map((step, index) => {
+          const status =
+            step.id < currentStepId
+              ? 'completed'
+              : step.id === currentStepId
+                ? 'active'
+                : 'pending';
+          return (
+            <div key={step.id} className="flex items-center gap-4">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                    status === 'completed'
+                      ? 'bg-emerald-500 text-white'
+                      : status === 'active'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-stone-100 text-stone-700'
+                  }`}
+                >
+                  {status === 'completed' ? <Check className="h-3.5 w-3.5" /> : step.id}
+                </div>
+                <span
+                  className={`whitespace-nowrap text-sm ${
+                    status === 'active' ? 'font-bold text-red-700' : 'font-medium text-stone-700'
+                  }`}
+                >
+                  {step.label}
+                </span>
+              </div>
+              {index < steps.length - 1 ? (
+                <div className="h-px w-10 bg-stone-200 md:w-16" />
+              ) : null}
             </div>
-            <p className="text-[11px] text-on-surface-variant">{MOCK_FLIGHT.duration}</p>
-          </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
-          {/* Arrival */}
-          <div className="text-right">
-            <p className="text-2xl font-black text-on-surface">{MOCK_FLIGHT.arrivalTime}</p>
-            <p className="text-sm font-bold text-on-surface">{MOCK_FLIGHT.arrivalCode}</p>
-            <p className="text-[11px] text-on-surface-variant">{MOCK_FLIGHT.arrivalCity}</p>
+function FlightSelectionList({
+  flights,
+  selectedFlights,
+  onToggleFlight,
+  onContinue,
+}: {
+  flights: DerivedFlight[];
+  selectedFlights: Set<string>;
+  onToggleFlight: (id: string) => void;
+  onContinue: () => void;
+}) {
+  return (
+    <section className="pb-6">
+      <h2 className="mb-6 text-2xl font-bold tracking-tight text-stone-950">Check-in trực tuyến</h2>
+      <CheckinStepper currentStepId={1} />
+
+      <div className="rounded-[16px] border border-stone-200 bg-white">
+        <div className="border-b border-stone-100 p-5">
+          <h3 className="text-lg font-semibold text-stone-950">1. Chọn chuyến bay để check-in</h3>
+          <p className="mt-1 text-sm text-stone-600">
+            Chỉ các chuyến đã mở check-in mới có thể được chọn. Trạng thái hiện tại được lấy từ
+            backend.
+          </p>
+        </div>
+
+        <div className="space-y-4 bg-stone-50/50 p-5">
+          {flights.map((flight) => {
+            const isSelected = selectedFlights.has(flight.id);
+            const isCheckinOpen = flight.checkInWindow.status === 'OPEN';
+            return (
+              <article
+                key={flight.id}
+                className={`rounded-xl border bg-white transition-colors ${
+                  isSelected ? 'border-amber-400 bg-amber-50/10' : 'border-stone-200'
+                }`}
+              >
+                <div className="flex flex-col md:flex-row">
+                  <div
+                    className={`flex w-full items-start gap-3 border-b border-stone-100 p-4 md:w-56 md:shrink-0 md:border-b-0 md:border-r ${
+                      isSelected ? 'bg-amber-50/30' : ''
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onToggleFlight(flight.id)}
+                      disabled={!isCheckinOpen}
+                      className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                        isSelected
+                          ? 'border-red-600 bg-red-600 text-white'
+                          : !isCheckinOpen
+                            ? 'cursor-not-allowed border-stone-200 bg-stone-100'
+                            : 'border-stone-300 bg-white hover:border-red-400'
+                      }`}
+                    >
+                      {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
+                    </button>
+                    <div className="flex flex-col items-start">
+                      <span
+                        className={`mb-2 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          flight.checkInWindow.status === 'OPEN'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : flight.checkInWindow.status === 'NOT_OPEN'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-stone-100 text-stone-600'
+                        }`}
+                      >
+                        {formatWindowStatusLabel(flight.checkInWindow.status)}
+                      </span>
+                      <div className="text-base font-bold text-stone-950">{flight.flightNumber}</div>
+                      <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-stone-900">
+                        {flight.departureCode}
+                        <ArrowRight className="h-3 w-3 text-stone-400" />
+                        {flight.arrivalCode}
+                      </div>
+                      <div className="mt-1.5 text-xs text-stone-500">
+                        {flight.departureTime} - {flight.arrivalTime}
+                        {flight.shortDate ? ` • ${flight.shortDate}` : ''}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid flex-1 grid-cols-2 gap-4 p-4 md:grid-cols-4">
+                    <div className="flex flex-col text-sm">
+                      <div className="mb-1 text-[11px] text-stone-500">Khởi hành</div>
+                      <div className="text-base font-bold text-stone-950">{flight.departureTime}</div>
+                      <div className="mt-0.5 font-semibold text-stone-900">{flight.departureCode}</div>
+                      <div className="truncate text-[11px] text-stone-500">{flight.departureCity}</div>
+                      {formatTerminalLabel(flight.departureTerminal) ? (
+                        <div className="mt-0.5 text-[11px] font-medium text-stone-500">
+                          {formatTerminalLabel(flight.departureTerminal)}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="flex flex-col items-center justify-center px-2 text-center">
+                      <Plane className="mb-1 h-5 w-5 shrink-0 text-stone-400" />
+                      {flight.durationLabel ? (
+                        <span className="whitespace-nowrap text-[11px] text-stone-500">
+                          {flight.durationLabel}
+                        </span>
+                      ) : null}
+                      <span className="mt-1 text-[11px] text-stone-400">{flight.journeyType}</span>
+                    </div>
+
+                    <div className="flex flex-col text-sm">
+                      <div className="mb-1 text-[11px] text-stone-500">Đến</div>
+                      <div className="text-base font-bold text-stone-950">{flight.arrivalTime}</div>
+                      <div className="mt-0.5 font-semibold text-stone-900">{flight.arrivalCode}</div>
+                      <div className="truncate text-[11px] text-stone-500">{flight.arrivalCity}</div>
+                      {formatTerminalLabel(flight.arrivalTerminal) ? (
+                        <div className="mt-0.5 text-[11px] font-medium text-stone-500">
+                          {formatTerminalLabel(flight.arrivalTerminal)}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="flex flex-col text-sm">
+                      <div className="mb-1 text-[11px] text-stone-500">Hạng vé</div>
+                      <div className="text-[11px] font-semibold text-stone-950">{flight.cabin}</div>
+                      <div className="mb-1 mt-2 text-[11px] text-stone-500">Trạng thái</div>
+                      <div
+                        className={`text-[11px] font-semibold ${
+                          flight.segmentStatus === 'READY'
+                            ? 'text-emerald-600'
+                            : flight.segmentStatus === 'SEAT_SELECTION_REQUIRED'
+                              ? 'text-amber-600'
+                              : 'text-stone-500'
+                        }`}
+                      >
+                        {formatWindowMessage(flight)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-col items-end border-t border-stone-100 p-5">
+          <button
+            type="button"
+            disabled={selectedFlights.size === 0}
+            onClick={onContinue}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Tiếp tục: Chọn hành khách ({selectedFlights.size} chuyến)
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PassengerSelectionPanel({
+  passengers,
+  selected,
+  onToggle,
+  onToggleAll,
+  flight,
+  onBack,
+  onCheckin,
+  checkingIn,
+  submitError,
+}: {
+  passengers: DerivedPassenger[];
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  onToggleAll: () => void;
+  flight: DerivedFlight;
+  onBack: () => void;
+  onCheckin: () => void;
+  checkingIn: boolean;
+  submitError: string | null;
+}) {
+  const eligiblePassengers = passengers.filter((passenger) => passenger.segments[flight.id]?.eligible);
+  const isAllSelected =
+    eligiblePassengers.length > 0 &&
+    eligiblePassengers.every((passenger) => selected.has(passenger.id));
+
+  return (
+    <section className="pb-6">
+      <h2 className="mb-6 text-2xl font-bold tracking-tight text-stone-950">Check-in trực tuyến</h2>
+      <CheckinStepper currentStepId={2} />
+
+      <div className="rounded-[16px] border border-stone-200 bg-white p-5 md:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-stone-200 pb-5">
+          <div className="flex-1">
+            <h3 className="text-2xl font-semibold text-stone-950">2. Chọn hành khách</h3>
+            <div className="mt-2 flex items-center justify-between text-sm leading-6 text-stone-600">
+              <p>
+                Trạng thái hành khách cho chuyến bay{' '}
+                <span className="font-semibold text-stone-900">
+                  {flight.flightNumber} ({flight.departureCode} → {flight.arrivalCode})
+                </span>{' '}
+              </p>
+              <button
+                type="button"
+                onClick={onToggleAll}
+                className="font-semibold text-sky-600 transition hover:text-sky-700"
+              >
+                {isAllSelected ? 'Bỏ chọn đủ điều kiện' : 'Chọn tất cả đủ điều kiện'}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Divider */}
-        <div className="hidden h-10 w-px bg-surface-container-high sm:block" />
+        <div className="mt-5 overflow-x-auto">
+          <table className="min-w-[760px] w-full whitespace-nowrap text-left text-sm">
+            <thead>
+              <tr className="border-b border-stone-100 text-stone-500">
+                <th className="py-3 font-medium">Hành khách</th>
+                <th className="py-3 font-medium">Loại</th>
+                <th className="py-3 font-medium">Ngày sinh</th>
+                <th className="py-3 font-medium">Ghế</th>
+                <th className="py-3 font-medium">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              {passengers.map((passenger) => {
+                const segment = passenger.segments[flight.id];
+                const isSelected = selected.has(passenger.id);
+                const disabled = !segment?.eligible;
+                return (
+                  <tr key={passenger.id} className="border-b border-stone-100 last:border-0">
+                    <td className="py-4">
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => onToggle(passenger.id)}
+                          disabled={disabled}
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                            isSelected
+                              ? 'border-red-600 bg-red-600 text-white'
+                              : disabled
+                                ? 'cursor-not-allowed border-stone-200 bg-stone-100'
+                                : 'border-stone-300 bg-white'
+                          }`}
+                        >
+                          {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
+                        </button>
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                          <User className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-base font-bold text-stone-950">{passenger.name.toUpperCase()}</p>
+                          <p className="mt-0.5 text-xs text-stone-500">
+                            {passenger.dob} | {passenger.type}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 text-stone-700">{passenger.type}</td>
+                    <td className="py-4 text-stone-700">{passenger.dob}</td>
+                    <td className="py-4 text-stone-700">
+                      <div className="flex items-center gap-1.5">
+                        <Briefcase className="h-4 w-4 text-stone-400" />
+                        {segment?.seatNumber ?? 'Chưa chọn'}
+                      </div>
+                    </td>
+                    <td className="py-4">
+                      <div className={`font-semibold ${statusTone(segment?.checkInStatus ?? 'UNKNOWN')}`}>
+                        {formatCheckInStatusLabel(segment?.checkInStatus ?? 'UNKNOWN')}
+                      </div>
+                      {segment?.warnings?.length ? (
+                        <div className="mt-1 text-xs text-stone-500">
+                          {segment.warnings.map(formatCheckInStatusLabel).join(', ')}
+                        </div>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
-        {/* Date & Cabin */}
-        <div className="text-right">
-          <p className="text-sm font-semibold text-on-surface">{MOCK_FLIGHT.dateLabel}</p>
-          <p className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
-            {MOCK_FLIGHT.cabin}
-          </p>
+        {submitError ? (
+          <div className="mt-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <p>{submitError}</p>
+          </div>
+        ) : null}
+
+
+
+        <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center justify-center rounded-2xl border border-stone-200 px-6 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+          >
+            Quay lại
+          </button>
+          <button
+            type="button"
+            disabled={selected.size === 0 || checkingIn}
+            onClick={onCheckin}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(220,38,38,0.22)] transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {checkingIn ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+            Tiếp tục: Xác nhận điều kiện ({selected.size} hành khách)
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function EnhancedPassengerSelectionPanel({
+  passengers,
+  selected,
+  onToggle,
+  onToggleAll,
+  flight,
+  onBack,
+  onContinue,
+  submitError,
+}: {
+  passengers: DerivedPassenger[];
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  onToggleAll: () => void;
+  flight: DerivedFlight;
+  onBack: () => void;
+  onContinue: () => void;
+  submitError: string | null;
+}) {
+  const eligiblePassengers = passengers.filter((passenger) => passenger.segments[flight.id]?.eligible);
+  const isAllSelected =
+    eligiblePassengers.length > 0 &&
+    eligiblePassengers.every((passenger) => selected.has(passenger.id));
+  const cabinBagLabel = `${flight.baggageHandKg ?? 7}kg`;
+
+  return (
+    <section className="pb-6">
+      <h2 className="mb-6 text-2xl font-bold tracking-tight text-stone-950">Check-in trực tuyến</h2>
+      <CheckinStepper currentStepId={2} />
+
+      <div className="space-y-4">
+        <div className="rounded-[20px] border border-stone-200 bg-white p-5 shadow-sm md:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-stone-200 pb-5">
+            <div className="flex-1">
+              <h3 className="text-2xl font-semibold text-stone-950">2. Chọn hành khách</h3>
+              <p className="mt-2 text-sm leading-6 text-stone-600">
+                Chọn hành khách bạn muốn làm thủ tục cho chuyến bay:{' '}
+                <span className="font-semibold text-stone-900">
+                  {flight.flightNumber} ({flight.departureCode} → {flight.arrivalCode})
+                </span>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onToggleAll}
+              className="text-sm font-semibold text-sky-600 transition hover:text-sky-700"
+            >
+              {isAllSelected ? 'Chọn lại' : 'Chọn tất cả'}
+            </button>
+          </div>
+
+          <div className="mt-5 overflow-x-auto">
+            <table className="min-w-[920px] w-full whitespace-nowrap text-left text-sm">
+              <thead>
+                <tr className="border-b border-stone-100 text-stone-500">
+                  <th className="w-12 py-3 font-medium" />
+                  <th className="py-3 font-medium">Hành khách</th>
+                  <th className="py-3 font-medium">Loại hành khách</th>
+                  <th className="py-3 font-medium">Ngày sinh</th>
+                  <th className="py-3 font-medium">Hành lý xách tay</th>
+                  <th className="py-3 font-medium">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {passengers.map((passenger) => {
+                  const segment = passenger.segments[flight.id];
+                  const isSelected = selected.has(passenger.id);
+                  const disabled = !segment?.eligible;
+
+                  return (
+                    <tr key={passenger.id} className="border-b border-stone-100 last:border-0">
+                      <td className="py-4">
+                        <button
+                          type="button"
+                          onClick={() => onToggle(passenger.id)}
+                          disabled={disabled}
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                            isSelected
+                              ? 'border-red-600 bg-red-600 text-white'
+                              : disabled
+                                ? 'cursor-not-allowed border-stone-200 bg-stone-100'
+                                : 'border-stone-300 bg-white'
+                          }`}
+                        >
+                          {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
+                        </button>
+                      </td>
+                      <td className="py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                            <User className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-base font-bold text-stone-950">{passenger.name.toUpperCase()}</p>
+                            <p className="mt-0.5 text-xs text-stone-500">
+                              {formatShortDate(passenger.dob)} | {formatPassengerTypeLabel(passenger.type)}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 text-stone-700">{formatPassengerTypeLabel(passenger.type)}</td>
+                      <td className="py-4 text-stone-700">{formatShortDate(passenger.dob)}</td>
+                      <td className="py-4 text-stone-700">
+                        <div className="flex items-center gap-2">
+                          <Briefcase className="h-4 w-4 text-stone-400" />
+                          {cabinBagLabel}
+                        </div>
+                      </td>
+                      <td className="py-4">
+                        <div className={`font-semibold ${statusTone(segment?.checkInStatus ?? 'UNKNOWN')}`}>
+                          {formatCheckInStatusLabel(segment?.checkInStatus ?? 'UNKNOWN')}
+                        </div>
+                        {segment?.warnings?.length ? (
+                          <div className="mt-1 text-xs text-stone-500">
+                            {segment.warnings.map(formatCheckInStatusLabel).join(', ')}
+                          </div>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {submitError ? (
+            <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <p>{submitError}</p>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center justify-center rounded-2xl border border-stone-200 px-6 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+          >
+            Quay lại
+          </button>
+          <button
+            type="button"
+            disabled={selected.size === 0}
+            onClick={onContinue}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(220,38,38,0.22)] transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ArrowRight className="h-4 w-4" />
+            Tiếp tục: Chọn ghế ngồi ({selected.size} hành khách)
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CheckinSeatReviewPanel({
+  passengers,
+  selected,
+  flight,
+  submitError,
+  checkingIn,
+  seatMapLoading,
+  seatMapError,
+  seatMap,
+  selectedSeat,
+  assignedSeatBySeatId,
+  seatConfirmLoading,
+  activePassengerId,
+  onActivePassengerChange,
+  onSeatPreview,
+  onSeatConfirm,
+  onSeatCancel,
+  onBack,
+  onContinue,
+}: {
+  passengers: DerivedPassenger[];
+  selected: Set<string>;
+  flight: DerivedFlight;
+  submitError: string | null;
+  checkingIn: boolean;
+  seatMapLoading: boolean;
+  seatMapError: string | null;
+  seatMap: Parameters<typeof AircraftSeatsMap>[0]['seatMap'];
+  selectedSeat: SeatSelectionValue | null;
+  assignedSeatBySeatId: ReadonlyMap<number, { label: string; isYours: boolean }> | null;
+  seatConfirmLoading: boolean;
+  activePassengerId: string | null;
+  onActivePassengerChange: (id: string) => void;
+  onSeatPreview: (seat: SeatSelectionValue) => void;
+  onSeatConfirm: (seat: SeatSelectionValue) => void;
+  onSeatCancel: (seat: SeatSelectionValue) => void;
+  onBack: () => void;
+  onContinue: () => void;
+}) {
+  const selectedPassengers = passengers.filter((passenger) => selected.has(passenger.id));
+  const missingSeatPassengers = selectedPassengers.filter((passenger) => !passenger.segments[flight.id]?.seatAssigned);
+  const hasMissingSeats = missingSeatPassengers.length > 0;
+  const activePassenger =
+    selectedPassengers.find((passenger) => passenger.id === activePassengerId) ?? selectedPassengers[0] ?? null;
+
+  return (
+    <section className="pb-6">
+      <h2 className="mb-6 text-2xl font-bold tracking-tight text-stone-950">Check-in trực tuyến</h2>
+      <CheckinStepper currentStepId={3} />
+
+      <div className="space-y-4">
+        <div className="rounded-[20px] border border-stone-200 bg-white p-5 shadow-sm md:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-stone-200 pb-5">
+            <div className="flex-1">
+              <h3 className="text-2xl font-semibold text-stone-950">3. Chọn ghế ngồi</h3>
+              <p className="mt-2 text-sm leading-6 text-stone-600">
+                Chọn ghế cho hành khách đã chọn trên chuyến bay{' '}
+                <span className="font-semibold text-stone-900">
+                  {flight.flightNumber} ({flight.departureCode} → {flight.arrivalCode})
+                </span>
+                . Chọn một hành khách ở cột bên phải, sau đó chọn ghế trực tiếp trên sơ đồ.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1.18fr)_340px]">
+            <div className="min-w-0 rounded-[18px] border border-stone-200 p-4">
+              <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-stone-500">
+                <div className="font-semibold text-stone-900">
+                  {flight.flightNumber} | {flight.departureCode} → {flight.arrivalCode} | {flight.departureTime} -{' '}
+                  {flight.arrivalTime} | {flight.shortDate}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-3.5 w-3.5 rounded border border-emerald-300 bg-emerald-50" />
+                  Ghế trống
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-3.5 w-3.5 rounded border border-amber-300 bg-amber-50" />
+                  Ghế trả phí
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-3.5 w-3.5 rounded border border-slate-500 bg-slate-200" />
+                  Ghế đã chọn
+                </div>
+              </div>
+
+              <AircraftSeatsMap
+                seatMap={seatMap}
+                loading={seatMapLoading}
+                error={seatMapError}
+                selectedSeat={selectedSeat}
+                assignedSeatBySeatId={assignedSeatBySeatId}
+                seatConfirmLoading={seatConfirmLoading}
+                onSeatPreview={onSeatPreview}
+                onSeatConfirm={onSeatConfirm}
+                onSeatCancel={onSeatCancel}
+                showDetailPanel={false}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <div className="rounded-[18px] border border-stone-200 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h4 className="text-lg font-semibold text-stone-950">
+                    Hành khách đã chọn ({selectedPassengers.length}/{selected.size})
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="text-sm font-semibold text-sky-600 transition hover:text-sky-700"
+                  >
+                    Chọn lại hành khách
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {selectedPassengers.map((passenger, index) => {
+                    const segment = passenger.segments[flight.id];
+                    const seatAssigned = Boolean(segment?.seatAssigned && segment?.seatNumber);
+                    const isActive = passenger.id === activePassenger?.id;
+
+                    return (
+                      <button
+                        key={passenger.id}
+                        type="button"
+                        onClick={() => onActivePassengerChange(passenger.id)}
+                        className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                          isActive
+                            ? 'border-red-300 bg-red-50/60 shadow-sm'
+                            : 'border-stone-200 hover:border-stone-300 hover:bg-stone-50'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-stone-950">
+                              {index + 1}. {passenger.name.toUpperCase()}
+                            </p>
+                            <p className="mt-1 text-xs text-stone-500">
+                              {formatPassengerTypeLabel(passenger.type)}
+                            </p>
+                          </div>
+                          <span
+                            className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${
+                              seatAssigned ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                            }`}
+                          >
+                            {segment?.seatNumber ?? 'Chưa chọn ghế'}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {activePassenger ? (
+                  <div className="mt-4 rounded-2xl bg-stone-50 px-4 py-3 text-sm text-stone-600">
+                    Đang thao tác cho <span className="font-semibold text-stone-950">{activePassenger.name}</span>.
+                    Chọn ghế trên sơ đồ để gán hoặc đổi ghế.
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="rounded-[18px] border border-stone-200 p-4 text-sm text-stone-600">
+                <p className="font-semibold text-stone-950">Lưu ý giá ghế</p>
+                <p className="mt-2">Giá hiển thị là giá cho 1 hành khách / 1 chặng và có thể thay đổi theo chuyến bay.</p>
+              </div>
+            </div>
+          </div>
+
+          {hasMissingSeats ? (
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Còn {missingSeatPassengers.length} hành khách chưa có ghế. Hãy hoàn tất chọn ghế trước khi xác nhận thông tin check-in.
+            </div>
+          ) : (
+            <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              Tất cả hành khách đã có ghế. Có thể tiếp tục sang bước xác nhận thông tin.
+            </div>
+          )}
+
+          {submitError ? (
+            <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <p>{submitError}</p>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center justify-center rounded-2xl border border-stone-200 px-6 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+          >
+            Quay lại
+          </button>
+          <button
+            type="button"
+            disabled={selectedPassengers.length === 0 || hasMissingSeats || checkingIn}
+            onClick={onContinue}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(220,38,38,0.22)] transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {checkingIn ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+            Tiếp tục: Xác nhận thông tin ({selectedPassengers.length} hành khách)
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CheckinSidebar({
+  booking,
+  flight,
+  onOpenDetails,
+}: {
+  booking: {
+    pnr: string;
+    lastName: string;
+    totalPassengers: number;
+    expiresAt: string | null;
+  };
+  flight: DerivedFlight | null;
+  onOpenDetails: () => void;
+}) {
+  return (
+    <aside className="space-y-3.5 xl:max-w-[300px] 2xl:max-w-[320px]">
+      <section className="rounded-[28px] border border-stone-200 bg-white p-6">
+        <h3 className="text-2xl font-semibold text-stone-950">Thông tin đặt chỗ</h3>
+        <div className="mt-6 space-y-5 text-sm">
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-stone-500">Mã đặt chỗ (PNR)</span>
+            <span className="text-xl font-semibold text-red-600">{booking.pnr}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-stone-500">Họ</span>
+            <span className="font-semibold uppercase text-stone-950">{booking.lastName}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-stone-500">Tổng số hành khách</span>
+            <span className="font-semibold text-stone-950">{booking.totalPassengers}</span>
+          </div>
+          {booking.expiresAt ? (
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-stone-500">Giữ chỗ đến</span>
+              <span className="font-semibold text-stone-950">{booking.expiresAt}</span>
+            </div>
+          ) : null}
+        </div>
+
+        <button
+          type="button"
+          onClick={onOpenDetails}
+          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-stone-200 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+        >
+          <ClipboardList className="h-4 w-4" />
+          Chi tiết đặt chỗ
+        </button>
+      </section>
+
+      <section className="rounded-[28px] border border-stone-200 bg-white p-6">
+        <h3 className="text-2xl font-semibold text-stone-950">Bạn cần hỗ trợ?</h3>
+        <div className="mt-5 space-y-2">
+          {[
+            { icon: HelpCircle, label: 'Câu hỏi thường gặp' },
+            { icon: Headphones, label: 'Liên hệ hỗ trợ' },
+            { icon: MessageSquare, label: 'Gửi phản hồi' },
+          ].map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              className="flex w-full items-center justify-between rounded-2xl px-2 py-3 text-left transition hover:bg-stone-50"
+            >
+              <div className="flex items-center gap-3">
+                <item.icon className="h-5 w-5 text-stone-500" />
+                <span className="text-base text-stone-800">{item.label}</span>
+              </div>
+              <ChevronRight className="h-4 w-4 text-stone-400" />
+            </button>
+          ))}
+        </div>
+      </section>
+    </aside>
+  );
+}
+
+function EnhancedCheckinSidebar({
+  booking,
+  flight,
+  onOpenDetails,
+}: {
+  booking: {
+    pnr: string;
+    lastName: string;
+    totalPassengers: number;
+    expiresAt: string | null;
+  };
+  flight: DerivedFlight | null;
+  onOpenDetails: () => void;
+}) {
+  return (
+    <aside className="space-y-4 xl:max-w-[320px] 2xl:max-w-[340px]">
+      <section className="rounded-[20px] border border-stone-200 bg-white p-4 shadow-sm">
+        <h3 className="text-2xl font-semibold text-stone-950">Thông tin đặt chỗ</h3>
+        <div className="mt-4 space-y-3.5 text-[0.9375rem]">
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-stone-500">Mã đặt chỗ (PNR)</span>
+            <span className="text-base font-semibold text-red-600">{booking.pnr}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-stone-500">Họ</span>
+            <span className="font-semibold uppercase text-stone-950">{booking.lastName}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-stone-500">Tổng số hành khách</span>
+            <span className="font-semibold text-stone-950">{booking.totalPassengers}</span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onOpenDetails}
+          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-stone-200 px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+        >
+          <ClipboardList className="h-4 w-4" />
+          Chi tiết đặt chỗ
+        </button>
+      </section>
+
+      {flight ? (
+        <section className="rounded-[20px] border border-amber-200 bg-gradient-to-br from-amber-50 via-amber-50/65 to-white p-4 shadow-sm">
+          <h3 className="text-2xl font-semibold text-amber-900">Chuyến bay đã chọn</h3>
+          <div className="mt-3.5 flex items-start gap-2.5">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-stone-100 bg-white text-red-600 shadow-sm">
+              <Plane className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[1.7rem] font-semibold leading-none text-stone-950">{flight.flightNumber}</div>
+              <div className="mt-1.5 flex items-center gap-2 text-base font-semibold text-stone-900">
+                <span>{flight.departureCode}</span>
+                <span className="text-stone-400">→</span>
+                <span>{flight.arrivalCode}</span>
+              </div>
+              <div className="mt-1.5 text-[0.9375rem] leading-5 text-stone-600">
+                {flight.departureTime} - {flight.arrivalTime} • {flight.shortDate}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="rounded-[20px] border border-stone-200 bg-white p-4 shadow-sm">
+        <h3 className="text-2xl font-semibold text-stone-950">Bạn cần hỗ trợ?</h3>
+        <div className="mt-3.5 space-y-0.5">
+          {[
+            { icon: HelpCircle, label: 'Câu hỏi thường gặp' },
+            { icon: Headphones, label: 'Liên hệ hỗ trợ' },
+            { icon: MessageSquare, label: 'Gửi phản hồi' },
+          ].map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              className="flex w-full items-center justify-between rounded-xl px-1.5 py-2 text-left transition hover:bg-stone-50"
+            >
+              <div className="flex items-center gap-3">
+                <item.icon className="h-[18px] w-[18px] text-stone-500" />
+                <span className="text-[0.975rem] text-stone-800">{item.label}</span>
+              </div>
+              <ChevronRight className="h-4 w-4 text-stone-400" />
+            </button>
+          ))}
+        </div>
+      </section>
+    </aside>
+  );
+}
+
+function CheckinBenefitsStrip() {
+  return (
+    <section className="mt-8 grid gap-4 border-t border-stone-200 pt-6 md:grid-cols-2 xl:grid-cols-4">
+      {CHECKIN_BENEFITS.map((benefit) => (
+        <article key={benefit.title} className="rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+            <benefit.icon className="h-5 w-5" />
+          </div>
+          <h4 className="mt-4 text-base font-semibold text-stone-950">{benefit.title}</h4>
+          <p className="mt-1 text-sm leading-6 text-stone-600">{benefit.desc}</p>
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function BookingDetailModal({
+  detail,
+  open,
+  onClose,
+  onContinueCheckin,
+  onOpenManageBooking,
+}: {
+  detail: BookingDetailModalData | null;
+  open: boolean;
+  onClose: () => void;
+  onContinueCheckin: () => void;
+  onOpenManageBooking: () => void;
+}) {
+  if (!open || !detail) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/45 p-4 backdrop-blur-[2px]">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-[30px] border border-stone-200 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.24)]">
+        <div className="flex items-center justify-between border-b border-stone-200 px-6 py-5 md:px-8">
+          <div>
+            <h3 className="text-2xl font-semibold text-stone-950">Chi tiết đặt chỗ</h3>
+            <p className="mt-1 text-sm text-stone-500">Thông tin được lấy trực tiếp từ store hiện tại.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-stone-200 text-stone-500 transition hover:bg-stone-50 hover:text-stone-800"
+            aria-label="Đóng chi tiết đặt chỗ"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="max-h-[calc(90vh-88px)] overflow-y-auto">
+          <div className="grid gap-4 border-b border-stone-100 bg-stone-50/80 px-6 py-5 text-sm md:grid-cols-3 md:px-8">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-stone-500">PNR:</span>
+                <span className="font-semibold text-stone-950">{detail.pnr}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-stone-500">Trạng thái:</span>
+                <span className="font-semibold text-emerald-700">{detail.statusLabel}</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-stone-500">Hành khách:</span>
+                <span className="font-semibold text-stone-950">{detail.totalPassengers}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-stone-500">Tổng tiền:</span>
+                <span className="font-semibold text-stone-950">{detail.totalAmountLabel}</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="text-stone-500">Liên hệ</div>
+              <div className="font-medium text-stone-950">{detail.contactLabel || 'Chưa có thông tin liên hệ'}</div>
+            </div>
+          </div>
+
+          <section className="border-b border-stone-100 px-6 py-5 md:px-8">
+            <div className="mb-4 flex items-center justify-between">
+              <h4 className="text-lg font-semibold text-stone-950">Hành trình</h4>
+              <span className="text-xs uppercase tracking-[0.2em] text-stone-400">
+                {detail.flights.length} chặng
+              </span>
+            </div>
+            <div className="space-y-3">
+              {detail.flights.map((flight) => (
+                <article
+                  key={flight.id}
+                  className="rounded-2xl border border-stone-200 bg-stone-50/70 px-4 py-4"
+                >
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="space-y-1">
+                      <div className="text-sm font-semibold text-stone-950">
+                        {flight.segmentLabel} • {flight.dateLabel}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-stone-700">
+                        <span className="font-semibold text-stone-950">{flight.departureCode}</span>
+                        <span>{flight.departureTime}</span>
+                        <span className="text-stone-400">{'->'}</span>
+                        <span className="font-semibold text-stone-950">{flight.arrivalCode}</span>
+                        <span>{flight.arrivalTime}</span>
+                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-stone-700">
+                          {flight.flightNumber}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-1 text-sm md:text-right">
+                      <div className="text-stone-500">
+                        Hạng vé: <span className="font-medium text-stone-900">{flight.cabinLabel}</span>
+                      </div>
+                      <div className="text-stone-500">
+                        Tình trạng: <span className="font-medium text-stone-900">{flight.statusLabel}</span>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="px-6 py-5 md:px-8">
+            <div className="mb-4 flex items-center justify-between">
+              <h4 className="text-lg font-semibold text-stone-950">Hành khách</h4>
+              <span className="text-xs uppercase tracking-[0.2em] text-stone-400">
+                {detail.passengers.length} người
+              </span>
+            </div>
+            <div className="space-y-3">
+              {detail.passengers.map((passenger) => (
+                <article
+                  key={passenger.id}
+                  className="rounded-2xl border border-stone-200 bg-white px-4 py-4 shadow-sm"
+                >
+                  <div className="flex flex-col gap-3 border-b border-stone-100 pb-3 md:flex-row md:items-start md:justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-50 text-sm font-semibold text-red-700">
+                        {passenger.orderLabel}
+                      </span>
+                      <div>
+                        <div className="font-semibold text-stone-950">{passenger.name}</div>
+                        <div className="text-sm text-stone-500">{passenger.statusLabel}</div>
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      {passenger.statusLabel}
+                    </span>
+                  </div>
+                  <div className="grid gap-4 pt-3 md:grid-cols-[1.2fr_1fr]">
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                        Ghế theo chặng
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {passenger.seatLabels.map((seatLabel) => (
+                          <span
+                            key={seatLabel}
+                            className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-sm text-stone-700"
+                          >
+                            {seatLabel}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                        Dịch vụ kèm theo
+                      </div>
+                      <div className="mt-2 space-y-1.5 text-sm text-stone-700">
+                        {passenger.serviceLabels.map((serviceLabel) => (
+                          <div key={serviceLabel}>{serviceLabel}</div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <div className="border-t border-stone-200 bg-stone-50/80 px-6 py-5 md:px-8">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex items-center justify-center rounded-2xl border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-700 transition hover:bg-white"
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                onClick={onContinueCheckin}
+                className="inline-flex items-center justify-center rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
+              >
+                Tiếp tục check-in
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenManageBooking}
+              className="mt-4 text-sm font-medium text-sky-700 transition hover:text-sky-800"
+            >
+              Xem đầy đủ trong Manage Booking
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function PassengerList({
-  passengers,
-  selected,
-  onToggle,
-  onCheckin,
-  onBack,
-}: {
-  passengers: MockPassenger[];
-  selected: Set<string>;
-  onToggle: (id: string) => void;
-  onCheckin: () => void;
-  onBack: () => void;
-}) {
+function NotesAndBenefits() {
   return (
-    <div className="glass-panel mb-4 rounded-2xl border border-surface-container-high p-5 shadow-sm">
-      <p className="text-base font-bold text-on-surface">Danh sách hành khách</p>
-      <p className="mb-4 text-[12px] text-on-surface-variant">Chọn hành khách làm thủ tục</p>
+    <div className="mt-8 space-y-5">
+      <section className="rounded-[28px] border border-sky-200 bg-sky-50 p-5">
+        <div className="flex items-start gap-3">
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-sky-700" />
+          <div className="space-y-2 text-sm leading-6 text-sky-950">
+            {NOTES.map((note) => (
+              <p key={note}>{note}</p>
+            ))}
+          </div>
+        </div>
+      </section>
 
-      <div className="flex flex-col gap-3">
-        {passengers.map((p, idx) => {
-          const isSelected = selected.has(p.id);
+      <section className="grid gap-4 border-t border-stone-200 pt-6 md:grid-cols-2 xl:grid-cols-4">
+        {BENEFITS.map((benefit) => (
+          <article key={benefit.title} className="flex items-start gap-4 rounded-3xl bg-white p-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+              <benefit.icon className="h-5 w-5" />
+            </div>
+            <div>
+              <h4 className="text-base font-semibold text-stone-950">{benefit.title}</h4>
+              <p className="mt-1 text-sm leading-6 text-stone-600">{benefit.desc}</p>
+            </div>
+          </article>
+        ))}
+      </section>
+    </div>
+  );
+}
+
+function CheckinSuccess({
+  checkedIn,
+  flight,
+}: {
+  checkedIn: DerivedPassenger[];
+  flight: DerivedFlight | null;
+}) {
+  const navigate = useNavigate();
+
+  return (
+    <section className="rounded-[32px] border border-stone-200 bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <div className="mx-auto max-w-3xl text-center">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
+          <CheckCircle2 className="h-10 w-10 text-emerald-600" />
+        </div>
+        <h2 className="mt-6 text-4xl font-semibold tracking-tight text-stone-950">
+          Check-in sẵn sàng
+        </h2>
+        <p className="mt-3 text-base leading-7 text-stone-600">
+          Backend đã xác nhận payload điều kiện hợp lệ cho bước tiếp tục check-in. Màn này vẫn là
+          placeholder trước khi có bước confirm cuối cùng và boarding pass thật.
+        </p>
+      </div>
+
+      <div className="mx-auto mt-8 grid max-w-4xl gap-4 md:grid-cols-2">
+        {checkedIn.map((passenger) => {
+          const segment = flight ? passenger.segments[flight.id] : null;
           return (
-            <button
-              key={p.id}
-              id={`passenger-item-${p.id}`}
-              onClick={() => onToggle(p.id)}
-              className={`group flex w-full cursor-pointer items-center gap-4 rounded-xl border px-4 py-3 transition-all hover:border-primary/40 hover:bg-primary/5
-                ${isSelected ? 'border-primary/30 bg-primary/5' : 'border-surface-container-high bg-white'}
-              `}
+            <article
+              key={passenger.id}
+              className="rounded-3xl border border-stone-200 bg-stone-50 p-5"
             >
-              {/* Checkbox */}
-              <div
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-all
-                  ${isSelected ? 'border-primary bg-primary' : 'border-gray-300 bg-white'}
-                `}
-              >
-                {isSelected && (
-                  <svg
-                    className="h-3.5 w-3.5 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={3}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </div>
-
-              {/* Number badge */}
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-sm font-bold text-on-surface-variant">
-                {idx + 1}
-              </div>
-
-              {/* Passenger info */}
-              <div className="flex-1 flex flex-row justify-between items-center">
-                <p className="text-sm font-bold text-on-surface">{p.name}</p>
-                <div className="flex flex-row justify-end items-center w-100 gap-20">
-                  <p className="text-[11px] text-on-surface-variant">{p.type}</p>
-                  <p className="text-[11px] text-on-surface-variant">Ngày sinh: {p.dob}</p>
-                  <p className="text-[11px] text-on-surface-variant">Ghế: {p.seat}</p>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+                  <Ticket className="h-5 w-5" />
                 </div>
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  Ready
+                </span>
               </div>
-            </button>
+              <p className="mt-4 text-xl font-semibold text-stone-950">{passenger.name}</p>
+              <p className="mt-1 text-sm text-stone-500">
+                {passenger.type} · Ngày sinh: {passenger.dob}
+              </p>
+              {flight ? (
+                <div className="mt-5 grid grid-cols-3 gap-3 rounded-2xl bg-white p-4 text-sm">
+                  <div>
+                    <p className="text-stone-400">Chuyến bay</p>
+                    <p className="mt-1 font-semibold text-stone-950">{flight.flightNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-stone-400">Khởi hành</p>
+                    <p className="mt-1 font-semibold text-stone-950">{flight.departureTime}</p>
+                  </div>
+                  <div>
+                    <p className="text-stone-400">Ghế</p>
+                    <p className="mt-1 font-semibold text-red-600">{segment?.seatNumber ?? 'N/A'}</p>
+                  </div>
+                </div>
+              ) : null}
+            </article>
           );
         })}
       </div>
 
-      {/* Action buttons */}
-      <div className="mt-5 flex items-center justify-between gap-3">
+      <div className="mx-auto mt-8 flex max-w-4xl flex-wrap items-center justify-center gap-3">
         <button
-          id="checkin-back-btn"
-          onClick={onBack}
-          className="rounded-xl border border-surface-container-high bg-white px-6 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-surface-low active:scale-95"
-        >
-          Quay lại
-        </button>
-        <button
-          id="checkin-continue-btn"
-          disabled={selected.size === 0}
-          onClick={onCheckin}
-          className="flex items-center gap-2 rounded-xl bg-primary px-8 py-2.5 text-sm font-bold text-white shadow-lg transition-all hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Check-in ngay
-          <ArrowRight className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function CheckinStatusSidebar() {
-  return (
-    <div className="flex flex-col gap-4">
-      {/* Check-in availability card */}
-      <div className="glass-panel rounded-2xl border border-surface-container-high p-4 shadow-sm">
-        <div className="mb-3 flex flex-col items-center gap-1">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-            <CheckCircle2 className="h-7 w-7 text-green-500" />
-          </div>
-          <p className="text-sm font-bold text-green-600">Check-in khả dụng</p>
-        </div>
-
-        <div className="space-y-2 text-center">
-          <p className="text-[11px] text-on-surface-variant">Thời gian check-in</p>
-          <p className="text-lg font-black text-primary">{MOCK_FLIGHT.checkinOpen}</p>
-          <p className="text-[11px] text-on-surface-variant">đến</p>
-          <p className="text-lg font-black text-primary">{MOCK_FLIGHT.checkinClose}</p>
-        </div>
-      </div>
-
-      {/* Booking info */}
-      <div className="glass-panel rounded-2xl border border-surface-container-high p-4 shadow-sm">
-        <p className="mb-3 text-sm font-bold text-on-surface">Thông tin đặt chỗ</p>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[12px] text-on-surface-variant">Mã đặt chỗ (PNR)</span>
-            <span className="text-sm font-black text-primary">{MOCK_BOOKING.pnr}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[12px] text-on-surface-variant">Họ</span>
-            <span className="text-sm font-bold text-on-surface">{MOCK_BOOKING.lastName}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[12px] text-on-surface-variant">Tổng số hành khách</span>
-            <span className="text-sm font-bold text-on-surface">
-              {MOCK_BOOKING.totalPassengers}
-            </span>
-          </div>
-        </div>
-        <button
-          id="booking-detail-btn"
-          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-surface-container-high py-2 text-[12px] font-semibold text-on-surface transition-all hover:bg-surface-low active:scale-95"
-        >
-          <ClipboardList className="h-3.5 w-3.5" />
-          Chi tiết đặt chỗ
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function BenefitsBar() {
-  return (
-    <div>
-      {/* Notes */}
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-        <div className="mb-2 flex items-center gap-1.5">
-          <AlertTriangle className="h-4 w-4 text-amber-500" />
-          <p className="text-sm font-bold text-amber-800">Lưu ý</p>
-        </div>
-        <div>
-          {NOTES.map((note, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <note.icon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-              <p className="text-[15px] leading-snug text-amber-800">{note.text}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4">
-        {BENEFITS.map((b, i) => (
-          <div
-            key={i}
-            className="glass-panel flex items-start gap-3 rounded-2xl border border-surface-container-high p-4 shadow-sm"
-          >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-              <b.icon className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <p className="text-[12px] font-bold text-on-surface">{b.title}</p>
-              <p className="text-[11px] leading-snug text-on-surface-variant">{b.desc}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Checkin Success Screen ───────────────────────────────────────────────────
-
-function CheckinSuccess({ checkedIn }: { checkedIn: MockPassenger[] }) {
-  const navigate = useNavigate();
-  return (
-    <div className="glass-panel rounded-2xl border border-surface-container-high p-8 shadow-sm text-center animate-moving-up">
-      {/* Success icon */}
-      <div className="flex justify-center mb-4">
-        <div className="relative flex h-20 w-20 items-center justify-center">
-          <div className="absolute inset-0 rounded-full bg-green-100 animate-ping opacity-30" />
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
-            <CheckCircle2 className="h-12 w-12 text-green-500" />
-          </div>
-        </div>
-      </div>
-
-      <h2 className="text-2xl font-black text-on-surface mb-1">Check-in thành công!</h2>
-      <p className="text-sm text-on-surface-variant mb-8">
-        Thẻ lên máy bay của bạn đã sẵn sàng. Chúc bạn có chuyến bay tuyệt vời!
-      </p>
-
-      {/* Boarding pass summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 text-left max-w-2xl mx-auto">
-        {checkedIn.map((p) => (
-          <div
-            key={p.id}
-            className="rounded-2xl border border-surface-container-high bg-white p-4 shadow-sm"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
-                <Ticket className="h-5 w-5 text-primary" />
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-green-600">
-                ✓ Đã check-in
-              </span>
-            </div>
-            <p className="text-sm font-black text-on-surface mb-1">{p.name}</p>
-            <p className="text-[11px] text-on-surface-variant mb-3">
-              {p.type} · Ngày sinh: {p.dob}
-            </p>
-            <div className="flex justify-between">
-              <div>
-                <p className="text-[10px] text-on-surface-variant">Chuyến bay</p>
-                <p className="text-sm font-black text-on-surface">{MOCK_FLIGHT.flightNumber}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-[10px] text-on-surface-variant">Khởi hành</p>
-                <p className="text-sm font-black text-on-surface">{MOCK_FLIGHT.departureTime}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] text-on-surface-variant">Ghế</p>
-                <p className="text-sm font-black text-primary">{p.seat}</p>
-              </div>
-            </div>
-            <div className="mt-3 flex items-center justify-between text-[10px] text-on-surface-variant border-t border-dashed border-surface-container-high pt-3">
-              <span>
-                {MOCK_FLIGHT.departureCode} → {MOCK_FLIGHT.arrivalCode}
-              </span>
-              <span>{MOCK_FLIGHT.dateLabel}</span>
-              <span>{MOCK_FLIGHT.cabin}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Flight info strip */}
-      <div className="flex flex-wrap items-center justify-center gap-6 rounded-2xl border border-surface-container-high bg-surface-low px-6 py-4 mb-8 max-w-2xl mx-auto">
-        <div className="text-center">
-          <p className="text-[10px] text-on-surface-variant">Số hiệu</p>
-          <p className="text-base font-black text-on-surface">{MOCK_FLIGHT.flightNumber}</p>
-        </div>
-        <div className="text-center">
-          <p className="text-[10px] text-on-surface-variant">Khởi hành</p>
-          <p className="text-base font-black text-on-surface">
-            {MOCK_FLIGHT.departureCode} {MOCK_FLIGHT.departureTime}
-          </p>
-        </div>
-        <div className="text-center">
-          <p className="text-[10px] text-on-surface-variant">Đến</p>
-          <p className="text-base font-black text-on-surface">
-            {MOCK_FLIGHT.arrivalCode} {MOCK_FLIGHT.arrivalTime}
-          </p>
-        </div>
-        <div className="text-center">
-          <p className="text-[10px] text-on-surface-variant">Ngày</p>
-          <p className="text-base font-black text-on-surface">{MOCK_FLIGHT.dateLabel}</p>
-        </div>
-        <div className="text-center">
-          <p className="text-[10px] text-on-surface-variant">Hạng</p>
-          <p className="text-base font-black text-on-surface">{MOCK_FLIGHT.cabin}</p>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        <button
-          id="checkin-download-boarding"
-          className="flex items-center gap-2 rounded-xl border border-surface-container-high bg-white px-6 py-3 text-sm font-bold text-on-surface transition-all hover:bg-surface-low active:scale-95"
+          type="button"
+          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-stone-200 px-6 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
         >
           <Download className="h-4 w-4" />
-          Tải thẻ lên máy bay
+          Tải boarding pass
         </button>
         <button
-          id="checkin-go-home"
+          type="button"
           onClick={() => navigate('/')}
-          className="flex items-center gap-2 rounded-xl bg-primary px-8 py-3 text-sm font-black text-white shadow-lg transition-all hover:brightness-110 active:scale-95"
+          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
         >
           <Home className="h-4 w-4" />
           Về trang chủ
         </button>
       </div>
+    </section>
+  );
+}
+
+function SeatConfirmModal({
+  open,
+  seat,
+  passengerName,
+  flight,
+  assigned,
+  loading,
+  onClose,
+  onConfirm,
+  onCancelSeat,
+}: SeatConfirmModalProps) {
+  if (!open || !seat || !passengerName || !flight) return null;
+
+  const seatPrice =
+    seat.displayPrice?.text?.trim() ||
+    (seat.extraPrice && seat.extraPrice > 0
+      ? formatCurrency(seat.extraPrice, seat.currency ?? 'VND')
+      : 'Free');
+
+  const isOwnAssignedSeat = Boolean(assigned?.isYours);
+  const isBlockedSeat = Boolean(assigned && !assigned.isYours);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/45 p-4 backdrop-blur-[2px]">
+      <div className="w-full max-w-md rounded-[28px] border border-stone-200 bg-white p-6 shadow-[0_30px_90px_rgba(15,23,42,0.24)]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+              Xac nhan ghe
+            </p>
+            <h3 className="mt-2 text-2xl font-semibold text-stone-950">Seat {seat.seatNumber}</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-stone-200 text-stone-500 transition hover:bg-stone-50 hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Dong xac nhan ghe"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50/80 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-stone-500">Hanh khach</span>
+            <span className="text-sm font-semibold text-stone-950">{passengerName}</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-sm text-stone-500">Chuyen bay</span>
+            <span className="text-sm font-semibold text-stone-950">{flight.flightNumber}</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-sm text-stone-500">Chang bay</span>
+            <span className="text-sm font-semibold text-stone-950">
+              {flight.departureCode} → {flight.arrivalCode}
+            </span>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-sm text-stone-500">Gia ghe</span>
+            <span className="text-sm font-semibold text-stone-950">{seatPrice}</span>
+          </div>
+        </div>
+
+        <p className="mt-4 text-sm leading-6 text-stone-600">
+          {isBlockedSeat
+            ? 'Ghe nay dang duoc gan cho hanh khach khac. Vui long chon ghe khac.'
+            : isOwnAssignedSeat
+              ? `Ban dang giu ghe ${seat.seatNumber} cho ${passengerName}.`
+              : `Xac nhan gan ghe ${seat.seatNumber} cho ${passengerName}.`}
+        </p>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="inline-flex h-11 items-center justify-center rounded-xl border border-stone-200 px-5 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Dong
+          </button>
+          {isBlockedSeat ? null : isOwnAssignedSeat ? (
+            <button
+              type="button"
+              onClick={() => onCancelSeat(seat)}
+              disabled={loading}
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-rose-600 px-5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? 'Dang xu ly...' : 'Bo ghe nay'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onConfirm(seat)}
+              disabled={loading}
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-red-600 px-5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? 'Dang xu ly...' : 'Xac nhan chon ghe'}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
 export default function Checkin() {
   const navigate = useNavigate();
-  const [selected, setSelected] = useState<Set<string>>(new Set(MOCK_PASSENGERS.map((p) => p.id)));
+  const location = useLocation();
+  const bookingLookup = useBookingStore((state) => state.bookingLookup);
+  const lookupCriteria = useBookingStore((state) => state.lookupCriteria);
+  const manageOptions = useBookingStore((state) => state.manageOptions);
+  const setManageOptions = useBookingStore((state) => state.setManageOptions);
+  const navState = (location.state as CheckinNavigationState | null) ?? null;
+  const manageBookingId =
+    manageOptions?.bookingId ?? bookingLookup?.booking?.bookingId ?? navState?.bookingId ?? null;
+
+  const manageOptionsQuery = useQuery({
+    queryKey: ['checkin-manage-options', manageBookingId],
+    queryFn: () => bookingService.getManageOptions(manageBookingId as number),
+    enabled: manageBookingId != null,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (manageOptionsQuery.data) {
+      setManageOptions(manageOptionsQuery.data);
+    }
+  }, [manageOptionsQuery.data, setManageOptions]);
+
+  const flights = useMemo<DerivedFlight[]>(() => {
+    if (manageOptions?.itineraries?.length) {
+      return manageOptions.itineraries.map((itinerary, index) => ({
+        id: String(itinerary.flightId),
+        numericId: itinerary.flightId,
+        flightNumber: itinerary.flightNumber,
+        departureCode: itinerary.departureAirportCode,
+        departureCity: itinerary.departureCity,
+        departureTime: formatTime(itinerary.departureTime),
+        departureTerminal: itinerary.departureTerminal,
+        arrivalCode: itinerary.arrivalAirportCode,
+        arrivalCity: itinerary.arrivalCity,
+        arrivalTime: formatTime(itinerary.arrivalTime),
+        arrivalTerminal: itinerary.arrivalTerminal,
+        dateLabel: formatDateLabel(itinerary.departureTime),
+        shortDate: formatShortDate(itinerary.departureTime),
+        durationLabel: formatDuration(itinerary.departureTime, itinerary.arrivalTime),
+        cabin: itinerary.fareName ?? itinerary.cabinClass ?? '',
+        baggageHandKg: itinerary.baggageHandKg,
+        segmentLabel: index === 0 ? 'Chặng đi' : index === 1 ? 'Chặng về' : `Chặng ${index + 1}`,
+        journeyType: itinerary.journeyType,
+        segmentStatus: itinerary.segmentStatus,
+        checkInWindow: itinerary.checkInWindow,
+      }));
+    }
+
+    if (bookingLookup?.itineraries?.length) {
+      return bookingLookup.itineraries.map((itinerary, index) => ({
+        id: String(itinerary.flightId),
+        numericId: itinerary.flightId,
+        flightNumber: itinerary.flightNumber,
+        departureCode: itinerary.departureAirportCode,
+        departureCity: itinerary.departureCity,
+        departureTime: formatTime(itinerary.departureTime),
+        departureTerminal: itinerary.departureTerminal,
+        arrivalCode: itinerary.arrivalAirportCode,
+        arrivalCity: itinerary.arrivalCity,
+        arrivalTime: formatTime(itinerary.arrivalTime),
+        arrivalTerminal: itinerary.arrivalTerminal,
+        dateLabel: formatDateLabel(itinerary.departureTime),
+        shortDate: formatShortDate(itinerary.departureTime),
+        durationLabel: formatDuration(itinerary.departureTime, itinerary.arrivalTime),
+        cabin: itinerary.fareName ?? itinerary.cabinClass ?? '',
+        baggageHandKg: itinerary.fareBenefits?.baggageHandKg ?? null,
+        segmentLabel: index === 0 ? 'Chặng đi' : index === 1 ? 'Chặng về' : `Chặng ${index + 1}`,
+        journeyType: 'UNKNOWN',
+        segmentStatus: 'BLOCKED',
+        checkInWindow: {
+          status: 'CLOSED',
+          opensAt: itinerary.departureTime,
+          closesAt: itinerary.departureTime,
+          message: 'Manage options chưa sẵn sàng cho chuyến bay này.',
+        },
+      }));
+    }
+
+    return [];
+  }, [bookingLookup?.itineraries, manageOptions?.itineraries]);
+
+  const passengers = useMemo<DerivedPassenger[]>(() => {
+    const segmentMapByPassenger = new Map<number, Record<string, DerivedPassengerSegment>>();
+    for (const passenger of manageOptions?.passengers ?? []) {
+      segmentMapByPassenger.set(
+        passenger.passengerId,
+        Object.fromEntries(
+          (passenger.segments ?? []).map((segment) => [
+            String(segment.flightId),
+            {
+              flightId: String(segment.flightId),
+              eligible: segment.eligible,
+              checkInStatus: segment.checkInStatus,
+              seatAssigned: segment.seatAssigned,
+              seatNumber: segment.seatNumber,
+              warnings: segment.warnings,
+            },
+          ])
+        )
+      );
+    }
+
+    if (!manageOptions?.passengers?.length) {
+      for (const passenger of bookingLookup?.passengers ?? []) {
+        const fallbackSegments =
+          passenger.segments?.map((segment) => [
+            String(segment.flightId),
+            {
+              flightId: String(segment.flightId),
+              eligible: segment.eligible,
+              checkInStatus: segment.checkInStatus,
+              seatAssigned: segment.seatAssigned,
+              seatNumber: segment.seatNumber,
+              warnings: segment.warnings,
+            } satisfies DerivedPassengerSegment,
+          ]) ?? [];
+        if (fallbackSegments.length > 0) {
+          segmentMapByPassenger.set(
+            passenger.passengerId,
+            Object.fromEntries(fallbackSegments)
+          );
+        }
+      }
+    }
+
+    return (
+      bookingLookup?.passengers?.map((passenger) => ({
+        id: String(passenger.passengerId),
+        name: formatDisplayName(passenger.lastName, passenger.firstName),
+        type: passenger.passengerType,
+        dob: passenger.dateOfBirth,
+        segments: segmentMapByPassenger.get(passenger.passengerId) ?? {},
+      })) ?? []
+    );
+  }, [bookingLookup?.passengers, manageOptions?.passengers]);
+
+  const booking = useMemo(
+    () => ({
+      pnr: lookupCriteria?.pnrCode ?? bookingLookup?.booking?.pnrCode ?? navState?.pnrCode ?? '',
+      lastName: lookupCriteria?.lastName ?? navState?.lastName ?? '',
+      totalPassengers: passengers.length,
+      expiresAt: bookingLookup?.booking?.expiresAt ?? navState?.expiresAt ?? null,
+    }),
+    [
+      lookupCriteria?.lastName,
+      lookupCriteria?.pnrCode,
+      bookingLookup?.booking?.expiresAt,
+      bookingLookup?.booking?.pnrCode,
+      navState?.expiresAt,
+      navState?.lastName,
+      navState?.pnrCode,
+      passengers.length,
+    ]
+  );
+
+  const bookingDetail = useMemo(
+    () => buildBookingDetailModalData(bookingLookup, manageOptions, lookupCriteria?.pnrCode ?? ''),
+    [bookingLookup, lookupCriteria?.pnrCode, manageOptions]
+  );
+
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectedFlights, setSelectedFlights] = useState<Set<string>>(new Set());
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [activeSeatPassengerId, setActiveSeatPassengerId] = useState<string | null>(null);
+  const [selectedSeat, setSelectedSeat] = useState<SeatSelectionValue | null>(null);
+  const [showSeatConfirmModal, setShowSeatConfirmModal] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [checkingIn, setCheckingIn] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showBookingDetail, setShowBookingDetail] = useState(false);
+
+  useEffect(() => {
+    if (!showBookingDetail) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowBookingDetail(false);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [showBookingDetail]);
+
+  useEffect(() => {
+    setSelectedFlights((prev) => {
+      const validIds = new Set(flights.map((flight) => flight.id));
+      const next = new Set([...prev].filter((id) => validIds.has(id)));
+      if (next.size > 0) return next;
+      const firstOpen = flights.find((flight) => flight.checkInWindow.status === 'OPEN');
+      if (firstOpen) return new Set([firstOpen.id]);
+      return flights[0] ? new Set([flights[0].id]) : new Set();
+    });
+  }, [flights]);
+
+  const primaryFlight = flights.find((flight) => selectedFlights.has(flight.id)) ?? flights[0] ?? null;
+  const activeFlightItinerary = manageOptions?.itineraries?.find(
+    (itinerary) => String(itinerary.flightId) === primaryFlight?.id
+  );
+  const seatMapFlightId = activeFlightItinerary?.flightId ?? primaryFlight?.numericId ?? null;
+  const seatMapFareId = activeFlightItinerary?.fareId ?? null;
+
+  useEffect(() => {
+    if (!primaryFlight) return;
+    setSelected((prev) => {
+      const next = new Set<string>();
+      for (const passengerId of prev) {
+        if (passengers.find((passenger) => passenger.id === passengerId)?.segments[primaryFlight.id]?.eligible) {
+          next.add(passengerId);
+        }
+      }
+      return next;
+    });
+  }, [passengers, primaryFlight]);
+
+  useEffect(() => {
+    setSubmitError(null);
+  }, [currentStep, selected, selectedFlights]);
+
+  useEffect(() => {
+    if (!primaryFlight || currentStep !== 3) return;
+    const selectedPassengers = passengers.filter(
+      (passenger) => selected.has(passenger.id) && passenger.segments[primaryFlight.id]
+    );
+    if (selectedPassengers.length === 0) {
+      setActiveSeatPassengerId(null);
+      return;
+    }
+    if (selectedPassengers.some((passenger) => passenger.id === activeSeatPassengerId)) return;
+    const firstWithoutSeat =
+      selectedPassengers.find((passenger) => !passenger.segments[primaryFlight.id]?.seatAssigned) ??
+      selectedPassengers[0];
+    setActiveSeatPassengerId(firstWithoutSeat.id);
+  }, [activeSeatPassengerId, currentStep, passengers, primaryFlight, selected]);
+
+  useEffect(() => {
+    setSelectedSeat(null);
+    setShowSeatConfirmModal(false);
+  }, [activeSeatPassengerId, primaryFlight?.id]);
+
+  const activeSeatPassengerNumericId = activeSeatPassengerId ? Number(activeSeatPassengerId) : null;
+
+  const assignedSeatBySeatId = useMemo(() => {
+    const assignments = manageOptions?.seatAssignments ?? [];
+    const next = new Map<number, { label: string; isYours: boolean }>();
+    for (const assignment of assignments) {
+      if (String(assignment.flightId) !== primaryFlight?.id) continue;
+      const passenger = passengers.find((item) => Number(item.id) === assignment.passengerId);
+      const label = passenger ? passenger.name.split(' ')[0] ?? passenger.name : 'Đã chọn';
+      next.set(assignment.seatId, {
+        label,
+        isYours: activeSeatPassengerNumericId != null && assignment.passengerId === activeSeatPassengerNumericId,
+      });
+    }
+    return next;
+  }, [activeSeatPassengerNumericId, manageOptions?.seatAssignments, passengers, primaryFlight?.id]);
+
+  const seatMapQuery = useQuery({
+    queryKey: ['checkin-seat-map', seatMapFlightId, seatMapFareId],
+    queryFn: () => flightService.getSeatMap(seatMapFlightId as number, seatMapFareId as number),
+    enabled: currentStep === 3 && seatMapFlightId != null && seatMapFareId != null,
+    staleTime: 60_000,
+  });
+
+  const assignSeatMutation = useMutation({
+    mutationFn: (vars: { bookingId: number; passengerId: number; seatId: number }) =>
+      bookingService.putSeatAssignments(vars.bookingId, {
+        assignments: [{ passengerId: vars.passengerId, seatId: vars.seatId }],
+      }),
+    onSuccess: async () => {
+      setShowSeatConfirmModal(false);
+      if (manageBookingId != null) {
+        const refreshed = await bookingService.getManageOptions(manageBookingId);
+        setManageOptions(refreshed);
+      }
+    },
+  });
+
+  const cancelSeatMutation = useMutation({
+    mutationFn: (vars: { bookingId: number; passengerId: number; seatId: number }) =>
+      bookingService.deleteSeatAssignments(vars.bookingId, {
+        assignments: [{ passengerId: vars.passengerId, seatId: vars.seatId }],
+      }),
+    onSuccess: async () => {
+      setShowSeatConfirmModal(false);
+      if (manageBookingId != null) {
+        const refreshed = await bookingService.getManageOptions(manageBookingId);
+        setManageOptions(refreshed);
+      }
+    },
+  });
+
+  const checkedInPassengers = passengers.filter((passenger) => selected.has(passenger.id));
+  const activeSeatPassenger =
+    passengers.find((passenger) => passenger.id === activeSeatPassengerId) ?? null;
+  const activeSelectedSeatAssigned =
+    selectedSeat && assignedSeatBySeatId ? (assignedSeatBySeatId.get(selectedSeat.seatId) ?? null) : null;
 
   function togglePassenger(id: string) {
+    if (!primaryFlight) return;
+    const segment = passengers.find((passenger) => passenger.id === id)?.segments[primaryFlight.id];
+    if (!segment?.eligible) return;
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -467,52 +2121,239 @@ export default function Checkin() {
     });
   }
 
-  const checkedInPassengers = MOCK_PASSENGERS.filter((p) => selected.has(p.id));
+  function toggleFlight(id: string) {
+    const flight = flights.find((item) => item.id === id);
+    if (!flight || flight.checkInWindow.status !== 'OPEN') return;
+    setSelectedFlights((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const seatMapError =
+    seatMapFlightId == null || seatMapFareId == null
+      ? 'Không tìm thấy dữ liệu chuyến bay để tải sơ đồ ghế.'
+      : seatMapQuery.error instanceof Error
+        ? seatMapQuery.error.message
+        : seatMapQuery.isError
+          ? 'Không thể tải sơ đồ ghế lúc này.'
+          : null;
+
+  function handleSeatPreview(seat: SeatSelectionValue) {
+    setSelectedSeat(seat);
+    const assignedMeta = assignedSeatBySeatId?.get(seat.seatId) ?? null;
+    if (assignedMeta && !assignedMeta.isYours) {
+      setShowSeatConfirmModal(false);
+      return;
+    }
+    setShowSeatConfirmModal(true);
+  }
+
+  function handleSeatConfirm(seat: SeatSelectionValue) {
+    setSelectedSeat(seat);
+    if (manageBookingId == null || activeSeatPassengerNumericId == null) return;
+    assignSeatMutation.mutate({
+      bookingId: manageBookingId,
+      passengerId: activeSeatPassengerNumericId,
+      seatId: seat.seatId,
+    });
+  }
+
+  function handleSeatCancel(seat: SeatSelectionValue) {
+    setSelectedSeat(seat);
+    if (manageBookingId == null || activeSeatPassengerNumericId == null) return;
+    cancelSeatMutation.mutate({
+      bookingId: manageBookingId,
+      passengerId: activeSeatPassengerNumericId,
+      seatId: seat.seatId,
+    });
+  }
+
+  async function handleContinueCheckIn() {
+    if (!booking.pnr || !booking.lastName) {
+      setSubmitError('Thiếu thông tin PNR hoặc họ để tiếp tục check-in.');
+      return;
+    }
+
+    const segments = [...selectedFlights]
+      .map((flightId) => {
+        const passengerIds = [...selected]
+          .map(Number)
+          .filter((passengerId) => {
+            const passenger = passengers.find((item) => item.id === String(passengerId));
+            return passenger?.segments[flightId]?.eligible;
+          });
+        return { flightId: Number(flightId), passengerIds };
+      })
+      .filter((segment) => segment.passengerIds.length > 0);
+
+    if (segments.length === 0) {
+      setSubmitError('Chưa có hành khách đủ điều kiện cho các chuyến bay đã chọn.');
+      return;
+    }
+
+    setSubmitError(null);
+    setCheckingIn(true);
+    try {
+      const response = await bookingService.continueCheckIn({
+        pnrCode: booking.pnr,
+        lastName: booking.lastName,
+        segments,
+      });
+      if (response.actions.allowConfirmCheckIn) {
+        setSuccess(true);
+        return;
+      }
+      if (response.actions.allowSeatSelection) {
+        setSubmitError('Một số hành khách còn thiếu ghế. Hãy hoàn tất chọn ghế trước khi tiếp tục.');
+        return;
+      }
+      setSubmitError('Backend từ chối bước tiếp tục check-in do còn hành khách hoặc chuyến bay bị chặn.');
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Không thể tiếp tục check-in.');
+    } finally {
+      setCheckingIn(false);
+    }
+  }
+
+  if (manageOptionsQuery.isLoading && !manageOptions) {
+    return (
+      <div className="min-h-screen bg-[#faf8f4] text-stone-900 antialiased">
+        <SiteHeader />
+        <main className="mx-auto flex min-h-svh max-w-4xl items-center justify-center px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
+          <div className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white px-6 py-4 text-stone-700 shadow-sm">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Đang tải dữ liệu check-in...
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
+  if (!bookingLookup || passengers.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#faf8f4] text-stone-900 antialiased">
+        <SiteHeader />
+        <main className="mx-auto flex min-h-svh max-w-4xl items-center justify-center px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
+          <div className="w-full rounded-[28px] border border-stone-200 bg-white p-8 text-center shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+            <h1 className="text-3xl font-semibold tracking-tight text-stone-950">Chưa có dữ liệu booking</h1>
+            <p className="mt-3 text-base leading-7 text-stone-600">
+              Quay lại trang quản lý đặt chỗ và tìm booking trước khi tiếp tục check-in.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/manage-booking')}
+              className="mt-6 inline-flex items-center justify-center rounded-2xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
+            >
+              Về quản lý đặt chỗ
+            </button>
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
 
   return (
-    <div className="relative min-h-screen bg-surface text-on-surface antialiased">
+    <div className="min-h-screen bg-[#faf8f4] text-stone-900 antialiased">
       <SiteHeader />
-
-      <main className="mx-auto max-w-7xl min-h-svh px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
-        {/* Page title */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-            <SquareCheckBig className="h-5 w-5 text-primary" />
-          </div>
-          <h1 className="font-headline text-2xl font-black text-on-surface md:text-3xl">
-            Check-in trực tuyến
-          </h1>
-        </div>
+      <main className="mx-auto min-h-svh max-w-7xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28 lg:px-8">
         {success ? (
-          <CheckinSuccess checkedIn={checkedInPassengers} />
+          <CheckinSuccess checkedIn={checkedInPassengers} flight={primaryFlight} />
         ) : (
           <>
-            {/* Two-column layout */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
-              {/* Left column */}
-              <div>
-                <FlightInfoCard />
-                <PassengerList
-                  passengers={MOCK_PASSENGERS}
-                  selected={selected}
-                  onToggle={togglePassenger}
-                  onCheckin={() => setSuccess(true)}
-                  onBack={() => navigate(-1)}
-                />
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="min-w-0">
+                {currentStep === 1 ? (
+                  <FlightSelectionList
+                    flights={flights}
+                    selectedFlights={selectedFlights}
+                    onToggleFlight={toggleFlight}
+                    onContinue={() => setCurrentStep(2)}
+                  />
+                ) : currentStep === 2 ? (
+                  <EnhancedPassengerSelectionPanel
+                    passengers={passengers}
+                    selected={selected}
+                    onToggle={togglePassenger}
+                    onToggleAll={() => {
+                      if (!primaryFlight) return;
+                      const eligibleIds = passengers
+                        .filter((passenger) => passenger.segments[primaryFlight.id]?.eligible)
+                        .map((passenger) => passenger.id);
+                      if (eligibleIds.every((id) => selected.has(id))) {
+                        setSelected(new Set());
+                      } else {
+                        setSelected(new Set(eligibleIds));
+                      }
+                    }}
+                    flight={primaryFlight as DerivedFlight}
+                    onBack={() => setCurrentStep(1)}
+                    onContinue={() => {
+                      setSelectedSeat(null);
+                      setCurrentStep(3);
+                    }}
+                    submitError={submitError}
+                  />
+                ) : (
+                  <CheckinSeatReviewPanel
+                    passengers={passengers}
+                    selected={selected}
+                    flight={primaryFlight as DerivedFlight}
+                    onBack={() => setCurrentStep(2)}
+                    onContinue={handleContinueCheckIn}
+                    checkingIn={checkingIn}
+                    submitError={submitError}
+                    seatMapLoading={seatMapQuery.isPending}
+                    seatMapError={seatMapError}
+                    seatMap={seatMapQuery.data ?? null}
+                    selectedSeat={selectedSeat}
+                    assignedSeatBySeatId={assignedSeatBySeatId}
+                    seatConfirmLoading={assignSeatMutation.isPending || cancelSeatMutation.isPending}
+                    activePassengerId={activeSeatPassengerId}
+                    onActivePassengerChange={setActiveSeatPassengerId}
+                    onSeatPreview={handleSeatPreview}
+                    onSeatConfirm={handleSeatConfirm}
+                    onSeatCancel={handleSeatCancel}
+                  />
+                )}
               </div>
 
-              {/* Right sidebar */}
-              <div>
-                <CheckinStatusSidebar />
-              </div>
+              <EnhancedCheckinSidebar
+                booking={booking}
+                flight={primaryFlight}
+                onOpenDetails={() => setShowBookingDetail(true)}
+              />
             </div>
 
-            {/* Benefits bar */}
-            <BenefitsBar />
+            <CheckinBenefitsStrip />
+            <BookingDetailModal
+              detail={bookingDetail}
+              open={showBookingDetail}
+              onClose={() => setShowBookingDetail(false)}
+              onContinueCheckin={() => {
+                setShowBookingDetail(false);
+                setCurrentStep(1);
+              }}
+              onOpenManageBooking={() => navigate('/manage-booking')}
+            />
+            <SeatConfirmModal
+              open={showSeatConfirmModal}
+              seat={selectedSeat}
+              passengerName={activeSeatPassenger?.name ?? null}
+              flight={primaryFlight}
+              assigned={activeSelectedSeatAssigned}
+              loading={assignSeatMutation.isPending || cancelSeatMutation.isPending}
+              onClose={() => setShowSeatConfirmModal(false)}
+              onConfirm={handleSeatConfirm}
+              onCancelSeat={handleSeatCancel}
+            />
           </>
         )}
       </main>
-
       <SiteFooter />
     </div>
   );

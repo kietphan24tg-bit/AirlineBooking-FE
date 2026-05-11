@@ -1,4 +1,10 @@
 import api from '../api/axios';
+import {
+  getMockSeatMapResponse,
+  isManageBookingMockVariant,
+  type ManageBookingMockVariant,
+} from '../mocks/manageBooking';
+import { useBookingStore } from '../stores/useBookingStore';
 import type {
   CabinClassKey,
   CabinFare,
@@ -91,6 +97,48 @@ function unwrapData(body: unknown): unknown {
   const b = body as Record<string, unknown>;
   if ('data' in b && b.data != null) return b.data;
   return body;
+}
+
+function resolveMockManageVariantForFlights(): ManageBookingMockVariant | null {
+  const isDevLocal =
+    import.meta.env.DEV &&
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const envFlag = import.meta.env?.VITE_MOCK_MANAGE_BOOKING === 'true';
+  let urlFlag = false;
+  let urlVariant: string | null = null;
+  if (typeof window !== 'undefined' && window.location?.search) {
+    const params = new URLSearchParams(window.location.search);
+    urlFlag = params.get('mockManageBooking') === '1';
+    urlVariant = params.get('mockManageVariant');
+  }
+  const { mockManageBookingMode, manageOptions, bookingLookup, lookupCriteria } = useBookingStore.getState();
+  const looksLikePersistedMock =
+    isDevLocal &&
+    (
+      bookingLookup?.booking?.pnrCode?.trim().toUpperCase() === 'ABC123' ||
+      lookupCriteria?.pnrCode?.trim().toUpperCase() === 'ABC123' ||
+      manageOptions?.bookingId === 90210
+    );
+  if (urlFlag || envFlag) {
+    if (urlVariant && isManageBookingMockVariant(urlVariant)) return urlVariant;
+    if (mockManageBookingMode || looksLikePersistedMock) {
+      if ((manageOptions?.passengers?.length ?? 0) === 1 && (manageOptions?.itineraries?.length ?? 0) === 1) {
+        return 'CHECKIN_SINGLE';
+      }
+      return 'CONFIRMED';
+    }
+    return 'CONFIRMED';
+  }
+
+  if (mockManageBookingMode || looksLikePersistedMock) {
+    if ((manageOptions?.passengers?.length ?? 0) === 1 && (manageOptions?.itineraries?.length ?? 0) === 1) {
+      return 'CHECKIN_SINGLE';
+    }
+    return 'CONFIRMED';
+  }
+
+  return null;
 }
 
 function formatMoney(amount: number, currency: string): string {
@@ -389,6 +437,11 @@ export async function revalidateFareMapped(
 }
 
 export async function getSeatMapMapped(flightId: number, fareId: number): Promise<SeatMapResponse> {
+  const mockVariant = resolveMockManageVariantForFlights();
+  if (mockVariant) {
+    const mockSeatMap = getMockSeatMapResponse(mockVariant, flightId, fareId);
+    if (mockSeatMap) return normalizeSeatMap(mockSeatMap);
+  }
   const res = await api.get<SeatMapResponse | { data?: SeatMapResponse }>(
     `/api/flights/${flightId}/seats`,
     {

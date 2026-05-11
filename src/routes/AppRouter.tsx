@@ -16,6 +16,7 @@ import Experience from '../pages/Experience';
 import CheckoutResult from '../pages/CheckoutResult';
 import Checkin from '../pages/Checkin';
 import CancelFlight from '../pages/CancelFlight';
+import ChangeFlight from '../pages/ChangeFlight';
 
 const AppRouter = createBrowserRouter([
   {
@@ -75,8 +76,20 @@ const AppRouter = createBrowserRouter([
     element: <Checkin />,
   },
   {
+    path: '/manage-booking/seat-selection',
+    element: <SeatSelection />,
+  },
+  {
+    path: '/manage-booking/add-services',
+    element: <SeatSelection />,
+  },
+  {
     path: '/manage-booking/cancel',
     element: <CancelFlight />,
+  },
+  {
+    path: '/manage-booking/change-flight',
+    element: <ChangeFlight />,
   },
   {
     path: '/app',

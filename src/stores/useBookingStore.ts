@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type {
+  BookingLookupResponse,
+  BookingManageOptionsResponse,
   BookingContactPayload,
   BookingContactWithId,
   BookingCreateResponse,
@@ -46,9 +48,28 @@ export interface BookingSession {
   raw: BookingCreateResponse;
 }
 
+export interface BookingLookupCriteria {
+  pnrCode: string;
+  lastName: string;
+}
+
 interface BookingStore {
   bookingDraft: BookingPersistedDraft;
   bookingResponse: BookingSession | null;
+  bookingLookup: BookingLookupResponse | null;
+  lookupCriteria: BookingLookupCriteria | null;
+  manageOptions: BookingManageOptionsResponse | null;
+  /**
+   * When the page boots with `?mockManageBooking=1`, ManageBooking sets this
+   * flag so downstream pages know they are looking at fixture data. Lives
+   * outside `partialize` so it is purely in-memory and resets on full reload
+   * back into the real flow.
+   */
+  mockManageBookingMode: boolean;
+  setMockManageBookingMode: (enabled: boolean) => void;
+  setLookupCriteria: (data: BookingLookupCriteria | null) => void;
+  setBookingLookup: (data: BookingLookupResponse) => void;
+  setManageOptions: (data: BookingManageOptionsResponse | null) => void;
   setRevalidationDraft: (data: FlightRevalidateFareResponse) => void;
   setBookingRequestDraft: (data: {
     contacts: BookingContactPayload[];
@@ -162,6 +183,14 @@ export const useBookingStore = create<BookingStore>()(
     (set, get) => ({
       bookingDraft: initialDraftState,
       bookingResponse: null,
+      bookingLookup: null,
+      lookupCriteria: null,
+      manageOptions: null,
+      mockManageBookingMode: false,
+      setMockManageBookingMode: (enabled) => set({ mockManageBookingMode: enabled }),
+      setLookupCriteria: (data) => set({ lookupCriteria: data }),
+      setBookingLookup: (data) => set({ bookingLookup: data }),
+      setManageOptions: (data) => set({ manageOptions: data }),
       setRevalidationDraft: (data) =>
         set((state) => ({
           bookingDraft: {
@@ -174,6 +203,9 @@ export const useBookingStore = create<BookingStore>()(
             pricing: data.pricing,
           },
           bookingResponse: null,
+          bookingLookup: null,
+          lookupCriteria: null,
+          manageOptions: null,
         })),
       setBookingRequestDraft: (data) =>
         set((state) => ({
@@ -228,6 +260,9 @@ export const useBookingStore = create<BookingStore>()(
         set({
           bookingDraft: initialDraftState,
           bookingResponse: null,
+          bookingLookup: null,
+          lookupCriteria: null,
+          manageOptions: null,
         }),
       isRevalidateExpired: () => {
         const expiresAt = get().bookingDraft.expiresAt;
@@ -241,12 +276,18 @@ export const useBookingStore = create<BookingStore>()(
       partialize: (state) => ({
         bookingDraft: state.bookingDraft,
         bookingResponse: state.bookingResponse,
+        bookingLookup: state.bookingLookup,
+        lookupCriteria: state.lookupCriteria,
+        manageOptions: state.manageOptions,
       }),
       migrate: (persistedState) => {
         if (!persistedState || typeof persistedState !== 'object') {
           return {
             bookingDraft: initialDraftState,
             bookingResponse: null,
+            bookingLookup: null,
+            lookupCriteria: null,
+            manageOptions: null,
           };
         }
 
@@ -262,6 +303,9 @@ export const useBookingStore = create<BookingStore>()(
                 lastSeatAssignment: state.bookingResponse.lastSeatAssignment ?? null,
               }
             : null,
+          bookingLookup: state.bookingLookup ?? null,
+          lookupCriteria: state.lookupCriteria ?? null,
+          manageOptions: state.manageOptions ?? null,
         };
       },
     }

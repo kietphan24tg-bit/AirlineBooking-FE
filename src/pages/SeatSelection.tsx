@@ -20,11 +20,6 @@ import { useBookingStore } from '../stores/useBookingStore';
 import { bookingService } from '../services/booking.service';
 import { flightService } from '../services/flight.service';
 
-const MOCK_PASSENGERS: PassengerProfile[] = [
-  { id: '1', fullName: 'Arthur Wellesley', seat: '2A' },
-  { id: '2', fullName: 'Jane Austen', seat: undefined },
-];
-
 type SeatContext = {
   flightId: number | null;
   fareId: number | null;
@@ -120,9 +115,40 @@ function findSeatCellById(
   return null;
 }
 
-function resolveStorePassengerId(passenger: BookingPassengerWithId | undefined): number | null {
+function resolveStorePassengerId(
+  passenger:
+    | BookingPassengerWithId
+    | { passengerId?: number | null; id?: number | null }
+    | undefined
+    | null
+): number | null {
   if (!passenger) return null;
   return pickNumericId(passenger.passengerId) ?? pickNumericId(passenger.id);
+}
+
+function buildConfirmedServicesLookupFromManageOptions(
+  manageOptions:
+    | {
+        serviceSelections?: Array<{
+          passengerId: number;
+          optionId: number | null;
+          quantity: number;
+        }>;
+      }
+    | null
+    | undefined
+): Record<number, { optionId: number; quantity: number }[]> {
+  const next: Record<number, { optionId: number; quantity: number }[]> = {};
+  for (const selection of manageOptions?.serviceSelections ?? []) {
+    if (!selection.optionId) continue;
+    const passengerSelections = next[selection.passengerId] ?? [];
+    passengerSelections.push({
+      optionId: selection.optionId,
+      quantity: Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1,
+    });
+    next[selection.passengerId] = passengerSelections;
+  }
+  return next;
 }
 
 function buildSelectionsFromSelectedServices(
@@ -210,8 +236,12 @@ function getBookingSessionExpiredMessage(error: unknown): string | null {
 
 export default function SeatSelection() {
   const location = useLocation();
+  const isManageBookingFlow = location.pathname.startsWith('/manage-booking/');
   const bookingDraft = useBookingStore((state) => state.bookingDraft);
   const bookingResponse = useBookingStore((state) => state.bookingResponse);
+  const bookingLookup = useBookingStore((state) => state.bookingLookup);
+  const manageOptions = useBookingStore((state) => state.manageOptions);
+  const setManageOptions = useBookingStore((state) => state.setManageOptions);
   const applySeatAssignmentResult = useBookingStore((state) => state.applySeatAssignmentResult);
   const applyServicesAssignmentResult = useBookingStore(
     (state) => state.applyServicesAssignmentResult
@@ -226,19 +256,56 @@ export default function SeatSelection() {
         seat: undefined,
       }))
     : null;
-  const passengers = storePassengers ?? navPassengers ?? MOCK_PASSENGERS;
+  const managePassengers = manageOptions?.passengers?.length
+    ? manageOptions.passengers.map((passenger, index) => ({
+        id: String(index + 1),
+        fullName: [passenger.lastName, passenger.firstName].filter(Boolean).join(' ').trim(),
+        seat:
+          manageOptions.seatAssignments.find(
+            (assignment) => assignment.passengerId === passenger.passengerId
+          )?.seatNumber ?? undefined,
+      }))
+    : null;
+  // For the manage-booking flow, prefer manageOptions/lookup; fall back to bookingResponse only in
+  // the original booking flow. The legacy `MOCK_PASSENGERS` placeholder was removed because the
+  // mock URL flag (`?mockManageBooking=1`) now hydrates real fixtures into the store instead.
+  const lookupPassengers = bookingLookup?.passengers?.length
+    ? bookingLookup.passengers.map((passenger, index) => ({
+        id: String(index + 1),
+        fullName: [passenger.lastName, passenger.firstName].filter(Boolean).join(' ').trim(),
+        seat:
+          (passenger.selections?.seats ?? passenger.seatAssignments ?? [])[0]?.seatNumber ??
+          undefined,
+      }))
+    : null;
+  const passengers: PassengerProfile[] = isManageBookingFlow
+    ? (managePassengers ?? lookupPassengers ?? [])
+    : (storePassengers ?? navPassengers ?? []);
+  const passengerSource = isManageBookingFlow
+    ? (manageOptions?.passengers ?? bookingLookup?.passengers ?? [])
+    : (bookingResponse?.passengers ?? []);
 
   const [activePassengerIndex, setActivePassengerIndex] = useState(0);
   const [selectedSeat, setSelectedSeat] = useState<SeatSelectionValue | null>(null);
-  const [isSeatSelecting, setIsSeatSelecting] = useState(false);
-  const [isServiceSelecting, setIsServiceSelecting] = useState(false);
+  const [isSeatSelecting, setIsSeatSelecting] = useState(
+    location.pathname.endsWith('/seat-selection')
+  );
+  const [isServiceSelecting, setIsServiceSelecting] = useState(
+    location.pathname.endsWith('/add-services')
+  );
   const [servicesByPassengerId, setServicesByPassengerId] = useState<ServicesByPassengerId>({});
   const [serviceSaveStatusByPassengerId, setServiceSaveStatusByPassengerId] =
     useState<ServiceSaveStatusByPassengerId>(() =>
-      createInitialServiceStatusMap(bookingResponse?.confirmedServicesByPassengerId ?? {})
+      createInitialServiceStatusMap(
+        bookingResponse?.confirmedServicesByPassengerId ??
+          buildConfirmedServicesLookupFromManageOptions(manageOptions)
+      )
     );
   const hydratedPassengersRef = useRef<Set<number>>(new Set());
   const assignInFlight = useRef(false);
+  const manageBookingId = pickNumericId(
+    manageOptions?.bookingId ?? bookingLookup?.booking?.bookingId ?? bookingResponse?.bookingId
+  );
 
   useEffect(() => {
     if (activePassengerIndex >= passengers.length) {
@@ -246,15 +313,36 @@ export default function SeatSelection() {
     }
   }, [activePassengerIndex, passengers.length]);
 
+  const manageOptionsQuery = useQuery({
+    queryKey: ['manage-options', manageBookingId],
+    queryFn: () => bookingService.getManageOptions(manageBookingId as number),
+    enabled: isManageBookingFlow && manageBookingId != null,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (manageOptionsQuery.data) {
+      setManageOptions(manageOptionsQuery.data);
+    }
+  }, [manageOptionsQuery.data, setManageOptions]);
+
   const seatContext = useMemo(() => {
+    if (manageOptions?.itineraries?.length) {
+      const itinerary = manageOptions.itineraries[0];
+      return {
+        flightId: itinerary.flightId,
+        fareId: itinerary.fareId,
+        fareCode: null,
+      };
+    }
     const responseContext = resolveSeatContext(bookingResponse);
     if (responseContext.flightId && responseContext.fareId) return responseContext;
     return resolveSeatContext(bookingDraft);
-  }, [bookingDraft, bookingResponse]);
+  }, [bookingDraft, bookingResponse, manageOptions]);
   const canLoadSeatMap = isSeatSelecting && !!seatContext.flightId && !!seatContext.fareId;
   const canLoadServices = isServiceSelecting && !!seatContext.flightId && !!seatContext.fareId;
 
-  const activePassenger = bookingResponse?.passengers?.[activePassengerIndex];
+  const activePassenger = passengerSource[activePassengerIndex];
   const activePassengerId = useMemo(
     () => resolveStorePassengerId(activePassenger),
     [activePassenger]
@@ -266,7 +354,12 @@ export default function SeatSelection() {
         assignments: [{ passengerId: vars.passengerId, seatId: vars.seatId }],
       }),
     onSuccess: (data) => {
-      applySeatAssignmentResult(data);
+      if (bookingResponse) {
+        applySeatAssignmentResult(data);
+      }
+      if (isManageBookingFlow) {
+        void manageOptionsQuery.refetch();
+      }
       toast.success('Da xac nhan ghe ngoi.');
     },
     onError: (error) => {
@@ -283,7 +376,12 @@ export default function SeatSelection() {
         assignments: [{ passengerId: vars.passengerId, seatId: vars.seatId }],
       }),
     onSuccess: (data) => {
-      applySeatAssignmentResult(data);
+      if (bookingResponse) {
+        applySeatAssignmentResult(data);
+      }
+      if (isManageBookingFlow) {
+        void manageOptionsQuery.refetch();
+      }
       toast.success('Da huy ghe ngoi.');
     },
     onError: (error) => {
@@ -306,10 +404,18 @@ export default function SeatSelection() {
   });
 
   const assignedSeatMetaBySeatId = useMemo(() => {
-    const assignments = bookingResponse?.lastSeatAssignment?.assignments;
+    const assignments =
+      bookingResponse?.lastSeatAssignment?.assignments ??
+      manageOptions?.seatAssignments?.map((assignment) => ({
+        passengerId: assignment.passengerId,
+        seatId: assignment.seatId,
+        status: assignment.status,
+        surchargeAmount: assignment.surchargeAmount,
+        currency: assignment.currency,
+      }));
     if (!assignments?.length) return new Map<number, { label: string; isYours: boolean }>();
     const next = new Map<number, { label: string; isYours: boolean }>();
-    const pax = bookingResponse?.passengers ?? [];
+    const pax = bookingResponse?.passengers ?? manageOptions?.passengers ?? [];
     for (const a of assignments) {
       if (a.seatId == null || a.seatId <= 0) continue;
       const idx = pax.findIndex((p) => resolveStorePassengerId(p) === a.passengerId);
@@ -318,7 +424,12 @@ export default function SeatSelection() {
       next.set(a.seatId, { label, isYours });
     }
     return next;
-  }, [bookingResponse?.lastSeatAssignment, bookingResponse?.passengers, activePassengerId]);
+  }, [
+    bookingResponse,
+    manageOptions?.passengers,
+    manageOptions?.seatAssignments,
+    activePassengerId,
+  ]);
 
   const seatMapQuery = useQuery({
     queryKey: ['seat-map', seatContext.flightId, seatContext.fareId],
@@ -337,7 +448,9 @@ export default function SeatSelection() {
   });
 
   useEffect(() => {
-    const confirmedServicesByPassengerId = bookingResponse?.confirmedServicesByPassengerId ?? {};
+    const confirmedServicesByPassengerId =
+      bookingResponse?.confirmedServicesByPassengerId ??
+      buildConfirmedServicesLookupFromManageOptions(manageOptions);
     if (
       !servicesQuery.data?.services?.length ||
       !Object.keys(confirmedServicesByPassengerId).length
@@ -384,7 +497,7 @@ export default function SeatSelection() {
 
       return changed ? next : current;
     });
-  }, [bookingResponse?.confirmedServicesByPassengerId, servicesQuery.data?.services]);
+  }, [bookingResponse?.confirmedServicesByPassengerId, manageOptions, servicesQuery.data?.services]);
 
   const activePassengerServices = activePassengerId
     ? (servicesByPassengerId[activePassengerId] ?? [])
@@ -396,6 +509,7 @@ export default function SeatSelection() {
   const pricing = bookingResponse?.pricing ?? bookingDraft.pricing;
   const serviceCurrency =
     activePassengerServices[0]?.currency ??
+    manageOptions?.currency ??
     servicesQuery.data?.currency ??
     pricing?.currency ??
     'VND';
@@ -405,7 +519,9 @@ export default function SeatSelection() {
   );
   const totalPriceLabel = pricing
     ? formatMoney(pricing.discountedTotalPrice, pricing.currency || 'VND')
-    : null;
+    : manageOptions && bookingLookup
+      ? formatMoney(bookingLookup.booking.totalAmount, bookingLookup.booking.currency || manageOptions.currency)
+      : null;
   const seatDetails = findSeatCellById(seatMapQuery.data?.rows, selectedSeat?.seatId ?? null);
   const seatPriceLabel = normalizeSeatPriceText(
     selectedSeat?.displayPrice?.text ?? seatDetails?.displayPrice?.text
@@ -413,6 +529,8 @@ export default function SeatSelection() {
   const seatMapError =
     !seatContext.flightId || !seatContext.fareId
       ? 'Khong tim thay flightId/fareId trong store de tai so do ghe.'
+      : manageOptionsQuery.error instanceof Error
+        ? manageOptionsQuery.error.message
       : seatMapQuery.error instanceof Error
         ? seatMapQuery.error.message
         : seatMapQuery.isError
@@ -421,6 +539,8 @@ export default function SeatSelection() {
   const servicesError =
     !seatContext.flightId || !seatContext.fareId
       ? 'Khong tim thay flightId/fareId trong store de tai danh sach dich vu.'
+      : manageOptionsQuery.error instanceof Error
+        ? manageOptionsQuery.error.message
       : servicesQuery.error instanceof Error
         ? servicesQuery.error.message
         : servicesQuery.isError
@@ -433,11 +553,9 @@ export default function SeatSelection() {
 
   const handleSeatConfirm = (seat: SeatSelectionValue) => {
     setSelectedSeat(seat);
-    const bookingIdNumeric = pickNumericId(bookingResponse?.bookingId);
+    const bookingIdNumeric = manageBookingId;
     if (bookingIdNumeric == null) return;
-    const passengerId = resolveStorePassengerId(
-      bookingResponse?.passengers?.[activePassengerIndex]
-    );
+    const passengerId = activePassengerId;
     if (passengerId == null) return;
     if (assignInFlight.current) return;
     assignInFlight.current = true;
@@ -453,11 +571,9 @@ export default function SeatSelection() {
 
   const handleSeatCancel = (seat: SeatSelectionValue) => {
     setSelectedSeat(seat);
-    const bookingIdNumeric = pickNumericId(bookingResponse?.bookingId);
+    const bookingIdNumeric = manageBookingId;
     if (bookingIdNumeric == null) return;
-    const passengerId = resolveStorePassengerId(
-      bookingResponse?.passengers?.[activePassengerIndex]
-    );
+    const passengerId = activePassengerId;
     if (passengerId == null) return;
     if (assignInFlight.current) return;
     assignInFlight.current = true;
@@ -485,7 +601,7 @@ export default function SeatSelection() {
   };
 
   const handleServicesConfirm = () => {
-    const bookingIdNumeric = pickNumericId(bookingResponse?.bookingId);
+    const bookingIdNumeric = manageBookingId;
     if (bookingIdNumeric == null || activePassengerId == null) return;
     const services = servicesByPassengerId[activePassengerId] ?? [];
     const selections = buildSelectionsFromSelectedServices(services);
@@ -500,7 +616,12 @@ export default function SeatSelection() {
       { bookingId: bookingIdNumeric, passengerId: activePassengerId, selections },
       {
         onSuccess: (data, variables) => {
-          applyServicesAssignmentResult(data, [variables.passengerId]);
+          if (bookingResponse) {
+            applyServicesAssignmentResult(data, [variables.passengerId]);
+          }
+          if (isManageBookingFlow) {
+            void manageOptionsQuery.refetch();
+          }
           setServiceSaveStatusByPassengerId((current) => ({
             ...current,
             [variables.passengerId]: 'saved',
@@ -538,7 +659,7 @@ export default function SeatSelection() {
                 </p>
                 <div className="flex flex-wrap gap-3">
                   {passengers.map((p, idx) => {
-                    const passengerId = resolveStorePassengerId(bookingResponse?.passengers?.[idx]);
+                    const passengerId = resolveStorePassengerId(passengerSource[idx]);
                     const serviceStatus =
                       passengerId != null
                         ? (serviceSaveStatusByPassengerId[passengerId] ?? 'idle')
@@ -548,8 +669,9 @@ export default function SeatSelection() {
                       <button
                         key={p.id}
                         type="button"
+                        onClick={() => setActivePassengerIndex(idx)}
                         className={`flex min-w-0 items-center space-x-3 rounded-lg border-2 px-4 py-3 ${
-                          idx === 0
+                          idx === activePassengerIndex
                             ? 'border-midnight-burgundy bg-midnight-burgundy/5'
                             : 'border-transparent bg-surface-container-low hover:border-luxury-gold/30'
                         }`}

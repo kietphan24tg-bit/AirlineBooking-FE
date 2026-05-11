@@ -238,3 +238,345 @@ export interface PutBookingServicesResponse {
   currency: string;
   passengers: PassengerWithServiceSelections[];
 }
+
+export interface BookingLookupRequest {
+  pnrCode: string;
+  lastName: string;
+}
+
+export interface BookingLookupSeatAssignment {
+  flightId: number;
+  seatId: number;
+  seatNumber: string;
+  status: string;
+  surchargeAmount: number;
+  currency: string;
+}
+
+export interface BookingLookupServiceSelection {
+  serviceId: number;
+  serviceType: string;
+  serviceName: string;
+  optionId: number;
+  optionName: string;
+  quantity: number;
+  price: number;
+}
+
+export interface BookingLookupResponse {
+  booking: {
+    bookingId: number;
+    pnrCode: string;
+    status: string;
+    statusLabel: string;
+    totalAmount: number;
+    currency: string;
+    createdAt: string;
+    expiresAt: string | null;
+  };
+  primaryContact: {
+    email: string;
+    phone: string;
+  };
+  paymentDetails: {
+    price: {
+      baseFare: number;
+      discount: number;
+      tax: number;
+      serviceFee: number;
+      seatFee: number;
+      total: number;
+      currency: string;
+    };
+  };
+  itineraries: Array<{
+    flightId: number;
+    flightNumber: string;
+    departureTime: string;
+    arrivalTime: string;
+    departureAirportCode: string;
+    departureCity: string;
+    departureTerminal: string | null;
+    arrivalAirportCode: string;
+    arrivalCity: string;
+    arrivalTerminal: string | null;
+    flightStatus: string;
+    fareName: string;
+    cabinClass: string;
+    fareBenefits: {
+      fareClassCode: string;
+      fareClassName: string;
+      cabinClass: string;
+      baggageCheckinKg: number;
+      baggageHandKg: number;
+      changeFee: number;
+      refundFee: number;
+      refundable: boolean;
+      changeable: boolean;
+      priorityCheckin: boolean;
+      priorityBoarding: boolean;
+      loungeAccess: boolean;
+      seatSelection: boolean;
+      seatSelectionPolicy: string;
+      mileageRate: number;
+      mealType: string;
+      wifiIncluded: boolean;
+      fastTrackSecurity: boolean;
+      includedSeatCategory: {
+        id: number;
+        code: string;
+        name: string;
+      } | null;
+    };
+  }>;
+  passengers: Array<{
+    passengerId: number;
+    firstName: string;
+    lastName: string;
+    passengerType: string;
+    gender: string;
+    dateOfBirth: string;
+    segments?: Array<{
+      flightId: number;
+      eligible: boolean;
+      checkInStatus: string;
+      seatAssigned: boolean;
+      seatNumber: string | null;
+      warnings: string[];
+    }>;
+    selections?: {
+      seats: BookingLookupSeatAssignment[];
+      services: BookingLookupServiceSelection[];
+    };
+    // Legacy aliases kept for old UI code.
+    seatAssignments?: BookingLookupSeatAssignment[];
+    serviceSelections?: BookingLookupServiceSelection[];
+  }>;
+  actions: {
+    canSelectSeat: boolean;
+    canBuyAncillaries: boolean;
+    // Legacy typo alias kept for old UI code.
+    canBuyAancillaries?: boolean;
+    canCheckIn: boolean;
+    canChangeFlight: boolean;
+    canCancel: boolean;
+  };
+}
+
+export interface BookingManageOptionsResponse {
+  bookingId: number;
+  bookingStatus: string;
+  currency: string;
+  passengers: Array<{
+    passengerId: number;
+    firstName: string;
+    lastName: string;
+    passengerType: string;
+    segments?: Array<{
+      flightId: number;
+      eligible: boolean;
+      checkInStatus: string;
+      seatAssigned: boolean;
+      seatNumber: string | null;
+      warnings: string[];
+    }>;
+  }>;
+  itineraries: Array<{
+    flightId: number;
+    fareId: number;
+    flightNumber: string;
+    departureTime: string;
+    arrivalTime: string;
+    departureAirportCode: string;
+    departureCity: string;
+    departureTerminal: string | null;
+    arrivalAirportCode: string;
+    arrivalCity: string;
+    arrivalTerminal: string | null;
+    fareName: string | null;
+    cabinClass: string | null;
+    baggageHandKg: number | null;
+    baggageCheckinKg: number | null;
+    journeyType: string;
+    checkInWindow: {
+      status: 'OPEN' | 'NOT_OPEN' | 'CLOSED';
+      opensAt: string;
+      closesAt: string;
+      message: string;
+    };
+    segmentStatus: 'READY' | 'SEAT_SELECTION_REQUIRED' | 'BLOCKED';
+  }>;
+  seatAssignments: Array<{
+    passengerId: number;
+    flightId: number;
+    seatId: number;
+    seatNumber: string;
+    status: string;
+    surchargeAmount: number;
+    currency: string;
+  }>;
+  serviceSelections: Array<{
+    passengerId: number;
+    serviceId: number | null;
+    serviceType: string | null;
+    serviceName: string | null;
+    optionId: number | null;
+    optionName: string | null;
+    quantity: number;
+    price: number;
+  }>;
+}
+
+export interface CheckInContinueRequest {
+  pnrCode: string;
+  lastName: string;
+  segments: Array<{
+    flightId: number;
+    passengerIds: number[];
+  }>;
+}
+
+export interface CheckInContinueResponse {
+  booking: {
+    bookingId: number;
+    pnrCode: string;
+    status: string;
+    contactEmail: string;
+    contactPhone: string;
+    passengerCount: number;
+    currency: string;
+    lastName: string;
+  };
+  segments: Array<{
+    flightId: number;
+    flightNumber: string;
+    journeyType: string;
+    status: string;
+    checkInWindow: {
+      status: string;
+      opensAt: string;
+      closesAt: string;
+      message: string;
+    };
+    departure: {
+      airportCode: string;
+      airportName: string;
+      city: string;
+      terminal: string | null;
+      gate: string | null;
+      time: string;
+    };
+    arrival: {
+      airportCode: string;
+      airportName: string;
+      city: string;
+      terminal: string | null;
+      gate: string | null;
+      time: string;
+    };
+    fare: {
+      fareClass: string;
+      cabinClass: string;
+    };
+    passengers: Array<{
+      passengerId: number;
+      ticketId: number;
+      ticketNumber: string;
+      fullName: string;
+      dateOfBirth: string;
+      passengerType: string;
+      eligible: boolean;
+      checkInStatus: string;
+      seat: {
+        assigned: boolean;
+        seatId: number | null;
+        seatNumber: string | null;
+      };
+      warnings: string[];
+    }>;
+  }>;
+  summary: {
+    selectedSegments: number;
+    selectedPassengers: number;
+    readyPassengers: number;
+    blockedPassengers: number;
+    passengersWithoutSeat: number;
+  };
+  actions: {
+    allowConfirmCheckIn: boolean;
+    allowSeatSelection: boolean;
+    nextStep: string;
+  };
+}
+
+export interface BookingTicketResponse {
+  bookingId: number;
+  pnrCode: string;
+  tickets: Array<{
+    id: number;
+    ticketNumber: string;
+    status: string;
+    issuedAt: string;
+    passenger: {
+      id: number;
+      firstName: string;
+      lastName: string;
+      passengerType: string;
+    };
+    seat: {
+      id: number;
+      seatNumber: string;
+    } | null;
+  }>;
+}
+
+export interface BookingCancellationPreviewRequest {
+  ticketIds: number[];
+}
+
+export interface BookingCancellationSelectionPreviewRequest {
+  passengers: Array<{
+    passengerId: number;
+    flightIds: number[];
+  }>;
+}
+
+export type BookingCancellationConfirmRequest = BookingCancellationSelectionPreviewRequest;
+
+export interface BookingCancellationPreviewResponse {
+  bookingId: number;
+  bookingStatus: string;
+  paymentStatus: string;
+  currency: string;
+  items: Array<{
+    ticketId: number | null;
+    passengerId: number;
+    passengerType: string;
+    passengerName: string;
+    flightIds: number[];
+    eligible: boolean;
+    reason: string | null;
+    fareGross: number;
+    promoAllocated: number;
+    fareNet: number;
+    seatRefund: number;
+    serviceRefund: number;
+    refundFee: number;
+    netRefund: number;
+  }>;
+  summary: {
+    fareGross: number;
+    promoAllocated: number;
+    fareNet: number;
+    seatRefund: number;
+    serviceRefund: number;
+    refundFee: number;
+    netRefund: number;
+  };
+}
+
+export interface BookingCancellationConfirmResponse extends BookingCancellationPreviewResponse {
+  cancellationStatus: string;
+  cancelledAt: string;
+  message: string;
+}

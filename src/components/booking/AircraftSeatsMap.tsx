@@ -34,6 +34,7 @@ export interface AircraftSeatsMapProps {
   /** From last successful seat-assignment API — key is `seatId`. */
   assignedSeatBySeatId?: ReadonlyMap<number, { label: string; isYours: boolean }> | null;
   seatConfirmLoading?: boolean;
+  showDetailPanel?: boolean;
 }
 
 type SeatVisualState = 'free' | 'paid' | 'unavailable' | 'not_allowed' | 'selected' | 'assigned';
@@ -58,6 +59,10 @@ type SeatDetailViewModel = {
   canSelect: boolean;
   canCancel: boolean;
 };
+
+const ROW_LABEL_WIDTH = 56;
+const SEAT_COLUMN_WIDTH = 88;
+const AISLE_COLUMN_WIDTH = 28;
 
 function normalizeSeatPriceText(value: string): string {
   return value.trim().replace(/^\+\s*/, '');
@@ -259,6 +264,19 @@ function renderSeatCell(key: string, content: ReactNode, className: string): Rea
       {content}
     </div>
   );
+}
+
+function buildSeatGridTemplate(columns: string[], aisleAfter: Set<string>): string {
+  const template = [`${ROW_LABEL_WIDTH}px`];
+
+  for (const column of columns) {
+    template.push(`minmax(${SEAT_COLUMN_WIDTH}px, ${SEAT_COLUMN_WIDTH}px)`);
+    if (aisleAfter.has(column)) {
+      template.push(`${AISLE_COLUMN_WIDTH}px`);
+    }
+  }
+
+  return template.join(' ');
 }
 
 function seatClassLabel(seatClass: SeatMapSeatClass, zoneLabel?: string): string {
@@ -491,7 +509,7 @@ function CompactSelectionBar({
 
 function LegendSwatch({ className, label }: { className: string; label: string }) {
   return (
-    <span className="inline-flex items-center gap-2 text-xs font-bold text-on-surface">
+    <span className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface">
       <span className={`h-3 w-3 rounded-sm border ${className}`} />
       {label}
     </span>
@@ -505,6 +523,7 @@ export default function AircraftSeatsMap({
   selectedSeat = null,
   assignedSeatBySeatId = null,
   seatConfirmLoading = false,
+  showDetailPanel = true,
   onSeatPreview,
   onSeatConfirm,
   onSeatCancel,
@@ -520,8 +539,8 @@ export default function AircraftSeatsMap({
       : null;
 
   return (
-    <div className="flex flex-row gap-4 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
-      <div className="flex flex-col gap-4 flex-1">
+    <div className="flex flex-col gap-4 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
+      <div className="flex min-w-0 flex-col gap-4">
         <div>
           <h1 className="mb-2 flex items-center gap-2 font-headline text-xl font-black text-midnight-burgundy">
             <List className="h-5 w-5" />
@@ -566,7 +585,7 @@ export default function AircraftSeatsMap({
         {!loading && !error && seatMap ? (
           <>
             <div className="rounded-xl border border-luxury-gold/10 bg-white/60 p-3.5 shadow-sm">
-              <div className="grid gap-4 text-sm md:grid-cols-2">
+              <div className="grid gap-4 text-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                 <div>
                   <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-on-surface-variant">
                     Availability
@@ -593,14 +612,14 @@ export default function AircraftSeatsMap({
               </div>
             </div>
 
-            <div className="grid gap-5 ">
+            <div className="grid gap-5">
               <div className="min-w-0 space-y-6">
                 {zones.map((zone) => {
                   const rows = seatMap.rows.filter(
                     (row) => row.rowNumber >= zone.rowStart && row.rowNumber <= zone.rowEnd
                   );
                   if (rows.length === 0) return null;
-                  const gridTemplateColumns = `56px repeat(${columns.length + aisleAfter.size}, 104px)`;
+                  const gridTemplateColumns = buildSeatGridTemplate(columns, aisleAfter);
                   return (
                     <section key={`${zone.seatClass}-${zone.rowStart}-${zone.rowEnd}`}>
                       <div className="mb-3">
@@ -609,10 +628,10 @@ export default function AircraftSeatsMap({
                         </h2>
                       </div>
 
-                      <div className="overflow-x-clip pb-3 ">
-                        <div className="min-w-max space-y-2.5 pr-4">
+                      <div className="overflow-x-auto pb-4 pr-2">
+                        <div className="min-w-max space-y-2.5 pr-5">
                           <div
-                            className="grid items-center gap-1.5"
+                            className="grid items-center gap-2"
                             style={{ gridTemplateColumns }}
                           >
                             {renderSeatCell(
@@ -629,7 +648,7 @@ export default function AircraftSeatsMap({
                                   <span className="text-center text-xs font-bold text-on-surface">
                                     {column}
                                   </span>,
-                                  'flex h-7 items-center justify-center'
+                                  'flex h-7 w-[88px] items-center justify-center'
                                 ),
                               ];
                               if (aisleAfter.has(column)) {
@@ -639,7 +658,7 @@ export default function AircraftSeatsMap({
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70">
                                       Aisle
                                     </span>,
-                                    'flex h-7 items-center justify-center'
+                                    'flex h-7 w-[28px] items-center justify-center'
                                   )
                                 );
                               }
@@ -654,7 +673,7 @@ export default function AircraftSeatsMap({
                             return (
                               <div
                                 key={`${zone.seatClass}-${row.rowNumber}`}
-                                className="grid items-center gap-1.5"
+                                className="grid items-center gap-2"
                                 style={{ gridTemplateColumns }}
                               >
                                 <div className="pr-2 text-right text-xs font-bold text-on-surface-variant">
@@ -689,14 +708,14 @@ export default function AircraftSeatsMap({
                                                 : null,
                                           });
                                         }}
-                                        className={`flex h-[4.625rem] w-26 flex-col items-start justify-center rounded-lg border px-2.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${getSeatClasses(
+                                        className={`flex h-[4.75rem] w-[88px] flex-col items-start justify-between overflow-hidden rounded-lg border px-2.5 py-2 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${getSeatClasses(
                                           viewModel.appearance
                                         )}`}
                                       >
                                         <span className="text-sm font-black leading-4">
                                           {viewModel.title}
                                         </span>
-                                        <span className="mt-1.5 inline-flex max-w-full rounded-full bg-white/60 px-2 py-1 text-[0.625rem] font-black leading-3 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)]">
+                                        <span className="block max-w-full truncate text-[0.625rem] font-black leading-3">
                                           {viewModel.subtitle}
                                         </span>
                                       </button>
@@ -705,7 +724,7 @@ export default function AircraftSeatsMap({
                                     parts.push(
                                       <div
                                         key={`empty-${row.rowNumber}-${column}`}
-                                        className="h-[4.625rem] w-26 rounded-lg border border-dashed border-outline-variant/10 bg-transparent"
+                                        className="h-[4.75rem] w-[88px] rounded-lg border border-dashed border-outline-variant/10 bg-transparent"
                                       />
                                     );
                                   }
@@ -713,7 +732,7 @@ export default function AircraftSeatsMap({
                                     parts.push(
                                       <div
                                         key={`aisle-${row.rowNumber}-${column}`}
-                                        className="flex h-[4.625rem] w-26 items-center justify-center"
+                                        className="flex h-[4.75rem] w-[28px] items-center justify-center"
                                       >
                                         <span className="h-full w-px bg-outline-variant/10" />
                                       </div>
@@ -753,7 +772,7 @@ export default function AircraftSeatsMap({
         ) : null}
       </div>
 
-      {seatMap && (
+      {seatMap && showDetailPanel ? (
         <aside className="hidden xl:block">
           <div className="sticky top-28">
             <DetailPanel
@@ -767,7 +786,7 @@ export default function AircraftSeatsMap({
             />
           </div>
         </aside>
-      )}
+      ) : null}
     </div>
   );
 }

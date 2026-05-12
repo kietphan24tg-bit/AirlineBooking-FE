@@ -27,6 +27,10 @@ import type {
   PutBookingServicesResponse,
   CheckInContinueRequest,
   CheckInContinueResponse,
+  CheckInConfirmRequest,
+  CheckInConfirmResponse,
+  SeatChangeRequest,
+  SeatChangeResponse,
   SeatAssignmentRequest,
   SeatAssignmentResponse,
   SeatUnassignmentRequest,
@@ -415,6 +419,74 @@ function buildMockCheckInContinueResponse(
   };
 }
 
+function buildMockCheckInConfirmResponse(
+  session: ManageBookingMockSession,
+  body: CheckInConfirmRequest
+): CheckInConfirmResponse {
+  const shouldUseRichVisualMock =
+    isDevLocalhostManageBooking() &&
+    session.variant === 'CONFIRMED' &&
+    session.manageOptions.itineraries.length > 1;
+  const effectiveBody = shouldUseRichVisualMock
+    ? {
+        pnrCode: body.pnrCode,
+        lastName: body.lastName,
+        segments: session.manageOptions.itineraries.map((itinerary) => ({
+          flightId: itinerary.flightId,
+          passengerIds: session.manageOptions.passengers.map((passenger) => passenger.passengerId),
+        })),
+      }
+    : body;
+  const preview = buildMockCheckInContinueResponse(session, effectiveBody);
+  const shouldForceDemoSuccess = isDevLocalhostManageBooking();
+  if (!preview.actions.allowConfirmCheckIn && !shouldForceDemoSuccess) {
+    throw new Error('Check-in confirmation failed');
+  }
+
+  const boardingPasses = preview.segments.flatMap((segment, segmentIndex) =>
+    segment.passengers.map((passenger, passengerIndex) => {
+      const fallbackSeatLabel = `${12 + passengerIndex}${String.fromCharCode(65 + (passengerIndex % 3))}`;
+      return {
+        boardingPassId: segment.flightId * 1000 + passenger.passengerId,
+        ticketId: passenger.ticketId,
+        passengerId: passenger.passengerId,
+        flightId: segment.flightId,
+        qrCode: `BP|${preview.booking.pnrCode}|${segment.flightId}|${passenger.passengerId}|${passenger.ticketId}|${passenger.seat.seatNumber ?? fallbackSeatLabel}`,
+        gate: segment.departure.gate ?? `${12 + segmentIndex}`,
+        boardingTime: segment.departure.time,
+        sequenceNumber: segmentIndex * 100 + passengerIndex + 1,
+        seatLabel: passenger.seat.seatNumber ?? fallbackSeatLabel,
+      };
+    })
+  );
+
+  return {
+    booking: {
+      bookingId: preview.booking.bookingId,
+      pnrCode: preview.booking.pnrCode,
+      status: 'CHECKED_IN_COMPLETED',
+    },
+    segments: preview.segments.map((segment) => ({
+      flightId: segment.flightId,
+      flightNumber: segment.flightNumber,
+      passengers: segment.passengers.map((passenger) => ({
+        passengerId: passenger.passengerId,
+        ticketId: passenger.ticketId,
+        ticketNumber: passenger.ticketNumber,
+        fullName: passenger.fullName,
+        seatNumber: passenger.seat.seatNumber,
+        boardingPassId: segment.flightId * 1000 + passenger.passengerId,
+        checkInStatus: 'CHECKED_IN',
+      })),
+    })),
+    boardingPasses,
+    summary: {
+      confirmedPassengers: boardingPasses.length,
+      confirmedSegments: preview.segments.length,
+    },
+  };
+}
+
 /**
  * Returns the mock manage-booking variant when the flag is enabled, otherwise
  * `null`. The flag can be set either via env (`VITE_MOCK_MANAGE_BOOKING=true`)
@@ -673,6 +745,63 @@ export async function deleteSeatAssignments(
   return raw;
 }
 
+export async function patchSeatAssignment(
+  bookingId: string | number,
+  body: SeatChangeRequest
+): Promise<SeatChangeResponse> {
+  const mockVariant =
+    resolveMockManageBookingVariant() ?? resolveImplicitMockManageBookingVariant(undefined, bookingId);
+  if (mockVariant) {
+    const session = getMockManageBookingSession(mockVariant);
+    const id = typeof bookingId === 'string' ? Number(bookingId) : bookingId;
+    if (id !== session.manageOptions.bookingId) {
+      throw new Error('Seat change failed');
+    }
+
+    const existingAssignment = session.manageOptions.seatAssignments.find(
+      (item) => item.passengerId === body.passengerId && item.seatId === body.fromSeatId
+    );
+    if (!existingAssignment) {
+      throw new Error('Seat change failed');
+    }
+
+    session.manageOptions.seatAssignments = session.manageOptions.seatAssignments.filter(
+      (item) => !(item.passengerId === body.passengerId && item.seatId === body.fromSeatId)
+    );
+
+    if (body.toSeatId != null) {
+      const seatContext = resolveMockSeatAssignmentContext(session, body.toSeatId);
+      if (!seatContext) {
+        throw new Error('Seat change failed');
+      }
+      session.manageOptions.seatAssignments.push({
+        passengerId: body.passengerId,
+        flightId: seatContext.flightId,
+        seatId: body.toSeatId,
+        seatNumber: seatContext.seatNumber,
+        status: 'BOOKED',
+        surchargeAmount: seatContext.surchargeAmount,
+        currency: seatContext.currency,
+      });
+    }
+
+    syncMockManageOptionsPassengerSegments(session);
+    syncMockLookupPassengerSelections(session);
+    return Promise.resolve(buildMockSeatAssignmentResponse(session));
+  }
+
+  const id = typeof bookingId === 'string' ? bookingId : String(bookingId);
+  const res = await api.patch<SeatChangeResponse | { data?: SeatChangeResponse }>(
+    `/api/bookings/${id}/seat-assignment`,
+    body
+  );
+  const raw = unwrapData(res.data) as SeatChangeResponse;
+  if (!raw || typeof raw !== 'object' || typeof raw.totalAmount !== 'number') {
+    throw new Error('Seat change failed');
+  }
+  return raw;
+}
+
 export async function putBookingServices(
   bookingId: string | number,
   body: PutBookingServicesRequest
@@ -751,6 +880,31 @@ export async function continueCheckIn(
   return raw;
 }
 
+export async function confirmCheckIn(
+  body: CheckInConfirmRequest
+): Promise<CheckInConfirmResponse> {
+  const mockVariant =
+    resolveMockManageBookingVariant() ?? resolveImplicitMockManageBookingVariant(body);
+  if (mockVariant) {
+    const session = getMockManageBookingSession(mockVariant);
+    return Promise.resolve(buildMockCheckInConfirmResponse(session, body));
+  }
+  const res = await api.post<CheckInConfirmResponse | { data?: CheckInConfirmResponse }>(
+    '/api/check-in/confirm',
+    body
+  );
+  const raw = unwrapData(res.data) as CheckInConfirmResponse;
+  if (
+    !raw ||
+    typeof raw !== 'object' ||
+    typeof raw.booking?.bookingId !== 'number' ||
+    !Array.isArray(raw.boardingPasses)
+  ) {
+    throw new Error('Check-in confirmation failed');
+  }
+  return raw;
+}
+
 export const bookingService = {
   createBooking,
   lookupBooking,
@@ -761,6 +915,8 @@ export const bookingService = {
   confirmCancellation,
   putSeatAssignments,
   deleteSeatAssignments,
+  patchSeatAssignment,
   putBookingServices,
   continueCheckIn,
+  confirmCheckIn,
 };

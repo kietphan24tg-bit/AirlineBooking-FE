@@ -172,9 +172,18 @@ export default function AdditionalService({
   const ActiveIcon = fallbackIconForServiceType(activeService.serviceType);
 
   return (
-    <div className="flex flex-row gap-5 rounded-[1.75rem] border border-luxury-gold/15 bg-surface-container-lowest p-5 shadow-[0_18px_45px_rgba(62,16,30,0.08)] md:p-6 h-170">
-      <div className=" w-100 flex flex-col justify-between">
-        <div className="flex flex-col flex-1 gap-y-4 overflow-y-auto">
+    <div className="grid gap-5 rounded-[1.75rem] border border-luxury-gold/15 bg-surface-container-lowest p-5 shadow-[0_18px_45px_rgba(62,16,30,0.08)] md:p-6 xl:grid-cols-[20rem_minmax(0,1fr)] xl:items-start">
+      <div className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-28">
+        <div className="rounded-2xl border border-luxury-gold/10 bg-white/80 p-4">
+          <p className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-secondary/80">
+            Service groups
+          </p>
+          <p className="mt-2 text-sm text-on-surface-variant">
+            Review available add-ons and switch groups without leaving this workspace.
+          </p>
+        </div>
+
+        <div className="flex max-h-[32rem] flex-col gap-y-4 overflow-y-auto pr-1">
           {activeServices.map((service) => {
             const Icon = fallbackIconForServiceType(service.serviceType);
             const hasSelection = selectedServices.some(
@@ -187,7 +196,7 @@ export default function AdditionalService({
                 key={service.serviceId}
                 type="button"
                 onClick={() => setActiveServiceId(service.serviceId)}
-                className={`group h-25 w-full flex items-start gap-4 rounded-2xl border p-4 text-left transition-all duration-200 ${
+                className={`group flex min-h-24 w-full items-start gap-4 rounded-2xl border p-4 text-left transition-all duration-200 ${
                   isActive
                     ? 'border-midnight-burgundy bg-midnight-burgundy/6'
                     : 'border-luxury-gold/15 bg-white hover:border-midnight-burgundy/30 hover:bg-surface-container-low'
@@ -230,20 +239,22 @@ export default function AdditionalService({
             );
           })}
         </div>
-        <div className="flex flex-row justify-between items-center gap-5 mt-4">
+
+        <div className="mt-2 flex flex-col gap-3 sm:flex-row">
           <button
             onClick={onClose}
             disabled={confirmLoading}
-            className="inline-flex h-15 w-full items-center justify-center gap-2 rounded-md border border-slate-400/30 bg-slate-100/90 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md border border-slate-400/30 bg-slate-100/90 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Return to select
+            Back to overview
           </button>
-          <Button onClick={onConfirm} disabled={confirmLoading} className=" h-15">
-            {confirmLoading ? 'Đang lưu...' : 'Xác nhận'}
+          <Button onClick={onConfirm} disabled={confirmLoading} className="h-12 w-full">
+            {confirmLoading ? 'Dang luu...' : 'Xac nhan'}
           </Button>
         </div>
       </div>
-      <section className="rounded-2xl border border-luxury-gold/15 bg-white flex flex-col w-full flex-1 overflow-hidden">
+
+      <section className="flex min-w-0 min-h-[38rem] flex-col overflow-hidden rounded-2xl border border-luxury-gold/15 bg-white">
         <header className="border-b border-luxury-gold/10 bg-[linear-gradient(180deg,rgba(125,6,51,0.06),rgba(255,255,255,0.96))] px-5 py-4 md:px-6">
           <p className="text-[0.7rem] font-bold uppercase tracking-[0.24em] text-secondary/80">
             {activeService.serviceType.replace(/_/g, ' ')}
@@ -268,7 +279,7 @@ export default function AdditionalService({
           </div>
         </header>
 
-        <div className="grid gap-4 px-5 py-5 md:grid-cols-2 md:px-6 xl:grid-cols-2 overflow-y-auto">
+        <div className="grid flex-1 gap-4 overflow-y-auto px-5 py-5 md:grid-cols-2 md:px-6">
           {activeService.options.map((option) => {
             const selected = isSelected(selectedServices, option.serviceId, option.optionId);
 

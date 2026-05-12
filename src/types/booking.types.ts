@@ -201,6 +201,14 @@ export interface SeatAssignmentResponse {
 export type SeatUnassignmentRequest = SeatAssignmentRequest;
 export type SeatUnassignmentResponse = SeatAssignmentResponse;
 
+export interface SeatChangeRequest {
+  passengerId: number;
+  fromSeatId: number;
+  toSeatId?: number | null;
+}
+
+export type SeatChangeResponse = SeatAssignmentResponse;
+
 // PUT /api/bookings/{bookingId}/services
 export interface BookingServiceSelectionInput {
   optionId: number;
@@ -506,6 +514,51 @@ export interface CheckInContinueResponse {
     allowConfirmCheckIn: boolean;
     allowSeatSelection: boolean;
     nextStep: string;
+  };
+}
+
+export interface CheckInConfirmRequest {
+  pnrCode: string;
+  lastName: string;
+  segments: Array<{
+    flightId: number;
+    passengerIds: number[];
+  }>;
+}
+
+export interface CheckInConfirmResponse {
+  booking: {
+    bookingId: number;
+    pnrCode: string;
+    status: string;
+  };
+  segments: Array<{
+    flightId: number;
+    flightNumber: string;
+    passengers: Array<{
+      passengerId: number;
+      ticketId: number;
+      ticketNumber: string;
+      fullName: string;
+      seatNumber: string | null;
+      boardingPassId: number;
+      checkInStatus: string;
+    }>;
+  }>;
+  boardingPasses: Array<{
+    boardingPassId: number;
+    ticketId: number;
+    passengerId: number;
+    flightId: number;
+    qrCode: string;
+    gate: string | null;
+    boardingTime: string | null;
+    sequenceNumber: number | null;
+    seatLabel: string | null;
+  }>;
+  summary: {
+    confirmedPassengers: number;
+    confirmedSegments: number;
   };
 }
 

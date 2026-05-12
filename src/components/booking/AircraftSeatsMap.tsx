@@ -316,13 +316,16 @@ function DetailPanel({
         <p className="text-xs font-black uppercase tracking-[0.16em] text-midnight-burgundy">
           Select seat to view details
         </p>
+        <p className="mt-2 text-sm text-on-surface-variant">
+          Use the workspace controls above to switch to extra services or return to the overview.
+        </p>
 
         <button
           type="button"
           onClick={onClose}
           className="auth-primary-btn mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Maybe later
+          Back to overview
         </button>
       </div>
     );
@@ -430,7 +433,7 @@ function DetailPanel({
         disabled={confirmLoading}
         className="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md border border-slate-400/30 bg-slate-100/90 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Return to select
+        Back to overview
       </button>
     </div>
   );
@@ -537,9 +540,12 @@ export default function AircraftSeatsMap({
     activeSeatCell && assignedSeatBySeatId
       ? (assignedSeatBySeatId.get(activeSeatCell.seatId) ?? null)
       : null;
+  const containerClassName = showDetailPanel
+    ? 'grid gap-4 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-sm sm:p-5 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start'
+    : 'grid gap-4 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-sm sm:p-5';
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
+    <div className={containerClassName}>
       <div className="flex min-w-0 flex-col gap-4">
         <div>
           <h1 className="mb-2 flex items-center gap-2 font-headline text-xl font-black text-midnight-burgundy">
@@ -773,7 +779,7 @@ export default function AircraftSeatsMap({
       </div>
 
       {seatMap && showDetailPanel ? (
-        <aside className="hidden xl:block">
+        <aside className="hidden xl:min-w-0 xl:block">
           <div className="sticky top-28">
             <DetailPanel
               seatMap={seatMap}

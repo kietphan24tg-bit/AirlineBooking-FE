@@ -546,6 +546,31 @@ export default function SeatSelection() {
         : servicesQuery.isError
           ? 'Khong the tai danh sach dich vu luc nay.'
           : null;
+  const selectionMode = isSeatSelecting ? 'seat' : isServiceSelecting ? 'service' : 'overview';
+  const activePassengerProfile = passengers[activePassengerIndex] ?? null;
+  const selectedServicesSummary = activePassengerServices
+    .map((service) => service.name)
+    .filter((value, index, list) => list.indexOf(value) === index)
+    .slice(0, 3);
+  const currentSeatLabel =
+    activePassengerProfile?.seat ??
+    (selectedSeat && selectionMode === 'seat' ? selectedSeat.seatNumber : null) ??
+    null;
+
+  const openSeatSelection = () => {
+    setIsSeatSelecting(true);
+    setIsServiceSelecting(false);
+  };
+
+  const openServiceSelection = () => {
+    setIsServiceSelecting(true);
+    setIsSeatSelecting(false);
+  };
+
+  const returnToOverview = () => {
+    setIsSeatSelecting(false);
+    setIsServiceSelecting(false);
+  };
 
   const handleSeatPreview = (seat: SeatSelectionValue) => {
     setSelectedSeat(seat);
@@ -649,10 +674,10 @@ export default function SeatSelection() {
       <SiteHeader />
       <div className="relative z-10 mx-auto max-w-4xl px-6 pt-28" />
       <BookingStepper current="select" />
-      <main className="relative z-10 mx-auto min-h-svh max-w-7xl gap-6 px-4 pb-16 sm:px-6 xl:grid-cols-[17rem_minmax(0,1fr)] xl:px-8">
+      <main className="relative z-10 mx-auto min-h-svh max-w-7xl gap-6 px-4 pb-16 sm:px-6 xl:px-8">
         {!isSeatSelecting && !isServiceSelecting && (
-          <div className="mb-6 flex flex-row space-y-5 xl:mb-0 gap-5">
-            <div className="flex flex-col w-full gap-5">
+          <div className="mb-6 flex flex-col gap-5 xl:mb-0 xl:flex-row xl:items-start">
+            <div className="flex w-full flex-col gap-5 xl:min-w-0 xl:flex-1">
               <div className="rounded-xl border border-luxury-gold/10 bg-white/60 p-5 shadow-sm backdrop-blur-md">
                 <p className="mb-4 text-[0.6875rem] font-bold uppercase tracking-[0.15em] text-secondary">
                   Select Passenger
@@ -702,7 +727,7 @@ export default function SeatSelection() {
                 type="button"
                 className="flex flex-row items-center gap-4 rounded-xl border border-luxury-gold/10 bg-white/60 p-5 shadow-sm backdrop-blur-md duration-200 hover:shadow-lg h-40"
                 onClick={() => {
-                  setIsSeatSelecting(true);
+                  openSeatSelection();
                 }}
               >
                 <Armchair
@@ -727,7 +752,7 @@ export default function SeatSelection() {
                 type="button"
                 className="flex flex-row items-center gap-4 rounded-xl border border-luxury-gold/10 bg-white/60 p-5 shadow-sm backdrop-blur-md duration-200 hover:shadow-lg h-40"
                 onClick={() => {
-                  setIsServiceSelecting(true);
+                  openServiceSelection();
                 }}
               >
                 <LuggageIcon
@@ -749,7 +774,7 @@ export default function SeatSelection() {
               </button>
             </div>
 
-            <div className="rounded-xl border border-luxury-gold/20 bg-surface-container-lowest p-5 shadow-lg w-150 h-full">
+            <div className="w-full rounded-xl border border-luxury-gold/20 bg-surface-container-lowest p-5 shadow-lg xl:sticky xl:top-28 xl:w-[23rem] xl:self-start">
               <h3 className="mb-4 font-headline text-lg font-black text-on-surface">Tóm tắt</h3>
               <p className="text-sm text-on-surface-variant">
                 Flight #{seatContext.flightId ?? '--'}
@@ -826,6 +851,166 @@ export default function SeatSelection() {
           </div>
         )}
 
+        {selectionMode !== 'overview' && (
+          <section className="mb-5 rounded-[1.75rem] border border-luxury-gold/15 bg-white/80 p-4 shadow-[0_18px_45px_rgba(62,16,30,0.08)] backdrop-blur-md sm:p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-secondary/80">
+                  Booking workspace
+                </p>
+                <p className="mt-2 text-sm text-on-surface-variant">
+                  Flight #{seatContext.flightId ?? '--'}
+                  {seatContext.fareCode ? ` | ${seatContext.fareCode}` : ''}
+                  {totalPriceLabel ? ` | Total ${totalPriceLabel}` : ''}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                <button
+                  type="button"
+                  onClick={returnToOverview}
+                  className="inline-flex h-11 items-center justify-center rounded-full border border-slate-400/30 bg-slate-100/90 px-5 text-sm font-bold text-slate-800 transition-colors hover:bg-slate-200"
+                >
+                  Back to overview
+                </button>
+                <div className="inline-flex h-11 rounded-full border border-luxury-gold/15 bg-surface-container-low p-1">
+                  <button
+                    type="button"
+                    onClick={openSeatSelection}
+                    className={`rounded-full px-4 text-sm font-bold transition-all ${
+                      selectionMode === 'seat'
+                        ? 'bg-midnight-burgundy text-white shadow-sm'
+                        : 'text-on-surface-variant hover:text-midnight-burgundy'
+                    }`}
+                  >
+                    Seat selection
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openServiceSelection}
+                    className={`rounded-full px-4 text-sm font-bold transition-all ${
+                      selectionMode === 'service'
+                        ? 'bg-midnight-burgundy text-white shadow-sm'
+                        : 'text-on-surface-variant hover:text-midnight-burgundy'
+                    }`}
+                  >
+                    Extra services
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-[1.4rem] border border-luxury-gold/10 bg-surface-container-lowest p-3 sm:p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-secondary/80">
+                    Passengers
+                  </p>
+                  <p className="mt-1 text-sm text-on-surface-variant">
+                    Switch passenger here before choosing a seat or extra services.
+                  </p>
+                </div>
+                <div className="rounded-full border border-luxury-gold/10 bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-midnight-burgundy">
+                  Active: Passenger {activePassengerIndex + 1}
+                </div>
+              </div>
+
+              <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+                {passengers.map((passenger, idx) => {
+                  const passengerId = resolveStorePassengerId(passengerSource[idx]);
+                  const serviceStatus =
+                    passengerId != null
+                      ? (serviceSaveStatusByPassengerId[passengerId] ?? 'idle')
+                      : 'idle';
+                  const isActive = idx === activePassengerIndex;
+
+                  return (
+                    <button
+                      key={passenger.id}
+                      type="button"
+                      onClick={() => setActivePassengerIndex(idx)}
+                      className={`min-w-[15rem] rounded-2xl border px-4 py-3 text-left transition-all ${
+                        isActive
+                          ? 'border-midnight-burgundy bg-midnight-burgundy/6 shadow-sm'
+                          : 'border-luxury-gold/10 bg-white hover:border-midnight-burgundy/30'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-headline text-lg font-black text-midnight-burgundy">
+                            {passenger.fullName}
+                          </p>
+                          <p className="mt-1 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-secondary/80">
+                            Passenger {idx + 1}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] ${
+                            isActive
+                              ? 'bg-midnight-burgundy text-white'
+                              : 'bg-surface-container-low text-midnight-burgundy'
+                          }`}
+                        >
+                          {isActive ? 'Active' : 'Open'}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="rounded-full border border-luxury-gold/15 bg-surface-container-low px-2.5 py-1 text-xs font-semibold text-on-surface">
+                          Seat: {passenger.seat ?? 'Not selected'}
+                        </span>
+                        <span className="rounded-full border border-luxury-gold/15 bg-surface-container-low px-2.5 py-1 text-xs font-semibold text-on-surface">
+                          Services: {getServiceStatusLabel(serviceStatus)}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              <div className="rounded-2xl border border-luxury-gold/10 bg-surface-container-lowest px-4 py-3">
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-on-surface-variant">
+                  Active passenger
+                </p>
+                <p className="mt-1 text-sm font-bold text-midnight-burgundy">
+                  {activePassengerProfile?.fullName ?? 'Passenger'}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-luxury-gold/10 bg-surface-container-lowest px-4 py-3">
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-on-surface-variant">
+                  Seat
+                </p>
+                <p className="mt-1 text-sm font-bold text-midnight-burgundy">
+                  {currentSeatLabel ?? 'Not selected'}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-luxury-gold/10 bg-surface-container-lowest px-4 py-3">
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-on-surface-variant">
+                  Services
+                </p>
+                <p className="mt-1 text-sm font-bold text-midnight-burgundy">
+                  {selectedServicesSummary.length > 0
+                    ? selectedServicesSummary.join(', ')
+                    : 'No extras selected'}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-luxury-gold/10 bg-surface-container-lowest px-4 py-3">
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-on-surface-variant">
+                  Service total
+                </p>
+                <p className="mt-1 text-sm font-bold text-midnight-burgundy">
+                  {formatMoney(totalServicePrice, serviceCurrency)}
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
         {isSeatSelecting && (
           <AircraftSeatsMap
             seatMap={seatMapQuery.data ?? null}
@@ -837,7 +1022,7 @@ export default function SeatSelection() {
             onSeatPreview={handleSeatPreview}
             onSeatConfirm={handleSeatConfirm}
             onSeatCancel={handleSeatCancel}
-            onClose={() => setIsSeatSelecting(false)}
+            onClose={returnToOverview}
           />
         )}
         {isServiceSelecting && (
@@ -849,7 +1034,7 @@ export default function SeatSelection() {
             confirmLoading={activePassengerServiceStatus === 'saving'}
             onSelectedServicesChange={handleActivePassengerServicesChange}
             onConfirm={handleServicesConfirm}
-            onClose={() => setIsServiceSelecting(false)}
+            onClose={returnToOverview}
           />
         )}
       </main>

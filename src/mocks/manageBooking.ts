@@ -136,10 +136,10 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
         statusLabel: 'Đã xác nhận',
         expiresAt: null,
         seatAssignmentStatus: 'BOOKED',
-        includeSeats: false,
+        includeSeats: true,
         includeServices: false,
         serviceFee: 0,
-        seatFee: 0,
+        seatFee: 120000,
         includeReturnFlight: false,
         includeSecondaryPassenger: false,
         actions: {

@@ -14,6 +14,7 @@ import {
   Home,
   Info,
   Loader2,
+  Mail,
   MessageSquare,
   Plane,
   Ticket,
@@ -28,7 +29,12 @@ import SiteHeader from '../components/layout/SiteHeader';
 import { bookingService } from '../services/booking.service';
 import { flightService } from '../services/flight.service';
 import { useBookingStore } from '../stores/useBookingStore';
-import type { BookingLookupResponse, BookingManageOptionsResponse } from '../types/booking.types';
+import type {
+  BookingLookupResponse,
+  BookingManageOptionsResponse,
+  CheckInConfirmResponse,
+  CheckInContinueRequest,
+} from '../types/booking.types';
 
 type FlightWindowStatus = 'OPEN' | 'NOT_OPEN' | 'CLOSED';
 type SegmentStatus = 'READY' | 'SEAT_SELECTION_REQUIRED' | 'BLOCKED';
@@ -117,12 +123,41 @@ interface BookingDetailModalData {
   passengers: BookingDetailPassengerItem[];
 }
 
+interface CheckinConfirmationServiceGroup {
+  key: 'baggage' | 'meal' | 'insurance' | 'other';
+  label: string;
+  items: string[];
+}
+
+interface CheckinConfirmationPassengerItem {
+  id: string;
+  name: string;
+  typeLabel: string;
+  statusLabel: string;
+  seatLabels: string[];
+  handBaggageLabels: string[];
+  serviceGroups: CheckinConfirmationServiceGroup[];
+}
+
+interface CheckinConfirmationData {
+  flights: DerivedFlight[];
+  passengers: CheckinConfirmationPassengerItem[];
+}
+
+interface CheckinBookingSummary {
+  pnr: string;
+  lastName: string;
+  totalPassengers: number;
+  expiresAt: string | null;
+}
+
 interface SeatConfirmModalProps {
   open: boolean;
   seat: SeatSelectionValue | null;
   passengerName: string | null;
   flight: DerivedFlight | null;
   assigned: { label: string; isYours: boolean } | null;
+  currentAssignedSeatNumber: string | null;
   loading: boolean;
   onClose: () => void;
   onConfirm: (seat: SeatSelectionValue) => void;
@@ -373,6 +408,107 @@ function formatPassengerStatus(
     return 'Đã xác nhận';
   }
   return formatCheckInStatusLabel(segments[0]?.checkInStatus ?? 'UNKNOWN');
+}
+
+function buildCheckInSegments(
+  selectedFlights: Set<string>,
+  selectedPassengers: Set<string>,
+  passengers: DerivedPassenger[]
+): CheckInContinueRequest['segments'] {
+  return [...selectedFlights]
+    .map((flightId) => {
+      const passengerIds = [...selectedPassengers]
+        .map(Number)
+        .filter((passengerId) => {
+          const passenger = passengers.find((item) => item.id === String(passengerId));
+          return passenger?.segments[flightId]?.eligible;
+        });
+      return { flightId: Number(flightId), passengerIds };
+    })
+    .filter((segment) => segment.passengerIds.length > 0);
+}
+
+function groupConfirmationServices(
+  services: Array<{
+    serviceType?: string | null;
+    serviceName?: string | null;
+    optionName?: string | null;
+    quantity?: number;
+  }>
+): CheckinConfirmationServiceGroup[] {
+  const grouped: CheckinConfirmationServiceGroup[] = [
+    { key: 'baggage', label: 'Hành lý ký gửi', items: [] },
+    { key: 'meal', label: 'Suất ăn', items: [] },
+    { key: 'insurance', label: 'Bảo hiểm', items: [] },
+    { key: 'other', label: 'Dịch vụ khác', items: [] },
+  ];
+
+  for (const service of services) {
+    const type = service.serviceType?.toUpperCase() ?? '';
+    const label = formatServiceLabel(service);
+    if (type.includes('BAG')) {
+      grouped[0].items.push(label);
+    } else if (type.includes('MEAL') || type.includes('FOOD')) {
+      grouped[1].items.push(label);
+    } else if (type.includes('INSURANCE')) {
+      grouped[2].items.push(label);
+    } else {
+      grouped[3].items.push(label);
+    }
+  }
+
+  return grouped;
+}
+
+function buildCheckinConfirmationData(
+  flights: DerivedFlight[],
+  passengers: DerivedPassenger[],
+  selectedFlights: Set<string>,
+  selectedPassengerIds: Set<string>,
+  manageOptions: BookingManageOptionsResponse | null
+): CheckinConfirmationData {
+  const selectedFlightItems = flights.filter((flight) => selectedFlights.has(flight.id));
+  const selectedPassengerItems = passengers.filter((passenger) => selectedPassengerIds.has(passenger.id));
+  const servicesByPassengerId = new Map<
+    number,
+    Array<{
+      serviceType?: string | null;
+      serviceName?: string | null;
+      optionName?: string | null;
+      quantity?: number;
+    }>
+  >();
+
+  for (const service of manageOptions?.serviceSelections ?? []) {
+    const bucket = servicesByPassengerId.get(service.passengerId) ?? [];
+    bucket.push(service);
+    servicesByPassengerId.set(service.passengerId, bucket);
+  }
+
+  return {
+    flights: selectedFlightItems,
+    passengers: selectedPassengerItems.map((passenger) => {
+      const serviceGroups = groupConfirmationServices(
+        servicesByPassengerId.get(Number(passenger.id)) ?? []
+      );
+
+      return {
+        id: passenger.id,
+        name: passenger.name,
+        typeLabel: formatPassengerTypeLabel(passenger.type),
+        statusLabel: formatPassengerStatus(Object.values(passenger.segments)),
+        seatLabels: selectedFlightItems.map((flight) => {
+          const segment = passenger.segments[flight.id];
+          return `${flight.segmentLabel}: ${segment?.seatNumber ?? 'Chưa chọn ghế'}`;
+        }),
+        handBaggageLabels: selectedFlightItems.map((flight) => {
+          const baggage = typeof flight.baggageHandKg === 'number' ? `${flight.baggageHandKg}kg` : '--';
+          return `${flight.segmentLabel}: ${baggage}`;
+        }),
+        serviceGroups,
+      } satisfies CheckinConfirmationPassengerItem;
+    }),
+  };
 }
 
 function buildBookingDetailModalData(
@@ -898,16 +1034,16 @@ function EnhancedPassengerSelectionPanel({
             </button>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
-            <table className="min-w-[920px] w-full whitespace-nowrap text-left text-sm">
+          <div className="mt-5 overflow-x-hidden">
+            <table className="w-full table-fixed text-left text-[13px] md:text-sm">
               <thead>
                 <tr className="border-b border-stone-100 text-stone-500">
-                  <th className="w-12 py-3 font-medium" />
-                  <th className="py-3 font-medium">Hành khách</th>
-                  <th className="py-3 font-medium">Loại hành khách</th>
-                  <th className="py-3 font-medium">Ngày sinh</th>
-                  <th className="py-3 font-medium">Hành lý xách tay</th>
-                  <th className="py-3 font-medium">Trạng thái</th>
+                  <th className="w-10 py-3 pr-2 font-medium" />
+                  <th className="w-[30%] py-3 pr-3 font-medium">Hành khách</th>
+                  <th className="w-[18%] py-3 pr-3 font-medium">Loại hành khách</th>
+                  <th className="w-[13%] py-3 pr-3 font-medium">Ngày sinh</th>
+                  <th className="w-[16%] py-3 pr-3 font-medium">Hành lý xách tay</th>
+                  <th className="w-[23%] py-3 font-medium">Trạng thái</th>
                 </tr>
               </thead>
               <tbody>
@@ -918,7 +1054,7 @@ function EnhancedPassengerSelectionPanel({
 
                   return (
                     <tr key={passenger.id} className="border-b border-stone-100 last:border-0">
-                      <td className="py-4">
+                      <td className="py-4 pr-2 align-top">
                         <button
                           type="button"
                           onClick={() => onToggle(passenger.id)}
@@ -934,33 +1070,35 @@ function EnhancedPassengerSelectionPanel({
                           {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
                         </button>
                       </td>
-                      <td className="py-4">
-                        <div className="flex items-center gap-3">
+                      <td className="py-4 pr-3 align-top">
+                        <div className="flex items-start gap-3">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
                             <User className="h-5 w-5" />
                           </div>
-                          <div>
-                            <p className="text-base font-bold text-stone-950">{passenger.name.toUpperCase()}</p>
-                            <p className="mt-0.5 text-xs text-stone-500">
+                          <div className="min-w-0">
+                            <p className="break-words text-sm font-bold text-stone-950 md:text-base">
+                              {passenger.name.toUpperCase()}
+                            </p>
+                            <p className="mt-0.5 break-words text-xs leading-5 text-stone-500">
                               {formatShortDate(passenger.dob)} | {formatPassengerTypeLabel(passenger.type)}
                             </p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 text-stone-700">{formatPassengerTypeLabel(passenger.type)}</td>
-                      <td className="py-4 text-stone-700">{formatShortDate(passenger.dob)}</td>
-                      <td className="py-4 text-stone-700">
+                      <td className="py-4 pr-3 align-top text-stone-700">{formatPassengerTypeLabel(passenger.type)}</td>
+                      <td className="py-4 pr-3 align-top text-stone-700">{formatShortDate(passenger.dob)}</td>
+                      <td className="py-4 pr-3 align-top text-stone-700">
                         <div className="flex items-center gap-2">
                           <Briefcase className="h-4 w-4 text-stone-400" />
                           {cabinBagLabel}
                         </div>
                       </td>
-                      <td className="py-4">
-                        <div className={`font-semibold ${statusTone(segment?.checkInStatus ?? 'UNKNOWN')}`}>
+                      <td className="py-4 align-top">
+                        <div className={`break-words font-semibold ${statusTone(segment?.checkInStatus ?? 'UNKNOWN')}`}>
                           {formatCheckInStatusLabel(segment?.checkInStatus ?? 'UNKNOWN')}
                         </div>
                         {segment?.warnings?.length ? (
-                          <div className="mt-1 text-xs text-stone-500">
+                          <div className="mt-1 break-words text-xs leading-5 text-stone-500">
                             {segment.warnings.map(formatCheckInStatusLabel).join(', ')}
                           </div>
                         ) : null}
@@ -1007,7 +1145,6 @@ function CheckinSeatReviewPanel({
   selected,
   flight,
   submitError,
-  checkingIn,
   seatMapLoading,
   seatMapError,
   seatMap,
@@ -1026,7 +1163,6 @@ function CheckinSeatReviewPanel({
   selected: Set<string>;
   flight: DerivedFlight;
   submitError: string | null;
-  checkingIn: boolean;
   seatMapLoading: boolean;
   seatMapError: string | null;
   seatMap: Parameters<typeof AircraftSeatsMap>[0]['seatMap'];
@@ -1199,12 +1335,227 @@ function CheckinSeatReviewPanel({
           </button>
           <button
             type="button"
-            disabled={selectedPassengers.length === 0 || hasMissingSeats || checkingIn}
+            disabled={selectedPassengers.length === 0 || hasMissingSeats}
             onClick={onContinue}
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(220,38,38,0.22)] transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {checkingIn ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+            <ArrowRight className="h-4 w-4" />
             Tiếp tục: Xác nhận thông tin ({selectedPassengers.length} hành khách)
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CheckinConfirmationPanel({
+  confirmation,
+  submitError,
+  checkingIn,
+  onBack,
+  onConfirm,
+}: {
+  confirmation: CheckinConfirmationData;
+  submitError: string | null;
+  checkingIn: boolean;
+  onBack: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <section className="pb-6">
+      <h2 className="mb-6 text-2xl font-bold tracking-tight text-stone-950">Check-in trực tuyến</h2>
+      <CheckinStepper currentStepId={4} />
+
+      <div className="space-y-4">
+        <div className="rounded-[20px] border border-stone-200 bg-white p-5 shadow-sm md:p-6">
+          <div className="border-b border-stone-200 pb-5">
+            <h3 className="text-2xl font-semibold text-stone-950">4. Xác nhận thông tin</h3>
+            <p className="mt-2 text-sm leading-6 text-stone-600">
+              Kiểm tra lại chuyến bay, hành khách, ghế ngồi và các dịch vụ bổ sung trước khi xác nhận
+              check-in.
+            </p>
+          </div>
+
+          <div className="mt-5 space-y-4">
+            <section className="rounded-[18px] border border-stone-200 p-4">
+              <div className="mb-4 flex items-center gap-2">
+                <Plane className="h-4 w-4 text-red-600" />
+                <h4 className="text-lg font-semibold text-stone-950">Thông tin chuyến bay</h4>
+              </div>
+              <div className="space-y-3">
+                {confirmation.flights.map((flight) => (
+                  <article
+                    key={flight.id}
+                    className="grid gap-4 rounded-2xl border border-stone-200 bg-stone-50/70 p-4 md:grid-cols-[1.1fr_0.9fr]"
+                  >
+                    <div>
+                      <div className="text-sm font-semibold text-stone-950">
+                        {flight.segmentLabel} • {flight.flightNumber}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-stone-700">
+                        <span className="font-semibold text-stone-950">{flight.departureCode}</span>
+                        <span>{flight.departureTime}</span>
+                        <span className="text-stone-400">{'->'}</span>
+                        <span className="font-semibold text-stone-950">{flight.arrivalCode}</span>
+                        <span>{flight.arrivalTime}</span>
+                        <span>{flight.shortDate}</span>
+                      </div>
+                      <div className="mt-2 text-sm text-stone-500">
+                        {flight.departureCity}
+                        {flight.departureTerminal ? ` • ${formatTerminalLabel(flight.departureTerminal)}` : ''}
+                      </div>
+                      <div className="text-sm text-stone-500">
+                        {flight.arrivalCity}
+                        {flight.arrivalTerminal ? ` • ${formatTerminalLabel(flight.arrivalTerminal)}` : ''}
+                      </div>
+                    </div>
+                    <div className="space-y-1 text-sm text-stone-600 md:text-right">
+                      <div>
+                        Hạng vé: <span className="font-medium text-stone-900">{flight.cabin}</span>
+                      </div>
+                      <div>
+                        Trạng thái:{' '}
+                        <span className="font-medium text-emerald-700">
+                          {formatCheckInStatusLabel(flight.segmentStatus)}
+                        </span>
+                      </div>
+                      <div>
+                        Thời gian bay: <span className="font-medium text-stone-900">{flight.durationLabel}</span>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[18px] border border-stone-200 p-4">
+              <div className="mb-4 flex items-center gap-2">
+                <User className="h-4 w-4 text-red-600" />
+                <h4 className="text-lg font-semibold text-stone-950">Danh sách hành khách và ghế ngồi</h4>
+              </div>
+              <div className="space-y-3">
+                {confirmation.passengers.map((passenger, index) => (
+                  <article
+                    key={passenger.id}
+                    className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex flex-col gap-3 border-b border-stone-100 pb-3 md:flex-row md:items-start md:justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-50 text-sm font-semibold text-red-700">
+                          {String(index + 1).padStart(2, '0')}
+                        </span>
+                        <div>
+                          <div className="font-semibold text-stone-950">{passenger.name}</div>
+                          <div className="text-sm text-stone-500">{passenger.typeLabel}</div>
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                        {passenger.statusLabel}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-4 md:grid-cols-2">
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                          Ghế theo chặng
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {passenger.seatLabels.map((label) => (
+                            <span
+                              key={label}
+                              className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-sm text-stone-700"
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                          Hành lý xách tay
+                        </div>
+                        <div className="mt-2 space-y-1.5 text-sm text-stone-700">
+                          {passenger.handBaggageLabels.map((label) => (
+                            <div key={label}>{label}</div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[18px] border border-stone-200 p-4">
+              <div className="mb-4 flex items-center gap-2">
+                <Briefcase className="h-4 w-4 text-red-600" />
+                <h4 className="text-lg font-semibold text-stone-950">Thông tin bổ sung</h4>
+              </div>
+              <div className="space-y-3">
+                {confirmation.passengers.map((passenger) => (
+                  <article
+                    key={passenger.id}
+                    className="rounded-2xl border border-stone-200 bg-stone-50/60 p-4"
+                  >
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-stone-950">{passenger.name}</div>
+                        <div className="text-sm text-stone-500">{passenger.typeLabel}</div>
+                      </div>
+                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-400">
+                        {passenger.serviceGroups.reduce((sum, group) => sum + group.items.length, 0)} dịch vụ
+                      </span>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {passenger.serviceGroups.map((group) => (
+                        <div key={group.key} className="rounded-2xl border border-stone-200 bg-white p-3">
+                          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                            {group.label}
+                          </div>
+                          <div className="mt-2 space-y-1.5 text-sm text-stone-700">
+                            {group.items.length ? (
+                              group.items.map((item) => <div key={item}>{item}</div>)
+                            ) : (
+                              <div className="text-stone-400">Chưa chọn</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              Lưu ý: Sau khi xác nhận, bạn sẽ không thể thay đổi ghế ngồi và thông tin hành khách trong
+              luồng check-in hiện tại.
+            </div>
+
+            {submitError ? (
+              <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                <p>{submitError}</p>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center justify-center rounded-2xl border border-stone-200 px-6 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+          >
+            Quay lại
+          </button>
+          <button
+            type="button"
+            disabled={confirmation.passengers.length === 0 || checkingIn}
+            onClick={onConfirm}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(220,38,38,0.22)] transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {checkingIn ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+            Xác nhận check-in
           </button>
         </div>
       </div>
@@ -1302,13 +1653,13 @@ function EnhancedCheckinSidebar({
   onOpenDetails: () => void;
 }) {
   return (
-    <aside className="space-y-4 xl:max-w-[320px] 2xl:max-w-[340px]">
-      <section className="rounded-[20px] border border-stone-200 bg-white p-4 shadow-sm">
+    <aside className="space-y-3.5 xl:max-w-[280px] 2xl:max-w-[292px]">
+      <section className="rounded-[20px] border border-stone-200 bg-white p-4 shadow-sm xl:p-3.5">
         <h3 className="text-2xl font-semibold text-stone-950">Thông tin đặt chỗ</h3>
-        <div className="mt-4 space-y-3.5 text-[0.9375rem]">
+        <div className="mt-4 space-y-3 text-[0.9375rem] xl:mt-3.5 xl:text-[0.9rem]">
           <div className="flex items-center justify-between gap-4">
             <span className="text-stone-500">Mã đặt chỗ (PNR)</span>
-            <span className="text-base font-semibold text-red-600">{booking.pnr}</span>
+            <span className="text-base font-semibold text-red-600 xl:text-[0.95rem]">{booking.pnr}</span>
           </div>
           <div className="flex items-center justify-between gap-4">
             <span className="text-stone-500">Họ</span>
@@ -1323,7 +1674,7 @@ function EnhancedCheckinSidebar({
         <button
           type="button"
           onClick={onOpenDetails}
-          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-stone-200 px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-stone-200 px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 xl:mt-3.5 xl:h-10 xl:px-3 xl:text-[0.9rem]"
         >
           <ClipboardList className="h-4 w-4" />
           Chi tiết đặt chỗ
@@ -1331,20 +1682,20 @@ function EnhancedCheckinSidebar({
       </section>
 
       {flight ? (
-        <section className="rounded-[20px] border border-amber-200 bg-gradient-to-br from-amber-50 via-amber-50/65 to-white p-4 shadow-sm">
+        <section className="rounded-[20px] border border-amber-200 bg-gradient-to-br from-amber-50 via-amber-50/65 to-white p-4 shadow-sm xl:p-3.5">
           <h3 className="text-2xl font-semibold text-amber-900">Chuyến bay đã chọn</h3>
-          <div className="mt-3.5 flex items-start gap-2.5">
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-stone-100 bg-white text-red-600 shadow-sm">
+          <div className="mt-3.5 flex items-start gap-2.5 xl:mt-3 xl:gap-2">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-stone-100 bg-white text-red-600 shadow-sm xl:h-8 xl:w-8">
               <Plane className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <div className="text-[1.7rem] font-semibold leading-none text-stone-950">{flight.flightNumber}</div>
-              <div className="mt-1.5 flex items-center gap-2 text-base font-semibold text-stone-900">
+              <div className="text-[1.7rem] font-semibold leading-none text-stone-950 xl:text-[1.45rem]">{flight.flightNumber}</div>
+              <div className="mt-1.5 flex items-center gap-2 text-base font-semibold text-stone-900 xl:text-[0.95rem]">
                 <span>{flight.departureCode}</span>
                 <span className="text-stone-400">→</span>
                 <span>{flight.arrivalCode}</span>
               </div>
-              <div className="mt-1.5 text-[0.9375rem] leading-5 text-stone-600">
+              <div className="mt-1.5 text-[0.9375rem] leading-5 text-stone-600 xl:text-[0.88rem]">
                 {flight.departureTime} - {flight.arrivalTime} • {flight.shortDate}
               </div>
             </div>
@@ -1352,9 +1703,9 @@ function EnhancedCheckinSidebar({
         </section>
       ) : null}
 
-      <section className="rounded-[20px] border border-stone-200 bg-white p-4 shadow-sm">
+      <section className="rounded-[20px] border border-stone-200 bg-white p-4 shadow-sm xl:p-3.5">
         <h3 className="text-2xl font-semibold text-stone-950">Bạn cần hỗ trợ?</h3>
-        <div className="mt-3.5 space-y-0.5">
+        <div className="mt-3.5 space-y-0.5 xl:mt-3">
           {[
             { icon: HelpCircle, label: 'Câu hỏi thường gặp' },
             { icon: Headphones, label: 'Liên hệ hỗ trợ' },
@@ -1363,11 +1714,11 @@ function EnhancedCheckinSidebar({
             <button
               key={item.label}
               type="button"
-              className="flex w-full items-center justify-between rounded-xl px-1.5 py-2 text-left transition hover:bg-stone-50"
+              className="flex w-full items-center justify-between rounded-xl px-1.5 py-2 text-left transition hover:bg-stone-50 xl:px-1 xl:py-1.5"
             >
               <div className="flex items-center gap-3">
                 <item.icon className="h-[18px] w-[18px] text-stone-500" />
-                <span className="text-[0.975rem] text-stone-800">{item.label}</span>
+                <span className="text-[0.975rem] text-stone-800 xl:text-[0.92rem]">{item.label}</span>
               </div>
               <ChevronRight className="h-4 w-4 text-stone-400" />
             </button>
@@ -1705,12 +2056,385 @@ function CheckinSuccess({
   );
 }
 
+function buildBoardingPassMatrix(seed: string, size = 21) {
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return Array.from({ length: size }, (_, row) =>
+    Array.from({ length: size }, (_, col) => {
+      const finderBounds =
+        (row < 7 && col < 7) ||
+        (row < 7 && col >= size - 7) ||
+        (row >= size - 7 && col < 7);
+
+      if (finderBounds) {
+        const localRow = row >= size - 7 ? row - (size - 7) : row;
+        const localCol = col >= size - 7 ? col - (size - 7) : col;
+        const ring = localRow === 0 || localRow === 6 || localCol === 0 || localCol === 6;
+        const core = localRow >= 2 && localRow <= 4 && localCol >= 2 && localCol <= 4;
+        return ring || core;
+      }
+
+      hash ^= row * 131 + col * 17;
+      hash = Math.imul(hash, 16777619);
+      return ((hash >>> 0) & 1) === 1;
+    })
+  );
+}
+
+function BoardingPassCode({ value }: { value: string }) {
+  const cells = useMemo(() => buildBoardingPassMatrix(value), [value]);
+
+  return (
+    <div className="rounded-xl border border-stone-200 bg-white p-2">
+      <div
+        className="grid aspect-square w-[92px] grid-cols-[repeat(21,minmax(0,1fr))] overflow-hidden rounded-[10px] bg-white"
+        aria-label="Boarding pass code"
+      >
+        {cells.flatMap((row, rowIndex) =>
+          row.map((filled, colIndex) => (
+            <span
+              key={`${rowIndex}-${colIndex}`}
+              className={filled ? 'bg-stone-950' : 'bg-white'}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CheckinSuccessExperience({
+  booking,
+  flights,
+  response,
+  onOpenDetails,
+}: {
+  booking: CheckinBookingSummary;
+  flights: DerivedFlight[];
+  response: CheckInConfirmResponse;
+  onOpenDetails: () => void;
+}) {
+  const navigate = useNavigate();
+  const confirmedFlightIds = new Set(response.segments.map((segment) => segment.flightId));
+  const confirmedFlights = flights.filter((flight) => confirmedFlightIds.has(flight.numericId));
+  const primaryFlight = confirmedFlights[0] ?? flights[0] ?? null;
+  const flightGroups = useMemo(
+    () =>
+      confirmedFlights
+        .map((flight) => {
+          const segment = response.segments.find((item) => item.flightId === flight.numericId);
+          if (!segment) return null;
+
+          const passengers = segment.passengers
+            .map((passenger) => {
+              const boardingPass = response.boardingPasses.find(
+                (item) =>
+                  item.flightId === flight.numericId && item.passengerId === passenger.passengerId
+              );
+              if (!boardingPass) return null;
+
+              return {
+                id: boardingPass.boardingPassId,
+                passengerName: passenger.fullName,
+                ticketNumber: passenger.ticketNumber,
+                seatNumber: boardingPass.seatLabel ?? passenger.seatNumber ?? 'Chua cap nhat',
+                gate: boardingPass.gate ?? 'Dang cap nhat',
+                boardingTime: boardingPass.boardingTime
+                  ? formatTime(boardingPass.boardingTime)
+                  : flight.departureTime,
+                sequenceNumber:
+                  boardingPass.sequenceNumber != null
+                    ? String(boardingPass.sequenceNumber).padStart(3, '0')
+                    : '---',
+                qrCode: boardingPass.qrCode,
+              };
+            })
+            .filter((item): item is NonNullable<typeof item> => item != null);
+
+          if (passengers.length === 0) return null;
+
+          return { flight, passengers };
+        })
+        .filter((item): item is NonNullable<typeof item> => item != null),
+    [confirmedFlights, response.boardingPasses, response.segments]
+  );
+
+  return (
+    <section className="space-y-8">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_272px]">
+        <div className="min-w-0 rounded-[32px] border border-stone-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:p-8">
+          <CheckinStepper currentStepId={5} />
+          <section className="mt-6 overflow-hidden rounded-[24px] border border-stone-200 bg-white">
+            <div className="flex flex-col gap-4 border-b border-stone-200 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-[1.85rem] font-semibold tracking-tight text-stone-950">
+                    Check-in thành công!
+                  </h3>
+                  <p className="mt-1 text-sm text-stone-600">
+                    Cảm ơn bạn đã check-in trực tuyến. Dưới đây là thẻ lên máy bay của bạn.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                >
+                  <Mail className="h-4 w-4" />
+                  Gửi qua email
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-6 px-4 py-4 sm:px-5 sm:py-5">
+              {flightGroups.map((group, groupIndex) => (
+                <section key={group.flight.id} className="space-y-3">
+                  <div className="flex flex-col gap-3 border-b border-stone-200 pb-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                      <div className="flex items-center gap-2 font-semibold text-stone-800">
+                        <Plane className="h-4 w-4 text-red-600" />
+                        <span>Chuyến bay {groupIndex + 1}: {group.flight.flightNumber}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[1.1rem] font-semibold text-stone-950">
+                        <span>{group.flight.departureCode}</span>
+                        <ArrowRight className="h-4 w-4 text-stone-400" />
+                        <span>{group.flight.arrivalCode}</span>
+                      </div>
+                      <div className="text-stone-600">
+                        {group.flight.departureTime} - {group.flight.arrivalTime}
+                      </div>
+                      <div className="text-stone-600">{group.flight.shortDate}</div>
+                    </div>
+
+                    <span className="w-fit rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      Đã check-in
+                    </span>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {group.passengers.map((card) => (
+                      <article
+                        key={card.id}
+                        className="overflow-hidden rounded-[16px] border border-stone-200 bg-white"
+                      >
+                        <div className="flex items-start justify-between gap-3 px-4 pb-3 pt-3.5">
+                          <div className="min-w-0">
+                            <div className="text-[1rem] font-bold italic leading-none text-red-600">
+                              vietjetAir.com
+                            </div>
+                            <div className="mt-4 text-[1.02rem] font-semibold uppercase text-stone-950">
+                              {card.passengerName}
+                            </div>
+                            <div className="mt-2 text-xs text-stone-500">Ghế ngồi</div>
+                            <div className="mt-1 text-[1.9rem] font-semibold leading-none text-stone-950">
+                              {card.seatNumber}
+                            </div>
+                          </div>
+
+                          <div className="flex shrink-0 flex-col items-end gap-2">
+                            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                              Đã check-in
+                            </span>
+                            <BoardingPassCode value={card.qrCode} />
+                          </div>
+                        </div>
+
+                        <div className="border-t border-stone-100 px-4 py-3">
+                          <div className="flex items-center gap-3 text-stone-950">
+                            <span className="text-[1.55rem] font-semibold">{group.flight.departureCode}</span>
+                            <ArrowRight className="h-4 w-4 text-stone-400" />
+                            <span className="text-[1.55rem] font-semibold">{group.flight.arrivalCode}</span>
+                          </div>
+
+                          <div className="mt-3 grid grid-cols-3 gap-3 text-[13px]">
+                            <div>
+                              <div className="text-stone-400">Chuyến bay</div>
+                              <div className="mt-1 font-semibold text-stone-950">{group.flight.flightNumber}</div>
+                            </div>
+                            <div>
+                              <div className="text-stone-400">Ngày</div>
+                              <div className="mt-1 font-semibold text-stone-950">{group.flight.shortDate}</div>
+                            </div>
+                            <div>
+                              <div className="text-stone-400">Giờ bay</div>
+                              <div className="mt-1 font-semibold text-stone-950">{group.flight.departureTime}</div>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 grid grid-cols-3 gap-3 border-t border-stone-100 pt-3 text-[13px]">
+                            <div>
+                              <div className="text-stone-400">Cửa</div>
+                              <div className="mt-1 font-semibold text-stone-950">{card.gate}</div>
+                            </div>
+                            <div>
+                              <div className="text-stone-400">Giờ ra cửa</div>
+                              <div className="mt-1 font-semibold text-stone-950">{card.boardingTime}</div>
+                            </div>
+                            <div>
+                              <div className="text-stone-400">SEQ</div>
+                              <div className="mt-1 font-semibold text-stone-950">{card.sequenceNumber}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 border-t border-stone-200 px-4 py-4 sm:px-5">
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+              >
+                <Home className="h-4 w-4" />
+                Về trang chủ
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/manage-booking/check-in')}
+                className="inline-flex items-center justify-center rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+              >
+                Check-in chuyến bay khác
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+              >
+                <Download className="h-4 w-4" />
+                Tải xuống tất cả (PDF)
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/manage-booking')}
+                className="inline-flex items-center justify-center rounded-xl bg-red-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 sm:ml-auto"
+              >
+                Hoàn tất
+              </button>
+            </div>
+          </section>
+
+          <section className="mt-6 rounded-[24px] border border-sky-200 bg-sky-50/80 p-5">
+            <div className="flex items-start gap-3">
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-sky-700" />
+              <div>
+                <h3 className="text-base font-semibold text-sky-950">Lưu ý trước giờ khởi hành</h3>
+                <div className="mt-2 space-y-1 text-sm leading-6 text-sky-950/80">
+                  <p>Có mặt tại sân bay sớm ít nhất 90 phút đối với chuyến bay nội địa.</p>
+                  <p>Kiểm tra lại cửa ra máy bay trên màn hình sân bay vì thông tin có thể thay đổi.</p>
+                  <p>Chuẩn bị giấy tờ tùy thân và thẻ lên máy bay trước khi vào khu vực an ninh.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+        <div className="space-y-5">
+          <section className="rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm">
+            <h3 className="text-2xl font-semibold text-stone-950">Thông tin đặt chỗ</h3>
+            <div className="mt-4 space-y-3 text-sm">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-stone-500">Mã đặt chỗ</span>
+                <span className="font-semibold text-red-600">{booking.pnr}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-stone-500">Họ</span>
+                <span className="font-semibold text-stone-950">{booking.lastName || '--'}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-stone-500">Tổng số hành khách</span>
+                <span className="font-semibold text-stone-950">{booking.totalPassengers}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenDetails}
+              className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-2xl border border-stone-300 px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+            >
+              Chi tiết đặt chỗ
+            </button>
+          </section>
+
+          {primaryFlight ? (
+            <section className="rounded-[24px] border border-amber-200 bg-gradient-to-br from-amber-50 via-amber-50/65 to-white p-5 shadow-sm">
+              <h3 className="text-2xl font-semibold text-amber-900">Các chuyến bay đã check-in</h3>
+              <div className="mt-4 flex items-start gap-3">
+                <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-stone-100 bg-white text-red-600 shadow-sm">
+                  <Plane className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[1.7rem] font-semibold leading-none text-stone-950">
+                    {primaryFlight.flightNumber}
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-2 text-base font-semibold text-stone-900">
+                    <span>{primaryFlight.departureCode}</span>
+                    <span className="text-stone-400">-&gt;</span>
+                    <span>{primaryFlight.arrivalCode}</span>
+                  </div>
+                  <div className="mt-1.5 text-[0.95rem] leading-5 text-stone-600">
+                    {primaryFlight.departureTime} - {primaryFlight.arrivalTime} • {primaryFlight.shortDate}
+                  </div>
+                </div>
+              </div>
+              {confirmedFlights.length > 1 ? (
+                <div className="mt-4 space-y-3 border-t border-amber-100 pt-4">
+                  {confirmedFlights.slice(1).map((flight) => (
+                    <div
+                      key={flight.id}
+                      className="rounded-2xl border border-amber-100 bg-white/80 px-4 py-3"
+                    >
+                      <div className="text-base font-semibold text-stone-950">
+                        {flight.flightNumber}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2 text-sm font-medium text-stone-800">
+                        <span>{flight.departureCode}</span>
+                        <span className="text-stone-400">-&gt;</span>
+                        <span>{flight.arrivalCode}</span>
+                      </div>
+                      <div className="mt-1 text-sm text-stone-600">
+                        {flight.departureTime} - {flight.arrivalTime} • {flight.shortDate}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
+          <EnhancedCheckinSidebar
+            booking={booking}
+            flight={primaryFlight}
+            onOpenDetails={onOpenDetails}
+          />
+        </div>
+      </div>
+
+      <CheckinBenefitsStrip />
+    </section>
+  );
+}
+
 function SeatConfirmModal({
   open,
   seat,
   passengerName,
   flight,
   assigned,
+  currentAssignedSeatNumber,
   loading,
   onClose,
   onConfirm,
@@ -1726,6 +2450,7 @@ function SeatConfirmModal({
 
   const isOwnAssignedSeat = Boolean(assigned?.isYours);
   const isBlockedSeat = Boolean(assigned && !assigned.isYours);
+  const isChangingSeat = !isBlockedSeat && !isOwnAssignedSeat && Boolean(currentAssignedSeatNumber);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/45 p-4 backdrop-blur-[2px]">
@@ -1733,7 +2458,7 @@ function SeatConfirmModal({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-              Xac nhan ghe
+              Xác nhận ghế
             </p>
             <h3 className="mt-2 text-2xl font-semibold text-stone-950">Seat {seat.seatNumber}</h3>
           </div>
@@ -1742,7 +2467,7 @@ function SeatConfirmModal({
             onClick={onClose}
             disabled={loading}
             className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-stone-200 text-stone-500 transition hover:bg-stone-50 hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Dong xac nhan ghe"
+            aria-label="Đóng xác nhận ghế"
           >
             <X className="h-4 w-4" />
           </button>
@@ -1750,31 +2475,33 @@ function SeatConfirmModal({
 
         <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50/80 p-4">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-stone-500">Hanh khach</span>
+            <span className="text-sm text-stone-500">Hành khách</span>
             <span className="text-sm font-semibold text-stone-950">{passengerName}</span>
           </div>
           <div className="mt-3 flex items-center justify-between gap-3">
-            <span className="text-sm text-stone-500">Chuyen bay</span>
+            <span className="text-sm text-stone-500">Chuyến bay</span>
             <span className="text-sm font-semibold text-stone-950">{flight.flightNumber}</span>
           </div>
           <div className="mt-3 flex items-center justify-between gap-3">
-            <span className="text-sm text-stone-500">Chang bay</span>
+            <span className="text-sm text-stone-500">Chặng bay</span>
             <span className="text-sm font-semibold text-stone-950">
               {flight.departureCode} → {flight.arrivalCode}
             </span>
           </div>
           <div className="mt-3 flex items-center justify-between gap-3">
-            <span className="text-sm text-stone-500">Gia ghe</span>
+            <span className="text-sm text-stone-500">Giá ghế</span>
             <span className="text-sm font-semibold text-stone-950">{seatPrice}</span>
           </div>
         </div>
 
         <p className="mt-4 text-sm leading-6 text-stone-600">
           {isBlockedSeat
-            ? 'Ghe nay dang duoc gan cho hanh khach khac. Vui long chon ghe khac.'
+            ? 'Ghế này đang được gán cho hành khách khác. Vui lòng chọn ghế khác.'
             : isOwnAssignedSeat
-              ? `Ban dang giu ghe ${seat.seatNumber} cho ${passengerName}.`
-              : `Xac nhan gan ghe ${seat.seatNumber} cho ${passengerName}.`}
+              ? `Bạn đang giữ ghế ${seat.seatNumber} cho ${passengerName}.`
+              : isChangingSeat
+                ? `Xác nhận đổi từ ghế ${currentAssignedSeatNumber} sang ghế ${seat.seatNumber} cho ${passengerName}.`
+                : `Xác nhận gán ghế ${seat.seatNumber} cho ${passengerName}.`}
         </p>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
@@ -1784,7 +2511,7 @@ function SeatConfirmModal({
             disabled={loading}
             className="inline-flex h-11 items-center justify-center rounded-xl border border-stone-200 px-5 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Dong
+            Đóng
           </button>
           {isBlockedSeat ? null : isOwnAssignedSeat ? (
             <button
@@ -1793,7 +2520,7 @@ function SeatConfirmModal({
               disabled={loading}
               className="inline-flex h-11 items-center justify-center rounded-xl bg-rose-600 px-5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? 'Dang xu ly...' : 'Bo ghe nay'}
+              {loading ? 'Đang xử lý...' : 'Bỏ ghế này'}
             </button>
           ) : (
             <button
@@ -1802,7 +2529,7 @@ function SeatConfirmModal({
               disabled={loading}
               className="inline-flex h-11 items-center justify-center rounded-xl bg-red-600 px-5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? 'Dang xu ly...' : 'Xac nhan chon ghe'}
+              {loading ? 'Đang xử lý...' : isChangingSeat ? 'Xác nhận đổi ghế' : 'Xác nhận chọn ghế'}
             </button>
           )}
         </div>
@@ -1949,7 +2676,7 @@ export default function Checkin() {
     );
   }, [bookingLookup?.passengers, manageOptions?.passengers]);
 
-  const booking = useMemo(
+  const booking = useMemo<CheckinBookingSummary>(
     () => ({
       pnr: lookupCriteria?.pnrCode ?? bookingLookup?.booking?.pnrCode ?? navState?.pnrCode ?? '',
       lastName: lookupCriteria?.lastName ?? navState?.lastName ?? '',
@@ -1975,11 +2702,11 @@ export default function Checkin() {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedFlights, setSelectedFlights] = useState<Set<string>>(new Set());
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
   const [activeSeatPassengerId, setActiveSeatPassengerId] = useState<string | null>(null);
   const [selectedSeat, setSelectedSeat] = useState<SeatSelectionValue | null>(null);
   const [showSeatConfirmModal, setShowSeatConfirmModal] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [checkinSuccess, setCheckinSuccess] = useState<CheckInConfirmResponse | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showBookingDetail, setShowBookingDetail] = useState(false);
@@ -2012,6 +2739,10 @@ export default function Checkin() {
   );
   const seatMapFlightId = activeFlightItinerary?.flightId ?? primaryFlight?.numericId ?? null;
   const seatMapFareId = activeFlightItinerary?.fareId ?? null;
+  const confirmationData = useMemo(
+    () => buildCheckinConfirmationData(flights, passengers, selectedFlights, selected, manageOptions),
+    [flights, manageOptions, passengers, selected, selectedFlights]
+  );
 
   useEffect(() => {
     if (!primaryFlight) return;
@@ -2089,6 +2820,27 @@ export default function Checkin() {
     },
   });
 
+  const changeSeatMutation = useMutation({
+    mutationFn: (vars: {
+      bookingId: number;
+      passengerId: number;
+      fromSeatId: number;
+      toSeatId?: number | null;
+    }) =>
+      bookingService.patchSeatAssignment(vars.bookingId, {
+        passengerId: vars.passengerId,
+        fromSeatId: vars.fromSeatId,
+        toSeatId: vars.toSeatId ?? null,
+      }),
+    onSuccess: async () => {
+      setShowSeatConfirmModal(false);
+      if (manageBookingId != null) {
+        const refreshed = await bookingService.getManageOptions(manageBookingId);
+        setManageOptions(refreshed);
+      }
+    },
+  });
+
   const cancelSeatMutation = useMutation({
     mutationFn: (vars: { bookingId: number; passengerId: number; seatId: number }) =>
       bookingService.deleteSeatAssignments(vars.bookingId, {
@@ -2103,9 +2855,14 @@ export default function Checkin() {
     },
   });
 
-  const checkedInPassengers = passengers.filter((passenger) => selected.has(passenger.id));
   const activeSeatPassenger =
     passengers.find((passenger) => passenger.id === activeSeatPassengerId) ?? null;
+  const activePassengerSeatAssignment =
+    manageOptions?.seatAssignments.find(
+      (assignment) =>
+        assignment.passengerId === activeSeatPassengerNumericId &&
+        String(assignment.flightId) === primaryFlight?.id
+    ) ?? null;
   const activeSelectedSeatAssigned =
     selectedSeat && assignedSeatBySeatId ? (assignedSeatBySeatId.get(selectedSeat.seatId) ?? null) : null;
 
@@ -2154,10 +2911,20 @@ export default function Checkin() {
   function handleSeatConfirm(seat: SeatSelectionValue) {
     setSelectedSeat(seat);
     if (manageBookingId == null || activeSeatPassengerNumericId == null) return;
-    assignSeatMutation.mutate({
+    const fromSeatId = activePassengerSeatAssignment?.seatId;
+    if (fromSeatId == null) {
+      assignSeatMutation.mutate({
+        bookingId: manageBookingId,
+        passengerId: activeSeatPassengerNumericId,
+        seatId: seat.seatId,
+      });
+      return;
+    }
+    changeSeatMutation.mutate({
       bookingId: manageBookingId,
       passengerId: activeSeatPassengerNumericId,
-      seatId: seat.seatId,
+      fromSeatId,
+      toSeatId: seat.seatId,
     });
   }
 
@@ -2169,6 +2936,79 @@ export default function Checkin() {
       passengerId: activeSeatPassengerNumericId,
       seatId: seat.seatId,
     });
+  }
+
+  function handleGoToConfirmationStep() {
+    if (!booking.pnr || !booking.lastName) {
+      setSubmitError('Thiáº¿u thÃ´ng tin PNR hoáº·c há» Ä‘á»ƒ tiáº¿p tá»¥c check-in.');
+      return;
+    }
+
+    if (selectedFlights.size === 0) {
+      setSubmitError('ChÆ°a chá»n chuyáº¿n bay Ä‘á»ƒ tiáº¿p tá»¥c check-in.');
+      return;
+    }
+
+    const segments = buildCheckInSegments(selectedFlights, selected, passengers);
+    if (segments.length === 0) {
+      setSubmitError('ChÆ°a cÃ³ hÃ nh khÃ¡ch Ä‘á»§ Ä‘iá»u kiá»‡n cho cÃ¡c chuyáº¿n bay Ä‘Ã£ chá»n.');
+      return;
+    }
+
+    const selectedPassengers = primaryFlight
+      ? passengers.filter(
+          (passenger) => selected.has(passenger.id) && passenger.segments[primaryFlight.id]?.eligible
+        )
+      : [];
+    const hasMissingSeats = primaryFlight
+      ? selectedPassengers.some((passenger) => !passenger.segments[primaryFlight.id]?.seatAssigned)
+      : false;
+
+    if (hasMissingSeats) {
+      setSubmitError(
+        'Má»™t sá»‘ hÃ nh khÃ¡ch cÃ²n thiáº¿u gháº¿. HÃ£y hoÃ n táº¥t chá»n gháº¿ trÆ°á»›c khi tiáº¿p tá»¥c.'
+      );
+      return;
+    }
+
+    setSubmitError(null);
+    setCurrentStep(4);
+  }
+
+  async function handleConfirmCheckIn() {
+    if (!booking.pnr || !booking.lastName) {
+      setSubmitError('Thiáº¿u thÃ´ng tin PNR hoáº·c há» Ä‘á»ƒ tiáº¿p tá»¥c check-in.');
+      return;
+    }
+
+    const segments = buildCheckInSegments(selectedFlights, selected, passengers);
+    if (segments.length === 0) {
+      setSubmitError('ChÆ°a cÃ³ hÃ nh khÃ¡ch Ä‘á»§ Ä‘iá»u kiá»‡n cho cÃ¡c chuyáº¿n bay Ä‘Ã£ chá»n.');
+      return;
+    }
+
+    setSubmitError(null);
+    setCheckingIn(true);
+    try {
+      const response = await bookingService.confirmCheckIn({
+        pnrCode: booking.pnr,
+        lastName: booking.lastName,
+        segments,
+      });
+      if (response.summary.confirmedPassengers > 0) {
+        setCheckinSuccess(response);
+        return;
+      }
+      if (response.summary.confirmedPassengers < 0) {
+        setSubmitError('Má»™t sá»‘ hÃ nh khÃ¡ch cÃ²n thiáº¿u gháº¿. HÃ£y hoÃ n táº¥t chá»n gháº¿ trÆ°á»›c khi tiáº¿p tá»¥c.');
+        return;
+      }
+      setSubmitError('Backend tá»« chá»‘i bÆ°á»›c tiáº¿p tá»¥c check-in do cÃ²n hÃ nh khÃ¡ch hoáº·c chuyáº¿n bay bá»‹ cháº·n.');
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'KhÃ´ng thá»ƒ tiáº¿p tá»¥c check-in.');
+    } finally {
+      setCheckingIn(false);
+    }
   }
 
   async function handleContinueCheckIn() {
@@ -2203,7 +3043,7 @@ export default function Checkin() {
         segments,
       });
       if (response.actions.allowConfirmCheckIn) {
-        setSuccess(true);
+        setCurrentStep(4);
         return;
       }
       if (response.actions.allowSeatSelection) {
@@ -2261,11 +3101,16 @@ export default function Checkin() {
     <div className="min-h-screen bg-[#faf8f4] text-stone-900 antialiased">
       <SiteHeader />
       <main className="mx-auto min-h-svh max-w-7xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28 lg:px-8">
-        {success ? (
-          <CheckinSuccess checkedIn={checkedInPassengers} flight={primaryFlight} />
+        {checkinSuccess ? (
+          <CheckinSuccessExperience
+            booking={booking}
+            flights={flights}
+            response={checkinSuccess}
+            onOpenDetails={() => setShowBookingDetail(true)}
+          />
         ) : (
           <>
-            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_256px] xl:grid-cols-[minmax(0,1.05fr)_272px]">
               <div className="min-w-0">
                 {currentStep === 1 ? (
                   <FlightSelectionList
@@ -2298,26 +3143,37 @@ export default function Checkin() {
                     }}
                     submitError={submitError}
                   />
-                ) : (
+                ) : currentStep === 3 ? (
                   <CheckinSeatReviewPanel
                     passengers={passengers}
                     selected={selected}
                     flight={primaryFlight as DerivedFlight}
                     onBack={() => setCurrentStep(2)}
                     onContinue={handleContinueCheckIn}
-                    checkingIn={checkingIn}
                     submitError={submitError}
                     seatMapLoading={seatMapQuery.isPending}
                     seatMapError={seatMapError}
                     seatMap={seatMapQuery.data ?? null}
                     selectedSeat={selectedSeat}
                     assignedSeatBySeatId={assignedSeatBySeatId}
-                    seatConfirmLoading={assignSeatMutation.isPending || cancelSeatMutation.isPending}
+                    seatConfirmLoading={
+                      assignSeatMutation.isPending ||
+                      changeSeatMutation.isPending ||
+                      cancelSeatMutation.isPending
+                    }
                     activePassengerId={activeSeatPassengerId}
                     onActivePassengerChange={setActiveSeatPassengerId}
                     onSeatPreview={handleSeatPreview}
                     onSeatConfirm={handleSeatConfirm}
                     onSeatCancel={handleSeatCancel}
+                  />
+                ) : (
+                  <CheckinConfirmationPanel
+                    confirmation={confirmationData}
+                    submitError={submitError}
+                    checkingIn={checkingIn}
+                    onBack={() => setCurrentStep(3)}
+                    onConfirm={handleConfirmCheckIn}
                   />
                 )}
               </div>
@@ -2346,7 +3202,12 @@ export default function Checkin() {
               passengerName={activeSeatPassenger?.name ?? null}
               flight={primaryFlight}
               assigned={activeSelectedSeatAssigned}
-              loading={assignSeatMutation.isPending || cancelSeatMutation.isPending}
+              currentAssignedSeatNumber={activePassengerSeatAssignment?.seatNumber ?? null}
+              loading={
+                assignSeatMutation.isPending ||
+                changeSeatMutation.isPending ||
+                cancelSeatMutation.isPending
+              }
               onClose={() => setShowSeatConfirmModal(false)}
               onConfirm={handleSeatConfirm}
               onCancelSeat={handleSeatCancel}

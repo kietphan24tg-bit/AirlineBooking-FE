@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+﻿import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
   Armchair,
@@ -84,6 +84,13 @@ interface DerivedFlight {
   };
 }
 
+interface SeatFlightProgress {
+  flightId: string;
+  eligibleCount: number;
+  missingCount: number;
+  complete: boolean;
+}
+
 interface CheckinNavigationState {
   bookingId?: number;
   pnrCode?: string;
@@ -158,6 +165,8 @@ interface SeatConfirmModalProps {
   flight: DerivedFlight | null;
   assigned: { label: string; isYours: boolean } | null;
   currentAssignedSeatNumber: string | null;
+  currentAssignedSeatSurcharge: number | null;
+  currentAssignedSeatCurrency: string | null;
   loading: boolean;
   onClose: () => void;
   onConfirm: (seat: SeatSelectionValue) => void;
@@ -550,7 +559,7 @@ function buildBookingDetailModalData(
     const managed = manageItinerariesByFlightId.get(lookupItinerary.flightId);
     const segmentLabel =
       managed?.index === 0 || index === 0
-        ? 'Chiều đi'
+          ? 'Chiều đi'
         : managed?.index === 1 || index === 1
           ? 'Chiều về'
           : `Chặng ${index + 1}`;
@@ -1143,6 +1152,10 @@ function EnhancedPassengerSelectionPanel({
 function CheckinSeatReviewPanel({
   passengers,
   selected,
+  seatFlights,
+  flightProgress,
+  activeFlightId,
+  onActiveFlightChange,
   flight,
   submitError,
   seatMapLoading,
@@ -1158,9 +1171,15 @@ function CheckinSeatReviewPanel({
   onSeatCancel,
   onBack,
   onContinue,
+  canContinue,
+  continueLabel,
 }: {
   passengers: DerivedPassenger[];
   selected: Set<string>;
+  seatFlights: DerivedFlight[];
+  flightProgress: ReadonlyMap<string, SeatFlightProgress>;
+  activeFlightId: string | null;
+  onActiveFlightChange: (flightId: string) => void;
   flight: DerivedFlight;
   submitError: string | null;
   seatMapLoading: boolean;
@@ -1176,8 +1195,12 @@ function CheckinSeatReviewPanel({
   onSeatCancel: (seat: SeatSelectionValue) => void;
   onBack: () => void;
   onContinue: () => void;
+  canContinue: boolean;
+  continueLabel: string;
 }) {
-  const selectedPassengers = passengers.filter((passenger) => selected.has(passenger.id));
+  const selectedPassengers = passengers.filter(
+    (passenger) => selected.has(passenger.id) && passenger.segments[flight.id]?.eligible
+  );
   const missingSeatPassengers = selectedPassengers.filter((passenger) => !passenger.segments[flight.id]?.seatAssigned);
   const hasMissingSeats = missingSeatPassengers.length > 0;
   const activePassenger =
@@ -1203,38 +1226,73 @@ function CheckinSeatReviewPanel({
             </div>
           </div>
 
+          {seatFlights.length > 1 ? (
+            <div className="mt-5 rounded-[18px] border border-stone-200 bg-stone-50/70 p-3">
+              <div className="mb-3">
+                <p className="text-sm font-semibold text-stone-950">Các chặng cần chọn ghế</p>
+                <p className="text-xs text-stone-500">
+                  Mỗi chặng có sơ đồ ghế riêng. Hoàn tất từng chặng trước khi sang bước xác nhận.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {seatFlights.map((seatFlight, index) => {
+                  const progress = flightProgress.get(seatFlight.id);
+                  const isActiveFlight = seatFlight.id === activeFlightId;
+                  return (
+                    <button
+                      key={seatFlight.id}
+                      type="button"
+                      onClick={() => onActiveFlightChange(seatFlight.id)}
+                      className={`rounded-2xl border px-4 py-3 text-left transition ${
+                        isActiveFlight
+                          ? 'border-red-300 bg-red-50/60 shadow-sm'
+                          : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                            Chặng {index + 1}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-stone-950">
+                            {seatFlight.flightNumber} ({seatFlight.departureCode} → {seatFlight.arrivalCode})
+                          </p>
+                          <p className="mt-1 text-xs text-stone-500">
+                            {seatFlight.departureTime} - {seatFlight.arrivalTime} • {seatFlight.shortDate}
+                          </p>
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                            progress?.complete
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-amber-50 text-amber-800'
+                          }`}
+                        >
+                          {progress?.complete ? 'Đủ ghế' : `Thiếu ${progress?.missingCount ?? 0}`}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
           <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1.18fr)_340px]">
             <div className="min-w-0 rounded-[18px] border border-stone-200 p-4">
-              <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-stone-500">
-                <div className="font-semibold text-stone-900">
-                  {flight.flightNumber} | {flight.departureCode} → {flight.arrivalCode} | {flight.departureTime} -{' '}
-                  {flight.arrivalTime} | {flight.shortDate}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-3.5 w-3.5 rounded border border-emerald-300 bg-emerald-50" />
-                  Ghế trống
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-3.5 w-3.5 rounded border border-amber-300 bg-amber-50" />
-                  Ghế trả phí
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-3.5 w-3.5 rounded border border-slate-500 bg-slate-200" />
-                  Ghế đã chọn
-                </div>
-              </div>
-
               <AircraftSeatsMap
                 seatMap={seatMap}
                 loading={seatMapLoading}
                 error={seatMapError}
                 selectedSeat={selectedSeat}
+                headerSubtitle={`${flight.flightNumber} | ${flight.departureCode} → ${flight.arrivalCode} | ${flight.departureTime} - ${flight.arrivalTime} | ${flight.shortDate}`}
                 assignedSeatBySeatId={assignedSeatBySeatId}
                 seatConfirmLoading={seatConfirmLoading}
                 onSeatPreview={onSeatPreview}
                 onSeatConfirm={onSeatConfirm}
                 onSeatCancel={onSeatCancel}
                 showDetailPanel={false}
+                showSeatLegend
               />
             </div>
 
@@ -1242,7 +1300,7 @@ function CheckinSeatReviewPanel({
               <div className="rounded-[18px] border border-stone-200 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <h4 className="text-lg font-semibold text-stone-950">
-                    Hành khách đã chọn ({selectedPassengers.length}/{selected.size})
+                    Hành khách áp dụng ({selectedPassengers.length})
                   </h4>
                   <button
                     type="button"
@@ -1254,7 +1312,7 @@ function CheckinSeatReviewPanel({
                 </div>
 
                 <div className="mt-4 space-y-3">
-                  {selectedPassengers.map((passenger, index) => {
+                  {selectedPassengers.length > 0 ? selectedPassengers.map((passenger, index) => {
                     const segment = passenger.segments[flight.id];
                     const seatAssigned = Boolean(segment?.seatAssigned && segment?.seatNumber);
                     const isActive = passenger.id === activePassenger?.id;
@@ -1289,7 +1347,11 @@ function CheckinSeatReviewPanel({
                         </div>
                       </button>
                     );
-                  })}
+                  }) : (
+                    <div className="rounded-2xl bg-stone-50 px-4 py-3 text-sm text-stone-600">
+                      Không có hành khách nào cần chọn ghế cho chặng này.
+                    </div>
+                  )}
                 </div>
 
                 {activePassenger ? (
@@ -1335,12 +1397,12 @@ function CheckinSeatReviewPanel({
           </button>
           <button
             type="button"
-            disabled={selectedPassengers.length === 0 || hasMissingSeats}
+            disabled={!canContinue}
             onClick={onContinue}
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(220,38,38,0.22)] transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ArrowRight className="h-4 w-4" />
-            Tiếp tục: Xác nhận thông tin ({selectedPassengers.length} hành khách)
+            {continueLabel}
           </button>
         </div>
       </div>
@@ -1640,7 +1702,7 @@ function CheckinSidebar({
 
 function EnhancedCheckinSidebar({
   booking,
-  flight,
+  flights,
   onOpenDetails,
 }: {
   booking: {
@@ -1649,7 +1711,7 @@ function EnhancedCheckinSidebar({
     totalPassengers: number;
     expiresAt: string | null;
   };
-  flight: DerivedFlight | null;
+  flights: DerivedFlight[];
   onOpenDetails: () => void;
 }) {
   return (
@@ -1681,24 +1743,31 @@ function EnhancedCheckinSidebar({
         </button>
       </section>
 
-      {flight ? (
+      {flights.length > 0 ? (
         <section className="rounded-[20px] border border-amber-200 bg-gradient-to-br from-amber-50 via-amber-50/65 to-white p-4 shadow-sm xl:p-3.5">
           <h3 className="text-2xl font-semibold text-amber-900">Chuyến bay đã chọn</h3>
-          <div className="mt-3.5 flex items-start gap-2.5 xl:mt-3 xl:gap-2">
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-stone-100 bg-white text-red-600 shadow-sm xl:h-8 xl:w-8">
-              <Plane className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-[1.7rem] font-semibold leading-none text-stone-950 xl:text-[1.45rem]">{flight.flightNumber}</div>
-              <div className="mt-1.5 flex items-center gap-2 text-base font-semibold text-stone-900 xl:text-[0.95rem]">
-                <span>{flight.departureCode}</span>
-                <span className="text-stone-400">→</span>
-                <span>{flight.arrivalCode}</span>
+          <div className="mt-3.5 space-y-3 xl:mt-3 xl:space-y-2.5">
+            {flights.map((flight) => (
+              <div
+                key={flight.id}
+                className="flex items-start gap-2.5 rounded-2xl border border-amber-100/80 bg-white/80 p-3 xl:gap-2 xl:p-2.5"
+              >
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-stone-100 bg-white text-red-600 shadow-sm xl:h-8 xl:w-8">
+                  <Plane className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[1.7rem] font-semibold leading-none text-stone-950 xl:text-[1.45rem]">{flight.flightNumber}</div>
+                  <div className="mt-1.5 flex items-center gap-2 text-base font-semibold text-stone-900 xl:text-[0.95rem]">
+                    <span>{flight.departureCode}</span>
+                    <span className="text-stone-400">-&gt;</span>
+                    <span>{flight.arrivalCode}</span>
+                  </div>
+                  <div className="mt-1.5 text-[0.9375rem] leading-5 text-stone-600 xl:text-[0.88rem]">
+                    {flight.departureTime} - {flight.arrivalTime} | {flight.shortDate}
+                  </div>
+                </div>
               </div>
-              <div className="mt-1.5 text-[0.9375rem] leading-5 text-stone-600 xl:text-[0.88rem]">
-                {flight.departureTime} - {flight.arrivalTime} • {flight.shortDate}
-              </div>
-            </div>
+            ))}
           </div>
         </section>
       ) : null}
@@ -2229,8 +2298,18 @@ function CheckinSuccessExperience({
                       >
                         <div className="flex items-start justify-between gap-3 px-4 pb-3 pt-3.5">
                           <div className="min-w-0">
-                            <div className="text-[1rem] font-bold italic leading-none text-red-600">
-                              vietjetAir.com
+                            <div className="flex items-center gap-2 text-luxury-gold">
+                              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-midnight-burgundy text-luxury-gold">
+                                <Plane className="h-3.5 w-3.5" />
+                              </span>
+                              <div className="leading-none">
+                                <div className="font-headline text-[0.8rem] font-black uppercase tracking-[0.18em] text-midnight-burgundy">
+                                  The Sovereign
+                                </div>
+                                <div className="mt-1 text-[10px] font-medium uppercase tracking-[0.24em] text-stone-400">
+                                  Boarding Pass
+                                </div>
+                              </div>
                             </div>
                             <div className="mt-4 text-[1.02rem] font-semibold uppercase text-stone-950">
                               {card.passengerName}
@@ -2241,8 +2320,12 @@ function CheckinSuccessExperience({
                             </div>
                           </div>
 
-                          <div className="flex shrink-0 flex-col items-end gap-2">
-                            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                          <div className="flex shrink-0 flex-col items-end">
+                            <span
+                              hidden
+                              aria-hidden="true"
+                              className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold text-emerald-700"
+                            >
                               Đã check-in
                             </span>
                             <BoardingPassCode value={card.qrCode} />
@@ -2344,80 +2427,9 @@ function CheckinSuccessExperience({
         </div>
 
         <div className="space-y-5">
-          <section className="rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm">
-            <h3 className="text-2xl font-semibold text-stone-950">Thông tin đặt chỗ</h3>
-            <div className="mt-4 space-y-3 text-sm">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-stone-500">Mã đặt chỗ</span>
-                <span className="font-semibold text-red-600">{booking.pnr}</span>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-stone-500">Họ</span>
-                <span className="font-semibold text-stone-950">{booking.lastName || '--'}</span>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-stone-500">Tổng số hành khách</span>
-                <span className="font-semibold text-stone-950">{booking.totalPassengers}</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onOpenDetails}
-              className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-2xl border border-stone-300 px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
-            >
-              Chi tiết đặt chỗ
-            </button>
-          </section>
-
-          {primaryFlight ? (
-            <section className="rounded-[24px] border border-amber-200 bg-gradient-to-br from-amber-50 via-amber-50/65 to-white p-5 shadow-sm">
-              <h3 className="text-2xl font-semibold text-amber-900">Các chuyến bay đã check-in</h3>
-              <div className="mt-4 flex items-start gap-3">
-                <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-stone-100 bg-white text-red-600 shadow-sm">
-                  <Plane className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[1.7rem] font-semibold leading-none text-stone-950">
-                    {primaryFlight.flightNumber}
-                  </div>
-                  <div className="mt-1.5 flex items-center gap-2 text-base font-semibold text-stone-900">
-                    <span>{primaryFlight.departureCode}</span>
-                    <span className="text-stone-400">-&gt;</span>
-                    <span>{primaryFlight.arrivalCode}</span>
-                  </div>
-                  <div className="mt-1.5 text-[0.95rem] leading-5 text-stone-600">
-                    {primaryFlight.departureTime} - {primaryFlight.arrivalTime} • {primaryFlight.shortDate}
-                  </div>
-                </div>
-              </div>
-              {confirmedFlights.length > 1 ? (
-                <div className="mt-4 space-y-3 border-t border-amber-100 pt-4">
-                  {confirmedFlights.slice(1).map((flight) => (
-                    <div
-                      key={flight.id}
-                      className="rounded-2xl border border-amber-100 bg-white/80 px-4 py-3"
-                    >
-                      <div className="text-base font-semibold text-stone-950">
-                        {flight.flightNumber}
-                      </div>
-                      <div className="mt-1 flex items-center gap-2 text-sm font-medium text-stone-800">
-                        <span>{flight.departureCode}</span>
-                        <span className="text-stone-400">-&gt;</span>
-                        <span>{flight.arrivalCode}</span>
-                      </div>
-                      <div className="mt-1 text-sm text-stone-600">
-                        {flight.departureTime} - {flight.arrivalTime} • {flight.shortDate}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-
           <EnhancedCheckinSidebar
             booking={booking}
-            flight={primaryFlight}
+            flights={primaryFlight ? [primaryFlight] : []}
             onOpenDetails={onOpenDetails}
           />
         </div>
@@ -2435,6 +2447,8 @@ function SeatConfirmModal({
   flight,
   assigned,
   currentAssignedSeatNumber,
+  currentAssignedSeatSurcharge,
+  currentAssignedSeatCurrency,
   loading,
   onClose,
   onConfirm,
@@ -2442,15 +2456,23 @@ function SeatConfirmModal({
 }: SeatConfirmModalProps) {
   if (!open || !seat || !passengerName || !flight) return null;
 
-  const seatPrice =
-    seat.displayPrice?.text?.trim() ||
-    (seat.extraPrice && seat.extraPrice > 0
-      ? formatCurrency(seat.extraPrice, seat.currency ?? 'VND')
-      : 'Free');
-
   const isOwnAssignedSeat = Boolean(assigned?.isYours);
   const isBlockedSeat = Boolean(assigned && !assigned.isYours);
   const isChangingSeat = !isBlockedSeat && !isOwnAssignedSeat && Boolean(currentAssignedSeatNumber);
+  const effectiveSeatSurcharge = isOwnAssignedSeat
+    ? currentAssignedSeatSurcharge
+    : seat.extraPrice;
+  const effectiveSeatCurrency = isOwnAssignedSeat
+    ? (currentAssignedSeatCurrency ?? seat.currency ?? 'VND')
+    : (seat.currency ?? 'VND');
+  const seatPrice =
+    effectiveSeatSurcharge != null
+      ? effectiveSeatSurcharge > 0
+        ? formatCurrency(effectiveSeatSurcharge, effectiveSeatCurrency)
+        : 'Miễn phí'
+      : isBlockedSeat
+        ? 'Đã giữ'
+        : seat.displayPrice?.text?.trim() || 'Miễn phí';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/45 p-4 backdrop-blur-[2px]">
@@ -2703,6 +2725,7 @@ export default function Checkin() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedFlights, setSelectedFlights] = useState<Set<string>>(new Set());
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
+  const [activeSeatFlightId, setActiveSeatFlightId] = useState<string | null>(null);
   const [activeSeatPassengerId, setActiveSeatPassengerId] = useState<string | null>(null);
   const [selectedSeat, setSelectedSeat] = useState<SeatSelectionValue | null>(null);
   const [showSeatConfirmModal, setShowSeatConfirmModal] = useState(false);
@@ -2733,11 +2756,15 @@ export default function Checkin() {
     });
   }, [flights]);
 
-  const primaryFlight = flights.find((flight) => selectedFlights.has(flight.id)) ?? flights[0] ?? null;
+  const selectedFlightItems = flights.filter((flight) => selectedFlights.has(flight.id));
+  const primaryFlight = selectedFlightItems[0] ?? flights[0] ?? null;
+  const seatFlowFlights = selectedFlightItems;
+  const activeSeatFlight =
+    seatFlowFlights.find((flight) => flight.id === activeSeatFlightId) ?? seatFlowFlights[0] ?? null;
   const activeFlightItinerary = manageOptions?.itineraries?.find(
-    (itinerary) => String(itinerary.flightId) === primaryFlight?.id
+    (itinerary) => String(itinerary.flightId) === activeSeatFlight?.id
   );
-  const seatMapFlightId = activeFlightItinerary?.flightId ?? primaryFlight?.numericId ?? null;
+  const seatMapFlightId = activeFlightItinerary?.flightId ?? activeSeatFlight?.numericId ?? null;
   const seatMapFareId = activeFlightItinerary?.fareId ?? null;
   const confirmationData = useMemo(
     () => buildCheckinConfirmationData(flights, passengers, selectedFlights, selected, manageOptions),
@@ -2745,26 +2772,56 @@ export default function Checkin() {
   );
 
   useEffect(() => {
-    if (!primaryFlight) return;
+    if (seatFlowFlights.length === 0) {
+      setActiveSeatFlightId(null);
+      return;
+    }
+    if (activeSeatFlightId && seatFlowFlights.some((flight) => flight.id === activeSeatFlightId)) return;
+    setActiveSeatFlightId(seatFlowFlights[0]?.id ?? null);
+  }, [activeSeatFlightId, seatFlowFlights]);
+
+  const seatFlightProgress = useMemo(() => {
+    const progress = new Map<string, SeatFlightProgress>();
+    for (const flight of seatFlowFlights) {
+      const eligiblePassengers = passengers.filter(
+        (passenger) => selected.has(passenger.id) && passenger.segments[flight.id]?.eligible
+      );
+      const missingCount = eligiblePassengers.filter((passenger) => !passenger.segments[flight.id]?.seatAssigned).length;
+      progress.set(flight.id, {
+        flightId: flight.id,
+        eligibleCount: eligiblePassengers.length,
+        missingCount,
+        complete: missingCount === 0,
+      });
+    }
+    return progress;
+  }, [passengers, seatFlowFlights, selected]);
+
+  useEffect(() => {
+    if (selectedFlights.size === 0) return;
     setSelected((prev) => {
       const next = new Set<string>();
       for (const passengerId of prev) {
-        if (passengers.find((passenger) => passenger.id === passengerId)?.segments[primaryFlight.id]?.eligible) {
+        const passenger = passengers.find((item) => item.id === passengerId);
+        const eligibleForAnySelectedFlight = [...selectedFlights].some(
+          (flightId) => passenger?.segments[flightId]?.eligible
+        );
+        if (eligibleForAnySelectedFlight) {
           next.add(passengerId);
         }
       }
       return next;
     });
-  }, [passengers, primaryFlight]);
+  }, [passengers, selectedFlights]);
 
   useEffect(() => {
     setSubmitError(null);
   }, [currentStep, selected, selectedFlights]);
 
   useEffect(() => {
-    if (!primaryFlight || currentStep !== 3) return;
+    if (!activeSeatFlight || currentStep !== 3) return;
     const selectedPassengers = passengers.filter(
-      (passenger) => selected.has(passenger.id) && passenger.segments[primaryFlight.id]
+      (passenger) => selected.has(passenger.id) && passenger.segments[activeSeatFlight.id]?.eligible
     );
     if (selectedPassengers.length === 0) {
       setActiveSeatPassengerId(null);
@@ -2772,15 +2829,15 @@ export default function Checkin() {
     }
     if (selectedPassengers.some((passenger) => passenger.id === activeSeatPassengerId)) return;
     const firstWithoutSeat =
-      selectedPassengers.find((passenger) => !passenger.segments[primaryFlight.id]?.seatAssigned) ??
+      selectedPassengers.find((passenger) => !passenger.segments[activeSeatFlight.id]?.seatAssigned) ??
       selectedPassengers[0];
     setActiveSeatPassengerId(firstWithoutSeat.id);
-  }, [activeSeatPassengerId, currentStep, passengers, primaryFlight, selected]);
+  }, [activeSeatFlight, activeSeatPassengerId, currentStep, passengers, selected]);
 
   useEffect(() => {
     setSelectedSeat(null);
     setShowSeatConfirmModal(false);
-  }, [activeSeatPassengerId, primaryFlight?.id]);
+  }, [activeSeatFlight?.id, activeSeatPassengerId]);
 
   const activeSeatPassengerNumericId = activeSeatPassengerId ? Number(activeSeatPassengerId) : null;
 
@@ -2788,16 +2845,16 @@ export default function Checkin() {
     const assignments = manageOptions?.seatAssignments ?? [];
     const next = new Map<number, { label: string; isYours: boolean }>();
     for (const assignment of assignments) {
-      if (String(assignment.flightId) !== primaryFlight?.id) continue;
-      const passenger = passengers.find((item) => Number(item.id) === assignment.passengerId);
-      const label = passenger ? passenger.name.split(' ')[0] ?? passenger.name : 'Đã chọn';
+      if (String(assignment.flightId) !== activeSeatFlight?.id) continue;
+      const isYours =
+        activeSeatPassengerNumericId != null && assignment.passengerId === activeSeatPassengerNumericId;
       next.set(assignment.seatId, {
-        label,
-        isYours: activeSeatPassengerNumericId != null && assignment.passengerId === activeSeatPassengerNumericId,
+        label: isYours ? 'Đã chọn' : 'Đã giữ',
+        isYours,
       });
     }
     return next;
-  }, [activeSeatPassengerNumericId, manageOptions?.seatAssignments, passengers, primaryFlight?.id]);
+  }, [activeSeatFlight?.id, activeSeatPassengerNumericId, manageOptions?.seatAssignments]);
 
   const seatMapQuery = useQuery({
     queryKey: ['checkin-seat-map', seatMapFlightId, seatMapFareId],
@@ -2861,15 +2918,15 @@ export default function Checkin() {
     manageOptions?.seatAssignments.find(
       (assignment) =>
         assignment.passengerId === activeSeatPassengerNumericId &&
-        String(assignment.flightId) === primaryFlight?.id
+        String(assignment.flightId) === activeSeatFlight?.id
     ) ?? null;
   const activeSelectedSeatAssigned =
     selectedSeat && assignedSeatBySeatId ? (assignedSeatBySeatId.get(selectedSeat.seatId) ?? null) : null;
 
   function togglePassenger(id: string) {
-    if (!primaryFlight) return;
-    const segment = passengers.find((passenger) => passenger.id === id)?.segments[primaryFlight.id];
-    if (!segment?.eligible) return;
+    const passenger = passengers.find((item) => item.id === id);
+    const eligibleForAnySelectedFlight = [...selectedFlights].some((flightId) => passenger?.segments[flightId]?.eligible);
+    if (!eligibleForAnySelectedFlight) return;
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -2938,35 +2995,45 @@ export default function Checkin() {
     });
   }
 
+  const activeSeatFlightIndex = activeSeatFlight
+    ? seatFlowFlights.findIndex((flight) => flight.id === activeSeatFlight.id)
+    : -1;
+  const nextIncompleteSeatFlight =
+    seatFlowFlights.find(
+      (flight) => flight.id !== activeSeatFlight?.id && !(seatFlightProgress.get(flight.id)?.complete ?? false)
+    ) ?? null;
+  const allSeatRequirementsMet = seatFlowFlights.every((flight) => seatFlightProgress.get(flight.id)?.complete ?? false);
+  const canContinueSeatReview =
+    activeSeatFlight != null &&
+    ((seatFlightProgress.get(activeSeatFlight.id)?.complete ?? false) ||
+      (seatFlightProgress.get(activeSeatFlight.id)?.eligibleCount ?? 0) === 0);
+  const seatReviewContinueLabel =
+    nextIncompleteSeatFlight != null
+      ? `Tiếp tục: Chọn ghế ${nextIncompleteSeatFlight.flightNumber}`
+      : activeSeatFlightIndex >= 0 && activeSeatFlightIndex < seatFlowFlights.length - 1
+        ? `Tiếp tục: Chọn ghế chặng ${activeSeatFlightIndex + 2}`
+      : 'Tiếp tục: Xác nhận thông tin';
+
   function handleGoToConfirmationStep() {
     if (!booking.pnr || !booking.lastName) {
-      setSubmitError('Thiáº¿u thÃ´ng tin PNR hoáº·c há» Ä‘á»ƒ tiáº¿p tá»¥c check-in.');
+      setSubmitError('Thiếu thông tin PNR hoặc họ để tiếp tục check-in.');
       return;
     }
 
     if (selectedFlights.size === 0) {
-      setSubmitError('ChÆ°a chá»n chuyáº¿n bay Ä‘á»ƒ tiáº¿p tá»¥c check-in.');
+      setSubmitError('Chưa chọn chuyến bay để tiếp tục check-in.');
       return;
     }
 
     const segments = buildCheckInSegments(selectedFlights, selected, passengers);
     if (segments.length === 0) {
-      setSubmitError('ChÆ°a cÃ³ hÃ nh khÃ¡ch Ä‘á»§ Ä‘iá»u kiá»‡n cho cÃ¡c chuyáº¿n bay Ä‘Ã£ chá»n.');
+      setSubmitError('Chưa có hành khách đủ điều kiện cho các chuyến bay đã chọn.');
       return;
     }
 
-    const selectedPassengers = primaryFlight
-      ? passengers.filter(
-          (passenger) => selected.has(passenger.id) && passenger.segments[primaryFlight.id]?.eligible
-        )
-      : [];
-    const hasMissingSeats = primaryFlight
-      ? selectedPassengers.some((passenger) => !passenger.segments[primaryFlight.id]?.seatAssigned)
-      : false;
-
-    if (hasMissingSeats) {
+    if (!allSeatRequirementsMet) {
       setSubmitError(
-        'Má»™t sá»‘ hÃ nh khÃ¡ch cÃ²n thiáº¿u gháº¿. HÃ£y hoÃ n táº¥t chá»n gháº¿ trÆ°á»›c khi tiáº¿p tá»¥c.'
+        'Một số hành khách còn thiếu ghế. Hãy hoàn tất chọn ghế trước khi tiếp tục.'
       );
       return;
     }
@@ -2977,13 +3044,18 @@ export default function Checkin() {
 
   async function handleConfirmCheckIn() {
     if (!booking.pnr || !booking.lastName) {
-      setSubmitError('Thiáº¿u thÃ´ng tin PNR hoáº·c há» Ä‘á»ƒ tiáº¿p tá»¥c check-in.');
+      setSubmitError('Thiếu thông tin PNR hoặc họ để tiếp tục check-in.');
       return;
     }
 
     const segments = buildCheckInSegments(selectedFlights, selected, passengers);
     if (segments.length === 0) {
-      setSubmitError('ChÆ°a cÃ³ hÃ nh khÃ¡ch Ä‘á»§ Ä‘iá»u kiá»‡n cho cÃ¡c chuyáº¿n bay Ä‘Ã£ chá»n.');
+      setSubmitError('Chưa có hành khách đủ điều kiện cho các chuyến bay đã chọn.');
+      return;
+    }
+
+    if (!allSeatRequirementsMet) {
+      setSubmitError('Một số hành khách còn thiếu ghế. Hãy hoàn tất chọn ghế trước khi tiếp tục.');
       return;
     }
 
@@ -3000,12 +3072,12 @@ export default function Checkin() {
         return;
       }
       if (response.summary.confirmedPassengers < 0) {
-        setSubmitError('Má»™t sá»‘ hÃ nh khÃ¡ch cÃ²n thiáº¿u gháº¿. HÃ£y hoÃ n táº¥t chá»n gháº¿ trÆ°á»›c khi tiáº¿p tá»¥c.');
+        setSubmitError('Một số hành khách còn thiếu ghế. Hãy hoàn tất chọn ghế trước khi tiếp tục.');
         return;
       }
-      setSubmitError('Backend tá»« chá»‘i bÆ°á»›c tiáº¿p tá»¥c check-in do cÃ²n hÃ nh khÃ¡ch hoáº·c chuyáº¿n bay bá»‹ cháº·n.');
+      setSubmitError('Backend từ chối bước tiếp tục check-in do còn hành khách hoặc chuyến bay bị chặn.');
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'KhÃ´ng thá»ƒ tiáº¿p tá»¥c check-in.');
+      setSubmitError(error instanceof Error ? error.message : 'Không thể tiếp tục check-in.');
     } finally {
       setCheckingIn(false);
     }
@@ -3014,6 +3086,17 @@ export default function Checkin() {
   async function handleContinueCheckIn() {
     if (!booking.pnr || !booking.lastName) {
       setSubmitError('Thiếu thông tin PNR hoặc họ để tiếp tục check-in.');
+      return;
+    }
+
+    if (!canContinueSeatReview) {
+      setSubmitError('Hãy hoàn tất chọn ghế cho chặng hiện tại trước khi tiếp tục.');
+      return;
+    }
+
+    if (nextIncompleteSeatFlight) {
+      setActiveSeatFlightId(nextIncompleteSeatFlight.id);
+      setSubmitError(null);
       return;
     }
 
@@ -3125,9 +3208,10 @@ export default function Checkin() {
                     selected={selected}
                     onToggle={togglePassenger}
                     onToggleAll={() => {
-                      if (!primaryFlight) return;
                       const eligibleIds = passengers
-                        .filter((passenger) => passenger.segments[primaryFlight.id]?.eligible)
+                        .filter((passenger) =>
+                          [...selectedFlights].some((flightId) => passenger.segments[flightId]?.eligible)
+                        )
                         .map((passenger) => passenger.id);
                       if (eligibleIds.every((id) => selected.has(id))) {
                         setSelected(new Set());
@@ -3147,9 +3231,15 @@ export default function Checkin() {
                   <CheckinSeatReviewPanel
                     passengers={passengers}
                     selected={selected}
-                    flight={primaryFlight as DerivedFlight}
+                    seatFlights={seatFlowFlights}
+                    flightProgress={seatFlightProgress}
+                    activeFlightId={activeSeatFlight?.id ?? null}
+                    onActiveFlightChange={setActiveSeatFlightId}
+                    flight={(activeSeatFlight ?? primaryFlight) as DerivedFlight}
                     onBack={() => setCurrentStep(2)}
                     onContinue={handleContinueCheckIn}
+                    canContinue={canContinueSeatReview}
+                    continueLabel={seatReviewContinueLabel}
                     submitError={submitError}
                     seatMapLoading={seatMapQuery.isPending}
                     seatMapError={seatMapError}
@@ -3180,7 +3270,7 @@ export default function Checkin() {
 
               <EnhancedCheckinSidebar
                 booking={booking}
-                flight={primaryFlight}
+                flights={selectedFlightItems}
                 onOpenDetails={() => setShowBookingDetail(true)}
               />
             </div>
@@ -3200,9 +3290,11 @@ export default function Checkin() {
               open={showSeatConfirmModal}
               seat={selectedSeat}
               passengerName={activeSeatPassenger?.name ?? null}
-              flight={primaryFlight}
+              flight={activeSeatFlight ?? primaryFlight}
               assigned={activeSelectedSeatAssigned}
               currentAssignedSeatNumber={activePassengerSeatAssignment?.seatNumber ?? null}
+              currentAssignedSeatSurcharge={activePassengerSeatAssignment?.surchargeAmount ?? null}
+              currentAssignedSeatCurrency={activePassengerSeatAssignment?.currency ?? null}
               loading={
                 assignSeatMutation.isPending ||
                 changeSeatMutation.isPending ||

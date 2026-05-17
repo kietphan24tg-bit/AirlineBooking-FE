@@ -3,7 +3,6 @@ import App from '../App';
 import AccountManagement from '../pages/AccountManagement';
 import Checkout from '../pages/Checkout';
 import FlightResults from '../pages/FlightResults';
-import Home from '../pages/Home';
 import Landing from '../pages/Landing';
 import Login from '../pages/Login';
 import PassengerInfo from '../pages/PassengerInfo';
@@ -94,10 +93,6 @@ const AppRouter = createBrowserRouter([
   {
     path: '/app',
     element: <App />,
-  },
-  {
-    path: '/home',
-    element: <Home />,
   },
   {
     path: '/account',

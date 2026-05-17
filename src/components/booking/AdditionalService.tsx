@@ -240,7 +240,7 @@ export default function AdditionalService({
           })}
         </div>
 
-        <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-2 flex flex-col gap-3 sm:flex-row xl:hidden">
           <button
             onClick={onClose}
             disabled={confirmLoading}

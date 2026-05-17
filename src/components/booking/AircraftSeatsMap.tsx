@@ -1,4 +1,4 @@
-import { Armchair, Check, Info, List, Loader2 } from 'lucide-react';
+﻿import { Armchair, Check, Info, List, Loader2 } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { toast } from 'sonner';
 import type {
@@ -20,21 +20,30 @@ export type SeatSelectionValue = {
   seatCategoryDisplay?: SeatMapDisplayItem;
 };
 
+export type AssignedSeatMeta = {
+  label: string;
+  isYours: boolean;
+  surchargeAmount?: number | null;
+  currency?: string | null;
+};
+
 export interface AircraftSeatsMapProps {
   seatMap: SeatMapResponse | null;
   loading?: boolean;
   error?: string | null;
   selectedSeat?: SeatSelectionValue | null;
-  /** Click a seat on the map — update preview only; no API. */
+  headerSubtitle?: string | null;
+  /** Click a seat on the map â€” update preview only; no API. */
   onSeatPreview?: (seat: SeatSelectionValue) => void;
-  /** "Select seat" in the side panel / bottom bar — parent commits and may call the API. */
+  /** "Select seat" in the side panel / bottom bar â€” parent commits and may call the API. */
   onSeatConfirm?: (seat: SeatSelectionValue) => void;
   onSeatCancel?: (seat: SeatSelectionValue) => void;
   onClose?: () => void;
-  /** From last successful seat-assignment API — key is `seatId`. */
-  assignedSeatBySeatId?: ReadonlyMap<number, { label: string; isYours: boolean }> | null;
+  /** From last successful seat-assignment API â€” key is `seatId`. */
+  assignedSeatBySeatId?: ReadonlyMap<number, AssignedSeatMeta> | null;
   seatConfirmLoading?: boolean;
   showDetailPanel?: boolean;
+  showSeatLegend?: boolean;
 }
 
 type SeatVisualState = 'free' | 'paid' | 'unavailable' | 'not_allowed' | 'selected' | 'assigned';
@@ -77,7 +86,14 @@ function fallbackDisplayItem(code: string | null | undefined): SeatMapDisplayIte
   };
 }
 
-function getDisplayPriceText(cell: SeatMapCell): string {
+function getDisplayPriceText(
+  cell: SeatMapCell,
+  assigned?: AssignedSeatMeta | null
+): string {
+  if (assigned?.label?.trim()) return assigned.label.trim();
+  if (assigned?.isYours) return 'Đã chọn';
+  if (assigned && !assigned.isYours) return 'Đã giữ';
+
   const text = cell.displayPrice?.text?.trim();
   if (text) return normalizeSeatPriceText(text);
 
@@ -86,32 +102,32 @@ function getDisplayPriceText(cell: SeatMapCell): string {
 
   if (!cell.selectable) {
     return cell.pricingBadge?.code === 'NOT_ALLOWED' || cell.reason === 'SEAT_NOT_ALLOWED_FOR_FARE'
-      ? 'Not allowed'
-      : 'Unavailable';
+      ? 'Không được phép'
+      : 'Không khả dụng';
   }
 
-  if (cell.displayPrice?.type === 'FREE' || cell.pricingBadge?.code === 'FREE') return 'Free';
+  if (cell.displayPrice?.type === 'FREE' || cell.pricingBadge?.code === 'FREE') return 'Miễn phí';
   if (cell.extraPrice != null && cell.extraPrice > 0) {
     return `${cell.extraPrice.toLocaleString('vi-VN')} ${cell.currency ?? ''}`.trim();
   }
-  return 'Free';
+  return 'Miễn phí';
 }
 
 function getSeatCellViewModel(
   cell: SeatMapCell,
   isSelected: boolean,
-  assigned: { label: string; isYours: boolean } | null
+  assigned: AssignedSeatMeta | null
 ): SeatCellViewModel {
   if (assigned) {
     return {
       title: cell.seatNumber,
-      subtitle: assigned.isYours ? 'Da chon (ban)' : assigned.label,
+      subtitle: assigned.isYours ? 'Đã chọn' : 'Đã giữ',
       appearance: 'assigned',
       disabled: true,
     };
   }
 
-  const subtitle = getDisplayPriceText(cell);
+  const subtitle = getDisplayPriceText(cell, assigned);
   if (isSelected) {
     return {
       title: cell.seatNumber,
@@ -215,25 +231,29 @@ function getSeatDetailViewModel(
   seat: SeatMapCell,
   policyDisplay: SeatMapDisplayItem | undefined,
   fallbackPolicy: string,
-  assigned: { label: string; isYours: boolean } | null
+  assigned: AssignedSeatMeta | null
 ): SeatDetailViewModel {
   const typeDisplay = seat.seatTypeDisplay ?? fallbackDisplayItem(seat.seatType);
   const categoryDisplay = seat.seatCategoryDisplay ?? fallbackDisplayItem(seat.seatCategory);
   const statusDisplay = seat.statusDisplay ?? fallbackDisplayItem(seat.status);
+  const effectiveSurchargeAmount =
+    assigned?.isYours && assigned.surchargeAmount != null ? assigned.surchargeAmount : seat.extraPrice;
+  const effectiveSurchargeCurrency =
+    assigned?.isYours && assigned.currency != null ? assigned.currency : seat.currency;
 
   if (assigned) {
     return {
       heading: `Seat ${seat.seatNumber}`,
-      priceText: getDisplayPriceText(seat),
+      priceText: getDisplayPriceText(seat, assigned),
       seatType: typeDisplay.label,
       seatCategory: categoryDisplay.label,
       description: categoryDisplay.description || typeDisplay.description || '',
-      status: assigned.isYours ? 'Da xac nhan cho ban' : 'Da xac nhan (hanh khach khac)',
-      includedInFare: seat.included ? 'Yes' : 'No',
+      status: assigned.isYours ? 'Đã chọn' : 'Đã xác nhận (hành khách khác)',
+      includedInFare: seat.included ? 'Có' : 'Không',
       surchargeText:
-        seat.extraPrice == null || seat.currency == null
+        effectiveSurchargeAmount == null || effectiveSurchargeCurrency == null
           ? '-'
-          : `${seat.extraPrice.toLocaleString('vi-VN')} ${seat.currency}`,
+          : `${effectiveSurchargeAmount.toLocaleString('vi-VN')} ${effectiveSurchargeCurrency}`,
       farePolicy: policyDisplay?.label ?? fallbackPolicy,
       canSelect: false,
       canCancel: assigned.isYours,
@@ -247,7 +267,7 @@ function getSeatDetailViewModel(
     seatCategory: categoryDisplay.label,
     description: categoryDisplay.description || typeDisplay.description || '',
     status: statusDisplay.label,
-    includedInFare: seat.included ? 'Yes' : 'No',
+    includedInFare: seat.included ? 'Có' : 'Không',
     surchargeText:
       seat.extraPrice == null || seat.currency == null
         ? '-'
@@ -307,7 +327,7 @@ function DetailPanel({
   onConfirm?: (seat: SeatMapCell) => void;
   onClose?: () => void;
   onCancel?: (seat: SeatMapCell) => void;
-  assigned: { label: string; isYours: boolean } | null;
+  assigned: AssignedSeatMeta | null;
   confirmLoading?: boolean;
 }) {
   if (!seat) {
@@ -451,7 +471,7 @@ function CompactSelectionBar({
   seat: SeatMapCell;
   onConfirm?: (seat: SeatMapCell) => void;
   onCancel?: (seat: SeatMapCell) => void;
-  assigned: { label: string; isYours: boolean } | null;
+  assigned: AssignedSeatMeta | null;
   confirmLoading?: boolean;
 }) {
   const vm = getSeatDetailViewModel(
@@ -492,7 +512,7 @@ function CompactSelectionBar({
         ) : (
           <div className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md border border-slate-400/30 bg-slate-100/90 px-5 text-sm font-bold text-slate-800">
             <Check className="h-4 w-4" />
-            Da chon
+            Đã chọn
           </div>
         )
       ) : (
@@ -524,9 +544,11 @@ export default function AircraftSeatsMap({
   loading = false,
   error = null,
   selectedSeat = null,
+  headerSubtitle = null,
   assignedSeatBySeatId = null,
   seatConfirmLoading = false,
   showDetailPanel = true,
+  showSeatLegend = true,
   onSeatPreview,
   onSeatConfirm,
   onSeatCancel,
@@ -550,12 +572,11 @@ export default function AircraftSeatsMap({
         <div>
           <h1 className="mb-2 flex items-center gap-2 font-headline text-xl font-black text-midnight-burgundy">
             <List className="h-5 w-5" />
-            Chon ghe
+            Chọn ghế
           </h1>
           <p className="text-sm text-on-surface-variant">
-            {seatMap
-              ? `Flight #${seatMap.flightId} - ${seatMap.fareCode}`
-              : 'Chon ghe phu hop theo dieu kien hang ve cua ban.'}
+            {headerSubtitle ??
+              (seatMap ? `${seatMap.fareCode} seat map` : 'Chọn ghế phù hợp theo điều kiện hạng vé của bạn.')}
           </p>
           {seatMap?.policyDisplay ? (
             <div className="mt-3 max-w-3xl">
@@ -570,9 +591,9 @@ export default function AircraftSeatsMap({
         </div>
 
         {loading ? (
-          <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-10 text-center text-sm text-on-surface-variant flex flex-col items-center justify-center">
+          <div className="flex min-h-[24rem] flex-col items-center justify-center rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-10 text-center text-sm text-on-surface-variant">
             <Loader2 className="h-8 w-8 animate-spin text-midnight-burgundy mb-3" />
-            Dang tai so do cho ngoi...
+            Đang tải sơ đồ chỗ ngồi...
           </div>
         ) : null}
 
@@ -584,39 +605,41 @@ export default function AircraftSeatsMap({
 
         {!loading && !error && !seatMap ? (
           <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-10 text-center text-sm text-on-surface-variant">
-            Khong tim thay flightId hoac fareId trong store de tai so do ghe.
+            Không tìm thấy flightId hoặc fareId trong store để tải sơ đồ ghế.
           </div>
         ) : null}
 
         {!loading && !error && seatMap ? (
           <>
-            <div className="rounded-xl border border-luxury-gold/10 bg-white/60 p-3.5 shadow-sm">
-              <div className="grid gap-4 text-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-                <div>
-                  <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-on-surface-variant">
-                    Availability
-                  </p>
-                  <div className="flex flex-wrap gap-4">
-                    <LegendSwatch className="border-emerald-300 bg-emerald-50" label="Available" />
-                    <LegendSwatch
-                      className="border-outline-variant/30 bg-surface-container-high"
-                      label="Unavailable"
-                    />
-                    <LegendSwatch className="border-rose-200 bg-rose-50" label="Not allowed" />
-                    <LegendSwatch className="border-slate-500 bg-slate-200" label="Your booking" />
+            {showSeatLegend ? (
+              <div className="rounded-xl border border-luxury-gold/10 bg-white/60 p-3.5 shadow-sm">
+                <div className="grid gap-4 text-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                  <div>
+                    <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-on-surface-variant">
+                      Trạng thái ghế
+                    </p>
+                    <div className="flex flex-wrap gap-4">
+                      <LegendSwatch className="border-emerald-300 bg-emerald-50" label="Có thể chọn" />
+                      <LegendSwatch
+                        className="border-outline-variant/30 bg-surface-container-high"
+                        label="Không khả dụng"
+                      />
+                      <LegendSwatch className="border-rose-200 bg-rose-50" label="Không được phép" />
+                      <LegendSwatch className="border-slate-500 bg-slate-200" label="Ghế của bạn" />
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-on-surface-variant">
-                    Pricing
-                  </p>
-                  <div className="flex flex-wrap gap-4">
-                    <LegendSwatch className="border-emerald-300 bg-emerald-50" label="Free" />
-                    <LegendSwatch className="border-amber-300 bg-amber-50" label="Paid" />
+                  <div>
+                    <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-on-surface-variant">
+                      Mức giá
+                    </p>
+                    <div className="flex flex-wrap gap-4">
+                      <LegendSwatch className="border-emerald-300 bg-emerald-50" label="Miễn phí" />
+                      <LegendSwatch className="border-amber-300 bg-amber-50" label="Có phí" />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : null}
 
             <div className="grid gap-5">
               <div className="min-w-0 space-y-6">

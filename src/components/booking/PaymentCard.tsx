@@ -52,12 +52,6 @@ function getQrImageUrlFromData(qrData: string): string {
   )}`;
 }
 
-function truncateMiddle(value: string, max = 34): string {
-  if (value.length <= max) return value;
-  const side = Math.floor((max - 3) / 2);
-  return `${value.slice(0, side)}...${value.slice(-side)}`;
-}
-
 function parseEmvFields(payload: string | null): Map<string, string> {
   const fields = new Map<string, string>();
   if (!payload) return fields;
@@ -365,12 +359,6 @@ export default function PaymentCard({
               Lưu ý: Nhập chính xác số tiền <span className="font-black">{amountText}</span>, nội
               dung <span className="font-black">{transferContent}</span> khi chuyển khoản.
             </p>
-
-            {qrData ? (
-              <p className="mt-4 max-w-full truncate text-[11px] text-on-surface-variant">
-                QR: {truncateMiddle(qrData, 96)}
-              </p>
-            ) : null}
 
             <div className="mt-6 flex flex-wrap gap-3">
               {status === 'PENDING' ? (

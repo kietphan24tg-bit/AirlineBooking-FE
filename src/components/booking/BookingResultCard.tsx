@@ -142,10 +142,8 @@ function buildManageActions(
       label: 'Hủy chuyến bay',
       description: 'Hủy chuyến và yêu cầu hoàn tiền',
       icon: CircleX,
-      iconClass: 'bg-red-100 stroke-red-600',
-      borderHoverClass: 'hover:border-red-600',
-      textClass: 'text-red-600',
-      chevronClass: 'text-red-600',
+      iconClass: 'bg-midnight-burgundy stroke-red-300',
+      textClass: 'text-on-surface',
       onClick: () => navigate('/manage-booking/cancel'),
     },
   ];
@@ -201,72 +199,85 @@ function PassengerCard({
   );
 
   return (
-    <div className="rounded-2xl border border-[#eadfd7] bg-gradient-to-br from-white via-white to-[#fcf7f3] px-5 py-5 shadow-[0_18px_40px_-32px_rgba(92,14,42,0.45)] sm:px-6">
+    <article className="rounded-2xl border border-[#e8ebf0] bg-white px-5 py-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-6">
+      <div className="hidden" />
       <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-bold tracking-[0.16em] text-midnight-burgundy/45">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="inline-flex h-11 min-w-11 items-center justify-center rounded-full border border-[#d8dee8] bg-[#f8fafc] px-3 text-xs font-bold tracking-[0.16em] text-[#64748b]">
                 {String(index).padStart(2, '0')}
               </span>
-              <h3 className="text-lg font-black uppercase tracking-[0.06em] text-on-surface">
-                {fullName}
-              </h3>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold uppercase tracking-[0.02em] text-[#0f172a] sm:text-[1.2rem]">
+                  {fullName}
+                </h3>
+              </div>
             </div>
-            <p className="mt-2 text-sm text-on-surface-variant">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-[#64748b]">
+              <span>{formatPassengerType(passenger.passengerType)}</span>
+              <span className="h-1 w-1 rounded-full bg-[#cbd5e1]" />
+              <span>{passenger.dateOfBirth}</span>
+              {/*
               {formatPassengerType(passenger.passengerType)} • {passenger.dateOfBirth}
-            </p>
+              */}
+            </div>
           </div>
 
-          <span className="inline-flex w-fit rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-[#d7f0df] bg-[#f5fbf7] px-3 py-1.5 text-xs font-semibold text-[#0f8a5f]">
+            <span className="h-2 w-2 rounded-full bg-[#10b981]" />
             Đã xác nhận
           </span>
         </div>
 
-        <div className="grid gap-3 text-sm text-on-surface sm:grid-cols-2">
-          <div className="flex items-center gap-2 rounded-xl bg-[#f8f1ea] px-3 py-2.5">
-            <Mail className="h-4 w-4 shrink-0 text-midnight-burgundy/70" />
+        <div className="grid gap-3 border-t border-[#eef2f7] pt-4 text-sm text-on-surface sm:grid-cols-2">
+          <div className="flex items-start gap-3 rounded-xl border border-[#edf1f5] bg-[#fafbfd] px-4 py-3">
+            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full border border-[#edf1f5] bg-white text-[#64748b]">
+              <Mail className="h-4 w-4 shrink-0" />
+            </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-midnight-burgundy/50">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
                 Email
               </p>
-              <p className="truncate font-medium">{email}</p>
+              <p className="mt-1 truncate text-sm font-medium text-[#0f172a]">{email}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-xl bg-[#f8f1ea] px-3 py-2.5">
-            <Phone className="h-4 w-4 shrink-0 text-midnight-burgundy/70" />
+          <div className="flex items-start gap-3 rounded-xl border border-[#edf1f5] bg-[#fafbfd] px-4 py-3">
+            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full border border-[#edf1f5] bg-white text-[#64748b]">
+              <Phone className="h-4 w-4 shrink-0" />
+            </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-midnight-burgundy/50">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
                 SĐT
               </p>
-              <p className="truncate font-medium">{phone}</p>
+              <p className="mt-1 truncate text-sm font-medium text-[#0f172a]">{phone}</p>
             </div>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
           {seats.length > 0 ? (
-            <span className="inline-flex rounded-full border border-[#e7c88c] bg-[#fff4d9] px-3 py-1.5 text-sm font-semibold text-[#7a5418]">
+            <span className="inline-flex rounded-full border border-[#dbe3ec] bg-[#f8fafc] px-3 py-1.5 text-sm font-medium text-[#334155]">
               Ghế {seats.map((seat) => seat.seatNumber).join(', ')}
             </span>
           ) : null}
 
-          <span className="inline-flex rounded-full border border-[#efd9d1] bg-[#fbf2ed] px-3 py-1.5 text-sm font-semibold text-midnight-burgundy">
+          <span className="inline-flex rounded-full border border-[#dbe3ec] bg-[#f8fafc] px-3 py-1.5 text-sm font-medium text-[#334155]">
             {carryOnWeight}kg miễn cước
           </span>
 
           {serviceLabels.map((label) => (
             <span
               key={`${passenger.passengerId}-${label}`}
-              className="inline-flex rounded-full border border-[#e5dce8] bg-[#f7f1fb] px-3 py-1.5 text-sm font-semibold text-[#5b3b74]"
+              className="inline-flex rounded-full border border-[#dbe3ec] bg-[#f8fafc] px-3 py-1.5 text-sm font-medium text-[#334155]"
             >
               {label}
             </span>
           ))}
         </div>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -456,21 +467,24 @@ export default function BookingResultCard() {
         </div>
 
         <div className="flex flex-col rounded-xl bg-white p-7">
-          <p className="mb-4 text-sm font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+          <p className="mb-2 text-base font-semibold text-[#0f172a]">
             Danh sách hành khách
+          </p>
+          <p className="mb-6 max-w-2xl text-sm leading-6 text-[#64748b]">
+            Thông tin liên hệ và dịch vụ đi kèm của từng hành khách.
           </p>
           <div className="space-y-4">
             {passengers.map((passenger, idx) => (
-            <PassengerCard
-              key={passenger.passengerId}
-              passenger={passenger}
-              index={idx + 1}
-              email={primaryContact.email}
-              phone={primaryContact.phone}
-              carryOnWeight={itineraries[0]?.fareBenefits.baggageHandKg || 7}
-            />
-          ))}
-        </div>
+              <PassengerCard
+                key={passenger.passengerId}
+                passenger={passenger}
+                index={idx + 1}
+                email={primaryContact.email}
+                phone={primaryContact.phone}
+                carryOnWeight={itineraries[0]?.fareBenefits.baggageHandKg || 7}
+              />
+            ))}
+          </div>
         </div>
       </div>
 

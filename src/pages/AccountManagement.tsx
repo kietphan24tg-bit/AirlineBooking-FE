@@ -18,7 +18,7 @@ export default function AccountManagement() {
     <div className="min-h-screen bg-surface font-body text-on-surface">
       <header className="bg-primary shadow-md">
         <div className="mx-auto flex h-20 max-w-[1920px] items-center justify-between px-8">
-          <Link to="/home" className="font-headline text-2xl font-black tracking-tight text-white">
+          <Link to="/" className="font-headline text-2xl font-black tracking-tight text-white">
             The Sovereign
           </Link>
           <nav className="hidden gap-8 md:flex">

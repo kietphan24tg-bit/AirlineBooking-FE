@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import AmbientSweep from '../components/layout/AmbientSweep';
 import BookingStepper from '../components/booking/BookingStepper';
@@ -77,11 +77,38 @@ function isStripeMethod(method?: PaymentMethod | null): boolean {
   return !!method && (method.provider ?? '').trim().toUpperCase() === 'STRIPE';
 }
 
+function isPayLaterMethod(method?: PaymentMethod | null): boolean {
+  return !!method && method.code.trim().toUpperCase() === 'PAY_LATER';
+}
+
+function isSelectableMethod(method?: PaymentMethod | null): boolean {
+  return !!method && (method.supported || isPayLaterMethod(method));
+}
+
 function resolveRedirectUrl(res: CreatePaymentResponse): string | null {
   const url = res.action?.paymentUrl ?? res.payment?.paymentUrl ?? null;
   if (typeof url !== 'string') return null;
   const trimmed = url.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function formatPaymentMethodName(method: PaymentMethod): string {
+  const code = method.code.trim().toUpperCase();
+
+  switch (code) {
+    case 'STRIPE_CARD':
+      return 'Thẻ tín dụng, thẻ ghi nợ quốc tế';
+    case 'PAYOS_QR':
+      return 'Mobile Banking VietQR';
+    case 'VNPAY':
+      return 'Thanh toán VNPAY';
+    case 'MOMO':
+      return 'Ví MoMo';
+    case 'PAY_LATER':
+      return 'Giữ chỗ, thanh toán sau';
+    default:
+      return method.label;
+  }
 }
 
 function MethodIconButton({
@@ -97,37 +124,44 @@ function MethodIconButton({
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const src = resolvePaymentIconUrl(method.icon);
+  const title = formatPaymentMethodName(method);
 
   return (
     <button
       type="button"
       disabled={disabled}
-      className={`overflow-hidden rounded-3xl border-5 border-amber-50 bg-surface-container-lowest/90 shadow-sm backdrop-blur-sm transition-all hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 ${
+      className={`group flex min-h-[172px] flex-col rounded-2xl border bg-white px-4 py-4 text-center shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60 ${
         selected
-          ? 'text-secondary border-cabin-burgundy'
-          : 'text-on-surface-variant hover:text-secondary'
+          ? 'border-cabin-burgundy ring-2 ring-cabin-burgundy/15'
+          : 'border-outline-variant/20 hover:border-luxury-gold/35'
       }`}
       onClick={onSelect}
     >
-      {src && !imgFailed ? (
-        <img
-          src={src}
-          alt={method.label}
-          className="h-full min-h-[100px] w-full object-contain object-center p-2"
-          onError={() => setImgFailed(true)}
-        />
-      ) : (
-        <div className="flex min-h-[100px] flex-col items-center justify-center gap-1 px-2 py-4 text-center">
-          <CreditCard className="h-8 w-8 text-on-surface-variant" strokeWidth={1.5} />
-          <span className="text-xs font-semibold leading-tight">{method.label}</span>
-        </div>
-      )}
+      <div className="flex min-h-[88px] flex-1 items-center justify-center rounded-xl bg-surface-container-low/40 px-3 py-3">
+        {src && !imgFailed ? (
+          <img
+            src={src}
+            alt={method.label}
+            className="h-12 w-full object-contain object-center md:h-14"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <div className="flex items-center justify-center">
+            <CreditCard className="h-9 w-9 text-on-surface-variant" strokeWidth={1.5} />
+          </div>
+        )}
+      </div>
+      <div className="mt-3 flex min-h-[48px] items-start justify-center">
+        <span className="text-sm font-semibold leading-5 text-on-surface">{title}</span>
+      </div>
     </button>
   );
 }
 
 export default function Checkout() {
   const navigate = useNavigate();
+  const paymentRedirectingRef = useRef(false);
+  const hardBlockHandledRef = useRef(false);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [qrPayment, setQrPayment] = useState<CreatePaymentResponse | null>(null);
   const [creatingPayment, setCreatingPayment] = useState(false);
@@ -167,7 +201,10 @@ export default function Checkout() {
     [paymentMethodsQuery.data?.groups]
   );
   const flatMethods = useMemo(() => groups.flatMap((g) => g.methods ?? []), [groups]);
-  const supportedMethods = useMemo(() => flatMethods.filter((m) => m.supported), [flatMethods]);
+  const supportedMethods = useMemo(
+    () => flatMethods.filter((m) => isSelectableMethod(m)),
+    [flatMethods]
+  );
   const groupsWithMethods = useMemo(
     () => groups.filter((g) => (g.methods ?? []).length > 0),
     [groups]
@@ -191,13 +228,10 @@ export default function Checkout() {
   }, [selectedCode, flatMethods, setValue]);
 
   const pricing = bookingResponse?.pricing ?? null;
-  const checkoutServiceFee =
-    (bookingResponse?.lastSeatAssignment?.seatSurchargeTotal ?? 0) +
-    (bookingResponse?.lastServicesResult?.ancillaryTotal ?? 0);
   const hasBooking = Boolean(bookingResponse);
 
   useEffect(() => {
-    if (!hasBooking) {
+    if (!hasBooking && !paymentRedirectingRef.current) {
       navigate('/booking/passengers', { replace: true });
     }
   }, [hasBooking, navigate]);
@@ -243,25 +277,50 @@ export default function Checkout() {
       ? paymentMethodsErrorMessage(errorStatus, errorData)
       : null;
 
+  useEffect(() => {
+    if (!paymentMethodsQuery.isError || !isHardBlock || !paymentMethodsError) {
+      hardBlockHandledRef.current = false;
+      return;
+    }
+    if (hardBlockHandledRef.current) return;
+    hardBlockHandledRef.current = true;
+    paymentRedirectingRef.current = true;
+    clearBooking();
+    navigate('/', {
+      replace: true,
+      state: { paymentRedirectMessage: paymentMethodsError },
+    });
+  }, [clearBooking, isHardBlock, navigate, paymentMethodsError, paymentMethodsQuery.isError]);
+
   const canPay =
     paymentMethodsQuery.isSuccess &&
     supportedMethods.length > 0 &&
     !paymentMethodsQuery.isError &&
     Boolean(selectedCode) &&
     supportedMethods.some((m) => m.code === selectedCode);
+  const selectedMethod = flatMethods.find((m) => m.code === selectedCode) ?? null;
+  const payLaterSelected = isPayLaterMethod(selectedMethod);
 
   if (!hasBooking || !pricing) return null;
 
   const currency = pricing.currency || 'VND';
+  const checkoutServiceFee = Math.max(
+    0,
+    pricing.discountedTotalPrice -
+      (pricing.baseFare + pricing.taxes + pricing.fees - pricing.discountAmount)
+  );
   const formatCurrency = (amount: number) => {
     try {
-      return new Intl.NumberFormat(undefined, {
+      if (currency === 'VND') {
+        return `${new Intl.NumberFormat('vi-VN').format(amount)} ₫`;
+      }
+      return new Intl.NumberFormat('vi-VN', {
         style: 'currency',
         currency,
         maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
       }).format(amount);
     } catch {
-      return `${amount} ${currency}`;
+      return `${amount.toLocaleString('vi-VN')} ${currency}`;
     }
   };
 
@@ -274,6 +333,7 @@ export default function Checkout() {
       setCreatingPayment(true);
       const selectedMethod = flatMethods.find((m) => m.code === selectedCode) ?? null;
       const stripeFlow = isStripeMethod(selectedMethod);
+      const payLaterFlow = isPayLaterMethod(selectedMethod);
       try {
         const res = await createPaymentLink({ bookingId, method: selectedCode });
         if (stripeFlow) {
@@ -284,6 +344,30 @@ export default function Checkout() {
             return;
           }
           const fallbackMsg = 'Không nhận được liên kết thanh toán Stripe. Vui lòng thử lại.';
+          setPaymentError(fallbackMsg);
+          setQrPayment(null);
+          toast.error(fallbackMsg);
+          setCreatingPayment(false);
+          return;
+        }
+        if (payLaterFlow) {
+          const paymentId = resolvePaymentId(res);
+          if (paymentId != null) {
+            const currentParams = new URLSearchParams(window.location.search);
+            const mockPaymentResult = currentParams.get('mockPaymentResult');
+            const mockPaymentVariant = currentParams.get('mockPaymentVariant');
+            const nextParams = new URLSearchParams({ paymentId: String(paymentId) });
+            if (mockPaymentResult === '1') {
+              nextParams.set('mockPaymentResult', '1');
+            }
+            if (mockPaymentVariant) {
+              nextParams.set('mockPaymentVariant', mockPaymentVariant);
+            }
+            setCreatingPayment(false);
+            navigate(`/booking/checkout/result?${nextParams.toString()}`);
+            return;
+          }
+          const fallbackMsg = 'KhÃ´ng nháº­n Ä‘Æ°á»£c phiÃªn thanh toÃ¡n tráº£ sau. Vui lÃ²ng thá»­ láº¡i.';
           setPaymentError(fallbackMsg);
           setQrPayment(null);
           toast.error(fallbackMsg);
@@ -303,6 +387,7 @@ export default function Checkout() {
               : 'Không thể tạo mã thanh toán. Vui lòng thử lại.');
         setPaymentError(msg);
         setQrPayment(null);
+        toast.error(msg);
         setCreatingPayment(false);
         return;
       }
@@ -366,7 +451,7 @@ export default function Checkout() {
   const handleCancelPayment = async () => {
     const paymentId = resolvePaymentId(qrPayment);
     if (paymentId == null) {
-      setPaymentError('Khong tim thay ma thanh toan de huy.');
+      setPaymentError('Không tìm thấy mã thanh toán để hủy.');
       return;
     }
     setPaymentError(null);
@@ -392,8 +477,8 @@ export default function Checkout() {
       const msg =
         pickBackendMessage(data) ||
         (status === 401 || status === 403
-          ? 'Vui lÃ²ng Ä‘Äƒng nháº­p láº¡i Ä‘á»ƒ há»§y thanh toÃ¡n.'
-          : 'KhÃ´ng thá»ƒ há»§y thanh toÃ¡n. Vui lÃ²ng thá»­ láº¡i.');
+          ? 'Vui lòng đăng nhập lại để hủy thanh toán.'
+          : 'Không thể hủy thanh toán. Vui lòng thử lại.');
       setPaymentError(msg);
     } finally {
       setCancelingPayment(false);
@@ -413,6 +498,7 @@ export default function Checkout() {
         return;
       }
       setStatusOverride(next ?? 'EXPIRED');
+      paymentRedirectingRef.current = true;
       clearBooking();
       navigate('/', {
         replace: true,
@@ -424,8 +510,8 @@ export default function Checkout() {
       const msg =
         pickBackendMessage(data) ||
         (status === 401 || status === 403
-          ? 'Vui lÃ²ng Ä‘Äƒng nháº­p láº¡i Ä‘á»ƒ kiá»ƒm tra tráº¡ng thÃ¡i thanh toÃ¡n.'
-          : 'KhÃ´ng thá»ƒ kiá»ƒm tra tráº¡ng thÃ¡i thanh toÃ¡n. Vui lÃ²ng thá»­ láº¡i.');
+          ? 'Vui lòng đăng nhập lại để kiểm tra trạng thái thanh toán.'
+          : 'Không thể kiểm tra trạng thái thanh toán. Vui lòng thử lại.');
       setPaymentError(msg);
     } finally {
       setCheckingStatus(false);
@@ -454,7 +540,7 @@ export default function Checkout() {
           errorMessage={paymentError}
         />
       )}
-      {paymentMethodsQuery.isError && paymentMethodsError && isHardBlock && (
+      {paymentMethodsQuery.isError && paymentMethodsError && isHardBlock && !hardBlockHandledRef.current && (
         <div
           className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-6"
           role="dialog"
@@ -474,7 +560,7 @@ export default function Checkout() {
             <div className="mt-6 flex justify-end">
               <Button
                 type="button"
-                onClick={() => navigate('/home', { replace: true })}
+                onClick={() => navigate('/', { replace: true })}
                 icon={<ArrowRight className="h-4 w-4" strokeWidth={2} />}
               >
                 Quay lại trang chủ
@@ -495,11 +581,11 @@ export default function Checkout() {
         <div>
           <form onSubmit={onPaymentSubmit} className="space-y-6">
             {paymentMethodsQuery.isLoading && (
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <div
                     key={i}
-                    className="h-[116px] animate-pulse rounded-3xl border border-outline-variant/20 bg-surface-container-high/40"
+                    className="h-[172px] animate-pulse rounded-2xl border border-outline-variant/20 bg-surface-container-high/40"
                   />
                 ))}
               </div>
@@ -551,23 +637,33 @@ export default function Checkout() {
                 </div>
               )}
 
+            {paymentError && !qrPayment && (
+              <div
+                className="flex gap-3 rounded-xl border border-cabin-burgundy/40 bg-cabin-burgundy/5 p-4"
+                role="alert"
+              >
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-cabin-burgundy" />
+                <p className="text-sm font-medium text-on-surface">{paymentError}</p>
+              </div>
+            )}
+
             {paymentMethodsQuery.isSuccess && groupsWithMethods.length > 0 && (
-              <div className="space-y-8">
+              <div className="space-y-8 rounded-3xl border border-luxury-gold/15 bg-white/95 p-6 shadow-sm">
                 {groupsWithMethods.map((group) => (
-                  <div key={group.type} className="space-y-3">
+                  <div key={group.type} className="space-y-4">
                     {showGroupLabels && (
-                      <p className="text-sm font-bold uppercase tracking-wider text-on-surface-variant">
+                      <p className="text-base font-black text-on-surface">
                         {group.label}
                       </p>
                     )}
-                    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
                       {group.methods.map((method) => (
                         <MethodIconButton
                           key={method.code}
                           method={method}
                           selected={selectedCode === method.code}
                           onSelect={() => setSelectedCode(method.code)}
-                          disabled={methodsDisabled || !method.supported}
+                          disabled={methodsDisabled || !isSelectableMethod(method)}
                         />
                       ))}
                     </div>
@@ -582,9 +678,9 @@ export default function Checkout() {
               </h2>
               <div className="space-y-4">
                 <div className="flex justify-between border-b border-outline-variant/20 pb-3">
-                  <span className="text-on-surface-variant">Giá vé gốc</span>
+                  <span className="text-on-surface-variant">Giá vé cơ bản</span>
                   <span className="font-bold text-on-surface">
-                    {formatCurrency(pricing.originalTotalPrice)}
+                    {formatCurrency(pricing.baseFare)}
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-outline-variant/20 pb-3">
@@ -638,10 +734,12 @@ export default function Checkout() {
 
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Link
-                to="/trips"
-                className="inline-flex items-center justify-center rounded-md border border-outline-variant/30 px-4 py-3 text-center text-sm font-semibold text-on-surface hover:bg-surface-container-low"
+                to="/booking/passengers/seats"
+                className={`inline-flex items-center justify-center rounded-md border border-outline-variant/30 px-4 py-3 text-center text-sm font-semibold text-on-surface hover:bg-surface-container-low ${
+                  payLaterSelected ? 'hidden' : ''
+                }`}
               >
-                Hoàn thành sau
+                Mua thêm
               </Link>
               <Button
                 type="submit"

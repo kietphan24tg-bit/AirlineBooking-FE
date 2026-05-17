@@ -1,5 +1,30 @@
 import { Check, Plane, PlaneTakeoff } from 'lucide-react';
-import type { FlightLeg } from '../../types/flight.types';
+import type { CabinClassKey, CabinFare, FlightLeg } from '../../types/flight.types';
+
+const CABIN_ORDER: CabinClassKey[] = ['Economy', 'Premium', 'Business', 'First'];
+
+function buildFareSlots(cabinFares: CabinFare[]) {
+  const fareByCabin = new Map(cabinFares.map((fare) => [fare.cabin, fare] as const));
+  return CABIN_ORDER.map((cabin) => {
+    const fare = fareByCabin.get(cabin);
+    if (fare) return fare;
+
+    return {
+      cabin,
+      priceLabel: '--',
+      priceAmount: 0,
+      originalPrice: 0,
+      originalPriceLabel: '',
+      finalPrice: 0,
+      finalPriceLabel: 'Unavailable',
+      discountAmount: 0,
+      discountPercent: null,
+      hasDiscount: false,
+      selectable: false,
+      benefits: [],
+    } satisfies CabinFare;
+  });
+}
 
 export interface FlightResultCardProps {
   leg: FlightLeg;
@@ -12,6 +37,7 @@ export default function FlightResultCard({
   pendingFareKey = null,
   onSelectFare,
 }: FlightResultCardProps) {
+  const fareSlots = buildFareSlots(leg.cabinFares);
   const subtitle = leg.aircraft.trim()
     ? `${leg.flightNumber} \u2022 ${leg.aircraft}`
     : leg.flightNumber;
@@ -77,7 +103,7 @@ export default function FlightResultCard({
       </div>
 
       <div className="grid grid-cols-1 divide-y divide-surface-container-high border-t border-surface-container-high sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
-        {leg.cabinFares.map((c) => (
+        {fareSlots.map((c) => (
           <div key={c.cabin} className="flex h-full flex-col">
             <div
               className={`flex h-full flex-col justify-between p-4 transition-colors lg:p-5 ${
@@ -151,7 +177,7 @@ export default function FlightResultCard({
               <ul className="mb-4 space-y-2">
                 {c.benefits.length === 0 ? (
                   <li className="text-[12px] text-on-surface-variant">
-                    See fare rules for details.
+                    {c.selectable ? 'See fare rules for details.' : 'Fare not available for this flight.'}
                   </li>
                 ) : (
                   c.benefits.map((benefit, idx) => (

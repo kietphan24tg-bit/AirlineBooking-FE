@@ -211,9 +211,12 @@ export default function PassengerInfo() {
 
   useEffect(() => {
     if (!hasValidRevalidation) {
+      if (!isPreviewMode) {
+        toast.error('Phiên giữ giá đã hết hạn. Vui lòng chọn lại chuyến bay.');
+      }
       navigate('/flights', { replace: true });
     }
-  }, [hasValidRevalidation, navigate]);
+  }, [hasValidRevalidation, isPreviewMode, navigate]);
 
   useEffect(() => {
     const nextPassengers =

@@ -520,9 +520,9 @@ export default function FlightResults() {
 
   if (!criteria || !summary) {
     return (
-      <div className="relative min-h-screen bg-surface text-on-surface antialiased">
+      <div className="relative flex min-h-screen flex-col bg-surface text-on-surface antialiased">
         <SiteHeader />
-        <main className="relative z-10 mx-auto max-w-480 px-4 pb-20 pt-28 md:px-12">
+        <main className="relative z-10 mx-auto flex-1 w-full max-w-480 px-4 pb-20 pt-28 md:px-12">
           <BookingStepper current="search" />
           <p className="mb-4 text-on-surface-variant">
             Missing or invalid search parameters. Start a new search from the home page.
@@ -540,9 +540,9 @@ export default function FlightResults() {
   }
 
   return (
-    <div className="relative min-h-screen bg-surface text-on-surface antialiased">
+    <div className="relative flex min-h-screen flex-col bg-surface text-on-surface antialiased">
       <SiteHeader />
-      <main className="relative z-10 mx-auto max-w-480 px-4 pb-16 pt-24 sm:px-6 md:px-12 md:pb-20 md:pt-28">
+      <main className="relative z-10 mx-auto flex-1 w-full max-w-480 px-4 pb-16 pt-24 sm:px-6 md:px-12 md:pb-20 md:pt-28">
         <BookingStepper current="search" />
 
         <div className="mb-8 flex flex-col gap-5 lg:mb-10 lg:flex-row lg:items-end lg:justify-between">

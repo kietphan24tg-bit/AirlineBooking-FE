@@ -442,8 +442,16 @@ export default function Landing() {
   const returnDateMin = departDate && departDate >= todayMin ? departDate : todayMin;
 
   useEffect(() => {
-    const state = location.state as { paymentExpired?: boolean } | null;
-    if (!state?.paymentExpired) return;
+    const state = location.state as
+      | { paymentExpired?: boolean; paymentRedirectMessage?: string }
+      | null;
+    if (!state) return;
+    if (state.paymentRedirectMessage) {
+      toast.error(state.paymentRedirectMessage);
+      navigate('/', { replace: true, state: null });
+      return;
+    }
+    if (!state.paymentExpired) return;
     toast.error('Phiên thanh toán đã hết hạn. Ghế/đặt chỗ không còn được giữ. Vui lòng đặt lại.');
     navigate('/', { replace: true, state: null });
   }, [location.state, navigate]);

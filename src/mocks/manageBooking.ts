@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   BookingCancellationConfirmRequest,
   BookingCancellationConfirmResponse,
   BookingCancellationPreviewResponse,
@@ -15,7 +15,7 @@ import type { SeatMapResponse } from '../types/flight.types';
  * Variants we want the UI to be able to render without a working backend.
  * Names mirror the backend booking statuses (`CONFIRMED`, `PENDING_PAYMENT`,
  * `CANCELLED`) plus a frontend-only `CHECKED_IN_LOCKED` view that BE does not
- * yet expose explicitly — see "follow-ups" notes in the chat.
+ * yet expose explicitly â€” see "follow-ups" notes in the chat.
  */
 export type ManageBookingMockVariant =
   | 'CONFIRMED'
@@ -112,7 +112,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'CONFIRMED':
       return {
         status: 'CONFIRMED',
-        statusLabel: 'Đã xác nhận',
+        statusLabel: 'ÄÃ£ xÃ¡c nháº­n',
         expiresAt: null,
         seatAssignmentStatus: 'BOOKED',
         includeSeats: true,
@@ -133,14 +133,14 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'CHECKIN_SINGLE':
       return {
         status: 'CONFIRMED',
-        statusLabel: 'Đã xác nhận',
+        statusLabel: 'ÄÃ£ xÃ¡c nháº­n',
         expiresAt: null,
         seatAssignmentStatus: 'BOOKED',
         includeSeats: true,
         includeServices: false,
         serviceFee: 0,
         seatFee: 120000,
-        includeReturnFlight: false,
+        includeReturnFlight: true,
         includeSecondaryPassenger: false,
         actions: {
           canSelectSeat: true,
@@ -154,7 +154,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'PENDING_PAYMENT':
       return {
         status: 'PENDING_PAYMENT',
-        statusLabel: 'Chờ thanh toán',
+        statusLabel: 'Chá» thanh toÃ¡n',
         expiresAt: EXPIRES_AT_PENDING,
         seatAssignmentStatus: 'HELD',
         includeSeats: false,
@@ -175,7 +175,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'CHECKED_IN_LOCKED':
       return {
         status: 'CHECKED_IN',
-        statusLabel: 'Đã check-in',
+        statusLabel: 'ÄÃ£ check-in',
         expiresAt: null,
         seatAssignmentStatus: 'CHECKED_IN',
         includeSeats: true,
@@ -196,7 +196,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'CANCELLED':
       return {
         status: 'CANCELLED',
-        statusLabel: 'Đã hủy',
+        statusLabel: 'ÄÃ£ há»§y',
         expiresAt: null,
         seatAssignmentStatus: 'CANCELLED',
         includeSeats: false,
@@ -302,6 +302,8 @@ function buildPassengerSegments(
   secondary: NonNullable<BookingLookupResponse['passengers'][number]['segments']>;
 } {
   const outboundEligible = overrides.status !== 'CANCELLED';
+  const returnEligible = overrides.status !== 'CANCELLED' && overrides.includeReturnFlight;
+  const returnCheckInOpen = overrides.includeReturnFlight && overrides.status !== 'CANCELLED';
 
   return {
     primary: [
@@ -316,12 +318,12 @@ function buildPassengerSegments(
       },
       {
         flightId: FLIGHT_RETURN_ID,
-        eligible: false,
-        checkInStatus: 'CHECKIN_NOT_OPEN',
+        eligible: returnEligible,
+        checkInStatus: returnCheckInOpen ? 'READY' : 'CHECKIN_NOT_OPEN',
         seatAssigned: seats.primary.some((seat) => seat.flightId === FLIGHT_RETURN_ID),
         seatNumber:
           seats.primary.find((seat) => seat.flightId === FLIGHT_RETURN_ID)?.seatNumber ?? null,
-        warnings: ['CHECKIN_NOT_OPEN'],
+        warnings: returnCheckInOpen ? [] : ['CHECKIN_NOT_OPEN'],
       },
     ].filter((segment) => overrides.includeReturnFlight || segment.flightId !== FLIGHT_RETURN_ID),
     secondary: [
@@ -336,12 +338,12 @@ function buildPassengerSegments(
       },
       {
         flightId: FLIGHT_RETURN_ID,
-        eligible: false,
-        checkInStatus: 'CHECKIN_NOT_OPEN',
+        eligible: returnEligible,
+        checkInStatus: returnCheckInOpen ? 'READY' : 'CHECKIN_NOT_OPEN',
         seatAssigned: seats.secondary.some((seat) => seat.flightId === FLIGHT_RETURN_ID),
         seatNumber:
           seats.secondary.find((seat) => seat.flightId === FLIGHT_RETURN_ID)?.seatNumber ?? null,
-        warnings: ['CHECKIN_NOT_OPEN'],
+        warnings: returnCheckInOpen ? [] : ['CHECKIN_NOT_OPEN'],
       },
     ].filter((segment) => overrides.includeReturnFlight || segment.flightId !== FLIGHT_RETURN_ID),
   };
@@ -598,12 +600,12 @@ export function getMockManageOptionsResponse(
       baggageCheckinKg: 20,
       journeyType: 'DOMESTIC',
       checkInWindow: {
-        status: 'NOT_OPEN',
-        opensAt: '2026-06-04T18:10:00+07:00',
+        status: overrides.includeReturnFlight ? 'OPEN' : 'NOT_OPEN',
+        opensAt: '2026-06-03T18:10:00+07:00',
         closesAt: '2026-06-05T17:30:00+07:00',
-        message: 'Online check-in is not open yet',
+        message: overrides.includeReturnFlight ? 'Online check-in is available' : 'Online check-in is not open yet',
       },
-      segmentStatus: 'BLOCKED',
+      segmentStatus: overrides.includeReturnFlight ? 'READY' : 'BLOCKED',
     },
   ] satisfies BookingManageOptionsResponse['itineraries'];
   const itineraries: BookingManageOptionsResponse['itineraries'] = itinerariesBase.filter(
@@ -883,7 +885,7 @@ export function getMockCancellationPreviewResponse(
   );
 
   if (selectedTickets.length === 0 || selectedPassengerIds.size === 0) {
-    throw new Error('Không tìm thấy vé hợp lệ để preview hủy chuyến.');
+    throw new Error('KhÃ´ng tÃ¬m tháº¥y vÃ© há»£p lá»‡ Ä‘á»ƒ preview há»§y chuyáº¿n.');
   }
 
   return {
@@ -947,7 +949,7 @@ export function getMockCancellationSelectionPreviewResponse(
     .filter((item): item is NonNullable<typeof item> => item != null);
 
   if (items.length === 0) {
-    throw new Error('Không tìm thấy lựa chọn hợp lệ để preview hủy chuyến.');
+    throw new Error('KhÃ´ng tÃ¬m tháº¥y lá»±a chá»n há»£p lá»‡ Ä‘á»ƒ preview há»§y chuyáº¿n.');
   }
 
   const summary = items.reduce(
@@ -986,10 +988,10 @@ export function getMockCancellationConfirmResponse(
   body: BookingCancellationConfirmRequest
 ): BookingCancellationConfirmResponse {
   if (variant === 'CANCELLED') {
-    throw new Error('Booking đã được hủy trước đó.');
+    throw new Error('Booking Ä‘Ã£ Ä‘Æ°á»£c há»§y trÆ°á»›c Ä‘Ã³.');
   }
   if (variant === 'CHECKED_IN_LOCKED') {
-    throw new Error('Booking đã check-in, không thể hủy.');
+    throw new Error('Booking Ä‘Ã£ check-in, khÃ´ng thá»ƒ há»§y.');
   }
 
   const preview = getMockCancellationSelectionPreviewResponse(variant, body);
@@ -997,6 +999,7 @@ export function getMockCancellationConfirmResponse(
     ...preview,
     cancellationStatus: 'SUCCESS',
     cancelledAt: '2026-05-20T10:15:00+07:00',
-    message: 'Hủy chuyến bay thành công.',
+    message: 'Há»§y chuyáº¿n bay thÃ nh cÃ´ng.',
   };
 }
+

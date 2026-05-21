@@ -34,8 +34,7 @@ export const MANAGE_BOOKING_MOCK_VARIANTS: readonly ManageBookingMockVariant[] =
 
 export function isManageBookingMockVariant(value: unknown): value is ManageBookingMockVariant {
   return (
-    typeof value === 'string' &&
-    (MANAGE_BOOKING_MOCK_VARIANTS as readonly string[]).includes(value)
+    typeof value === 'string' && (MANAGE_BOOKING_MOCK_VARIANTS as readonly string[]).includes(value)
   );
 }
 
@@ -76,7 +75,7 @@ const SEAT_ROW_SECONDARY_RETURN = {
 const SERVICE_MEAL = {
   serviceId: 5001,
   serviceType: 'MEAL',
-  serviceName: 'Suat an cao cap',
+  serviceName: 'Suất ăn cao cấp',
   optionId: 5101,
   optionName: 'Mi y bo bam',
   price: 120000,
@@ -85,7 +84,7 @@ const SERVICE_MEAL = {
 const SERVICE_BAGGAGE = {
   serviceId: 5002,
   serviceType: 'BAGGAGE',
-  serviceName: 'Hanh ly ky gui',
+  serviceName: 'Hành lý ký gửi',
   optionId: 5201,
   optionName: 'Goi 20kg',
   price: 350000,
@@ -112,7 +111,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'CONFIRMED':
       return {
         status: 'CONFIRMED',
-        statusLabel: 'ÄÃ£ xÃ¡c nháº­n',
+        statusLabel: 'Đã xác nhận',
         expiresAt: null,
         seatAssignmentStatus: 'BOOKED',
         includeSeats: true,
@@ -133,7 +132,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'CHECKIN_SINGLE':
       return {
         status: 'CONFIRMED',
-        statusLabel: 'ÄÃ£ xÃ¡c nháº­n',
+        statusLabel: 'Đã xác nhận',
         expiresAt: null,
         seatAssignmentStatus: 'BOOKED',
         includeSeats: true,
@@ -154,7 +153,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'PENDING_PAYMENT':
       return {
         status: 'PENDING_PAYMENT',
-        statusLabel: 'Chá» thanh toÃ¡n',
+        statusLabel: 'Chờ thanh toán',
         expiresAt: EXPIRES_AT_PENDING,
         seatAssignmentStatus: 'HELD',
         includeSeats: false,
@@ -175,7 +174,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'CHECKED_IN_LOCKED':
       return {
         status: 'CHECKED_IN',
-        statusLabel: 'ÄÃ£ check-in',
+        statusLabel: 'Đã check-in',
         expiresAt: null,
         seatAssignmentStatus: 'CHECKED_IN',
         includeSeats: true,
@@ -196,7 +195,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'CANCELLED':
       return {
         status: 'CANCELLED',
-        statusLabel: 'ÄÃ£ há»§y',
+        statusLabel: 'Đã hủy',
         expiresAt: null,
         seatAssignmentStatus: 'CANCELLED',
         includeSeats: false,
@@ -463,7 +462,9 @@ export function getMockBookingLookupResponse(
           includedSeatCategory: null,
         },
       },
-    ].filter((itinerary) => overrides.includeReturnFlight || itinerary.flightId !== FLIGHT_RETURN_ID),
+    ].filter(
+      (itinerary) => overrides.includeReturnFlight || itinerary.flightId !== FLIGHT_RETURN_ID
+    ),
     passengers: [
       {
         passengerId: PASSENGER_PRIMARY_ID,
@@ -495,7 +496,10 @@ export function getMockBookingLookupResponse(
         seatAssignments: seats.secondary,
         serviceSelections: services.secondary,
       },
-    ].filter((passenger) => overrides.includeSecondaryPassenger || passenger.passengerId !== PASSENGER_SECONDARY_ID),
+    ].filter(
+      (passenger) =>
+        overrides.includeSecondaryPassenger || passenger.passengerId !== PASSENGER_SECONDARY_ID
+    ),
     actions: overrides.actions,
   };
 }
@@ -554,7 +558,10 @@ export function getMockManageOptionsResponse(
       quantity: service.quantity,
       price: service.price,
     })),
-  ].filter((service) => overrides.includeSecondaryPassenger || service.passengerId !== PASSENGER_SECONDARY_ID);
+  ].filter(
+    (service) =>
+      overrides.includeSecondaryPassenger || service.passengerId !== PASSENGER_SECONDARY_ID
+  );
 
   const itinerariesBase = [
     {
@@ -603,7 +610,9 @@ export function getMockManageOptionsResponse(
         status: overrides.includeReturnFlight ? 'OPEN' : 'NOT_OPEN',
         opensAt: '2026-06-03T18:10:00+07:00',
         closesAt: '2026-06-05T17:30:00+07:00',
-        message: overrides.includeReturnFlight ? 'Online check-in is available' : 'Online check-in is not open yet',
+        message: overrides.includeReturnFlight
+          ? 'Online check-in is available'
+          : 'Online check-in is not open yet',
       },
       segmentStatus: overrides.includeReturnFlight ? 'READY' : 'BLOCKED',
     },
@@ -631,7 +640,10 @@ export function getMockManageOptionsResponse(
         passengerType: 'ADULT',
         segments: passengerSegments.secondary,
       },
-    ].filter((passenger) => overrides.includeSecondaryPassenger || passenger.passengerId !== PASSENGER_SECONDARY_ID),
+    ].filter(
+      (passenger) =>
+        overrides.includeSecondaryPassenger || passenger.passengerId !== PASSENGER_SECONDARY_ID
+    ),
     itineraries,
     seatAssignments,
     serviceSelections,
@@ -651,7 +663,10 @@ export function getMockSeatMapResponse(
   if (flightId === FLIGHT_OUTBOUND_ID && fareId !== FARE_OUTBOUND_ID) return null;
   if (flightId === FLIGHT_RETURN_ID && fareId !== FARE_RETURN_ID) return null;
 
-  const reservedSeats = new Map<number, { status: 'BOOKED' | 'UNAVAILABLE'; price: number | null }>();
+  const reservedSeats = new Map<
+    number,
+    { status: 'BOOKED' | 'UNAVAILABLE'; price: number | null }
+  >();
   if (flightId === FLIGHT_OUTBOUND_ID) {
     reservedSeats.set(SEAT_ROW_PRIMARY.seatId, { status: 'BOOKED', price: 100000 });
     reservedSeats.set(SEAT_ROW_SECONDARY.seatId, { status: 'BOOKED', price: 100000 });
@@ -725,14 +740,26 @@ export function getMockSeatMapResponse(
         currency: CURRENCY,
         reason: reserved ? 'SEAT_UNAVAILABLE' : isUnavailable ? 'SEAT_UNAVAILABLE' : null,
         displayPrice: {
-          type: reserved ? 'UNAVAILABLE' : isUnavailable ? 'UNAVAILABLE' : extraPrice > 0 ? 'PAID' : 'FREE',
+          type: reserved
+            ? 'UNAVAILABLE'
+            : isUnavailable
+              ? 'UNAVAILABLE'
+              : extraPrice > 0
+                ? 'PAID'
+                : 'FREE',
           text: reserved ? 'Unavailable' : `+${extraPrice.toLocaleString('vi-VN')} ${CURRENCY}`,
           amount: selectable ? extraPrice : null,
           currency: CURRENCY,
           description: '',
         },
         pricingBadge: {
-          code: reserved ? 'UNAVAILABLE' : isUnavailable ? 'UNAVAILABLE' : extraPrice > 0 ? 'PAID' : 'FREE',
+          code: reserved
+            ? 'UNAVAILABLE'
+            : isUnavailable
+              ? 'UNAVAILABLE'
+              : extraPrice > 0
+                ? 'PAID'
+                : 'FREE',
           label: reserved ? 'Unavailable' : extraPrice > 0 ? 'Paid' : 'Free',
           description: '',
         },
@@ -749,7 +776,8 @@ export function getMockSeatMapResponse(
     policyDisplay: {
       code: 'STANDARD',
       label: 'Standard seat selection',
-      description: 'Choose an available seat for the selected passenger before continuing check-in.',
+      description:
+        'Choose an available seat for the selected passenger before continuing check-in.',
     },
     includedSeatCategoryCode: null,
     currency: CURRENCY,
@@ -812,7 +840,10 @@ export function getMockBookingTicketsResponse(
             }
           : null,
       },
-    ].filter((ticket) => overrides.includeSecondaryPassenger || ticket.passenger.id !== PASSENGER_SECONDARY_ID),
+    ].filter(
+      (ticket) =>
+        overrides.includeSecondaryPassenger || ticket.passenger.id !== PASSENGER_SECONDARY_ID
+    ),
   };
 }
 
@@ -838,8 +869,10 @@ export function getMockCancellationPreviewResponse(
   const serviceRefundByPassenger = new Map(
     lookup.passengers.map((passenger) => [
       passenger.passengerId,
-      passenger.selections?.services?.reduce((sum, service) => sum + service.price * service.quantity, 0) ??
-        0,
+      passenger.selections?.services?.reduce(
+        (sum, service) => sum + service.price * service.quantity,
+        0
+      ) ?? 0,
     ])
   );
   const items = selectedTickets.map((ticket) => {
@@ -885,7 +918,7 @@ export function getMockCancellationPreviewResponse(
   );
 
   if (selectedTickets.length === 0 || selectedPassengerIds.size === 0) {
-    throw new Error('KhÃ´ng tÃ¬m tháº¥y vÃ© há»£p lá»‡ Ä‘á»ƒ preview há»§y chuyáº¿n.');
+    throw new Error('Không tìm thấy vé hợp lệ để xem trước hủy chuyến.');
   }
 
   return {
@@ -949,7 +982,7 @@ export function getMockCancellationSelectionPreviewResponse(
     .filter((item): item is NonNullable<typeof item> => item != null);
 
   if (items.length === 0) {
-    throw new Error('KhÃ´ng tÃ¬m tháº¥y lá»±a chá»n há»£p lá»‡ Ä‘á»ƒ preview há»§y chuyáº¿n.');
+    throw new Error('Không tìm thấy lựa chọn hợp lệ để xem trước hủy chuyến.');
   }
 
   const summary = items.reduce(
@@ -988,10 +1021,10 @@ export function getMockCancellationConfirmResponse(
   body: BookingCancellationConfirmRequest
 ): BookingCancellationConfirmResponse {
   if (variant === 'CANCELLED') {
-    throw new Error('Booking Ä‘Ã£ Ä‘Æ°á»£c há»§y trÆ°á»›c Ä‘Ã³.');
+    throw new Error('Booking đã được hủy trước đó.');
   }
   if (variant === 'CHECKED_IN_LOCKED') {
-    throw new Error('Booking Ä‘Ã£ check-in, khÃ´ng thá»ƒ há»§y.');
+    throw new Error('Booking đã check-in, không thể hủy.');
   }
 
   const preview = getMockCancellationSelectionPreviewResponse(variant, body);
@@ -999,7 +1032,6 @@ export function getMockCancellationConfirmResponse(
     ...preview,
     cancellationStatus: 'SUCCESS',
     cancelledAt: '2026-05-20T10:15:00+07:00',
-    message: 'Há»§y chuyáº¿n bay thÃ nh cÃ´ng.',
+    message: 'Hủy chuyến bay thành công.',
   };
 }
-

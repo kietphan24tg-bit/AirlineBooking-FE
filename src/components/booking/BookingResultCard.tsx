@@ -218,9 +218,6 @@ function PassengerCard({
               <span>{formatPassengerType(passenger.passengerType)}</span>
               <span className="h-1 w-1 rounded-full bg-[#cbd5e1]" />
               <span>{passenger.dateOfBirth}</span>
-              {/*
-              {formatPassengerType(passenger.passengerType)} • {passenger.dateOfBirth}
-              */}
             </div>
           </div>
 
@@ -309,6 +306,7 @@ export default function BookingResultCard() {
     )
   );
   const enabledManageActions = manageActions.filter((action) => action.enabled);
+
   return (
     <div className="flex flex-row gap-4 overflow-hidden bg-surface-container-lowest/90">
       <div className="flex flex-1 flex-col gap-4">
@@ -345,8 +343,9 @@ export default function BookingResultCard() {
               <h1 className="mt-1 text-lg font-bold text-on-surface">{booking.pnrCode}</h1>
             </div>
 
-            <div
-              className="relative flex cursor-pointer flex-col"
+            <button
+              type="button"
+              className="relative flex cursor-pointer flex-col text-left"
               onClick={() => setShowPriceDetail(!showPriceDetail)}
             >
               <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
@@ -405,7 +404,7 @@ export default function BookingResultCard() {
                   </div>
                 </div>
               ) : null}
-            </div>
+            </button>
           </div>
         </div>
 
@@ -430,7 +429,7 @@ export default function BookingResultCard() {
                   <div className="flex w-23 items-center justify-center rounded-sm bg-secondary-fixed">
                     {isReturn ? 'Chuyến về' : 'Chuyến đi'}
                   </div>
-                  <p className="text-xs text-on-surface-variant">Date</p>
+                  <p className="text-xs text-on-surface-variant">Ngày</p>
                   <p className="font-bold text-on-surface">{dateStr}</p>
                 </div>
 
@@ -467,9 +466,7 @@ export default function BookingResultCard() {
         </div>
 
         <div className="flex flex-col rounded-xl bg-white p-7">
-          <p className="mb-2 text-base font-semibold text-[#0f172a]">
-            Danh sách hành khách
-          </p>
+          <p className="mb-2 text-base font-semibold text-[#0f172a]">Danh sách hành khách</p>
           <p className="mb-6 max-w-2xl text-sm leading-6 text-[#64748b]">
             Thông tin liên hệ và dịch vụ đi kèm của từng hành khách.
           </p>

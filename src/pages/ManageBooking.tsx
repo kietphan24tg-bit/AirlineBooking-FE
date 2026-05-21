@@ -58,20 +58,26 @@ export default function ManageBooking() {
         setShowResult(true);
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : 'Khong the tai du lieu mock booking.'
+          error instanceof Error ? error.message : 'Không thể tải dữ liệu booking mẫu.'
         );
       } finally {
         setSearching(false);
       }
     })();
-  }, [clearBooking, setBookingLookup, setLookupCriteria, setManageOptions, setMockManageBookingMode]);
+  }, [
+    clearBooking,
+    setBookingLookup,
+    setLookupCriteria,
+    setManageOptions,
+    setMockManageBookingMode,
+  ]);
 
   const onSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     const pnrTrimmed = pnr.trim();
     const nameTrimmed = name.trim();
     if (!pnrTrimmed || !nameTrimmed) {
-      alert('Please enter your booking code (PNR) and full name.');
+      alert('Vui lòng nhập mã đặt chỗ (PNR) và họ của hành khách.');
       return;
     }
 
@@ -100,9 +106,7 @@ export default function ManageBooking() {
     } catch (error) {
       setManageOptions(null);
       setShowResult(false);
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Khong tim thay thong tin dat cho.'
-      );
+      setErrorMessage(error instanceof Error ? error.message : 'Không tìm thấy thông tin đặt chỗ.');
     } finally {
       setSearching(false);
     }
@@ -115,10 +119,10 @@ export default function ManageBooking() {
         <div className="flex flex-row items-center justify-between">
           <div>
             <h1 className="mb-2 font-headline text-3xl font-black text-on-surface md:text-5xl">
-              Manage Your Booking
+              Quản lý đặt chỗ
             </h1>
             <p className="mb-5 text-on-surface-variant">
-              Nhap thong tin chinh xac theo giay to tuy than de lam thu tuc suon se.
+              Nhập thông tin chính xác theo giấy tờ tùy thân để làm thủ tục suôn sẻ.
             </p>
           </div>
           {showResult ? (
@@ -126,7 +130,7 @@ export default function ManageBooking() {
               onClick={() => setShowResult(false)}
               className="flex h-full w-50 items-center justify-center gap-2 rounded-lg bg-midnight-burgundy py-4 font-headline font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-95"
             >
-              Tim kiem dat cho moi
+              Tìm kiếm đặt chỗ mới
             </button>
           ) : null}
         </div>
@@ -142,7 +146,7 @@ export default function ManageBooking() {
                   htmlFor="pnr"
                   className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
                 >
-                  BOOKING CODE (PNR)
+                  MÃ ĐẶT CHỖ (PNR)
                 </label>
                 <div className="flex items-center gap-2">
                   <Ticket className="h-5 w-5 shrink-0 text-midnight-burgundy" strokeWidth={1.75} />
@@ -150,7 +154,7 @@ export default function ManageBooking() {
                     id="pnr"
                     name="pnr"
                     type="text"
-                    placeholder="Enter your booking code"
+                    placeholder="Nhập mã đặt chỗ"
                     value={pnr}
                     onChange={(e) => setPnr(e.target.value)}
                     autoComplete="off"
@@ -164,7 +168,7 @@ export default function ManageBooking() {
                   htmlFor="name"
                   className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
                 >
-                  Last name (as on ID)
+                  HỌ (THEO GIẤY TỜ)
                 </label>
                 <div className="flex items-center gap-2">
                   <User className="h-5 w-5 shrink-0 text-midnight-burgundy" strokeWidth={1.75} />
@@ -172,7 +176,7 @@ export default function ManageBooking() {
                     id="name"
                     name="name"
                     type="text"
-                    placeholder="Enter your last name"
+                    placeholder="Nhập họ của hành khách"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     autoComplete="name"
@@ -187,7 +191,7 @@ export default function ManageBooking() {
                 disabled={searching}
                 className="flex h-full w-full items-center justify-center gap-2 rounded-lg bg-midnight-burgundy py-4 font-headline font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {searching ? 'SEARCHING...' : 'SEARCH FLIGHTS'}
+                {searching ? 'ĐANG TÌM KIẾM...' : 'TÌM ĐẶT CHỖ'}
                 <ArrowRight className="h-5 w-5" strokeWidth={2} />
               </button>
             </div>

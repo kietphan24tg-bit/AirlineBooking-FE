@@ -74,7 +74,6 @@ function buildSummary(c: FlightSearchCriteria): { routeTitle: string; metaLine: 
   if (c.child > 0) pax.push(c.child === 1 ? '1 Child' : `${c.child} Children`);
   if (c.infant > 0) pax.push(c.infant === 1 ? '1 Infant' : `${c.infant} Infants`);
   bits.push(pax.join(', '));
-  if (c.promoCode) bits.push(`Promo ${c.promoCode}`);
   return { routeTitle, metaLine: bits.join(' \u2022 ') };
 }
 
@@ -553,6 +552,11 @@ export default function FlightResults() {
             <p className="max-w-3xl text-sm font-medium text-on-surface-variant sm:text-base">
               {summary.metaLine}
             </p>
+            {criteria?.promoCode?.trim() ? (
+              <p className="mt-2 text-xs font-bold uppercase tracking-widest text-on-surface-variant/80">
+                Promo code: {criteria.promoCode.trim()}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:w-auto lg:justify-end">

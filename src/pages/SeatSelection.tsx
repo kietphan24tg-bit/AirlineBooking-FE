@@ -798,6 +798,7 @@ type BookingSummaryPanelProps = {
     passengerType: string | null;
   }>;
   fareAmountLabel: string | null;
+  discountAmountLabel: string | null;
   taxFeeTotalLabel: string | null;
   taxFeeItems: Array<{ label: string; value: string }>;
   seatItems: Array<{
@@ -806,6 +807,8 @@ type BookingSummaryPanelProps = {
     seatNumber: string;
     seatTypeLabel: string | null;
     seatCategoryLabel: string | null;
+    surchargeAmount: number;
+    currency: string;
     surchargeLabel: string;
   }>;
   serviceItems: Array<{
@@ -824,6 +827,10 @@ function bookingPassengerTypeLabel(value: string | null | undefined): string {
   if (value === 'CHILD') return 'Trẻ em';
   if (value === 'INFANT') return 'Em bé';
   return 'Hành khách';
+}
+
+function formatSummarySeatLabel(seatNumber: string): string {
+  return seatNumber.replace(/^Seat\s+/i, '').trim();
 }
 
 function BookingSummarySection({
@@ -856,7 +863,9 @@ function BookingSummarySection({
           {title}
         </span>
         <span className="flex items-center gap-2">
-          {value ? <span className="text-sm font-black text-secondary">{value}</span> : null}
+          {value ? (
+            <span className="text-sm font-black tabular-nums text-secondary">{value}</span>
+          ) : null}
           {interactive ? (
             open ? (
               <ChevronUp className="h-4 w-4 text-on-surface-variant" />
@@ -879,6 +888,7 @@ function BookingSummaryPanel({
   passengersCount,
   passengerItems,
   fareAmountLabel,
+  discountAmountLabel,
   taxFeeTotalLabel,
   taxFeeItems,
   seatItems,
@@ -893,7 +903,15 @@ function BookingSummaryPanel({
     },
     new Map<string, BookingSummaryPanelProps['passengerItems']>()
   );
-  const itineraryParts = itineraryLabel?.split('✈').map((part) => part.trim()) ?? [];
+  const summarySeatTotalLabel =
+    seatItems.length > 0
+      ? formatMoney(
+          seatItems.reduce((total, seat) => total + seat.surchargeAmount, 0),
+          seatItems[0]?.currency ?? 'VND'
+        )
+      : null;
+
+  const itineraryParts = itineraryLabel?.split('âœˆ').map((part) => part.trim()) ?? [];
   const itineraryFrom = itineraryParts[0] ?? itineraryLabel ?? 'Tom tat';
   const itineraryTo = itineraryParts[1] ?? null;
 
@@ -953,6 +971,12 @@ function BookingSummaryPanel({
                 <p className="font-semibold text-on-surface">Vé chuyến đi</p>
                 <span className="font-black text-secondary">{fareAmountLabel}</span>
               </div>
+              {discountAmountLabel ? (
+                <div className="mt-3 flex items-center justify-between gap-3 border-t border-outline-variant/10 pt-3 text-sm">
+                  <p className="font-semibold text-on-surface">Giảm giá</p>
+                  <span className="font-black text-secondary">-{discountAmountLabel}</span>
+                </div>
+              ) : null}
             </div>
           </BookingSummarySection>
         ) : null}
@@ -976,34 +1000,31 @@ function BookingSummaryPanel({
         {seatItems.length > 0 ? (
           <BookingSummarySection
             title="Ghế"
-            value={
-              seatItems.length === 1 ? seatItems[0].surchargeLabel : `${seatItems.length} ghế đã chọn`
-            }
+            value={summarySeatTotalLabel}
           >
             <div className="space-y-3">
               {seatItems.map((seat) => (
                 <div
                   key={`${seat.passengerId}-${seat.seatNumber}`}
-                  className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-4 py-3"
+                  className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-4 py-3.5"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-xs font-black uppercase tracking-[0.14em] text-on-surface-variant">
+                      <span className="inline-flex rounded-full bg-outline-variant/10 px-2.5 py-1 text-[0.68rem] font-black uppercase tracking-[0.14em] text-on-surface-variant">
                         {seat.passengerName}
+                      </span>
+                      <p className="mt-3 text-sm font-semibold text-on-surface">
+                        Ghế đã chọn
                       </p>
-                      <p className="mt-2 font-bold text-midnight-burgundy">Ghế đã chọn</p>
-                      <p className="mt-1 text-[1.35rem] font-black leading-none text-secondary">
-                        {seat.seatNumber}
+                      <p className="mt-1 text-lg font-bold leading-none tabular-nums text-on-surface">
+                        {formatSummarySeatLabel(seat.seatNumber)}
                       </p>
-                      {(seat.seatTypeLabel || seat.seatCategoryLabel) ? (
-                        <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-on-surface-variant">
-                          {[seat.seatTypeLabel, seat.seatCategoryLabel].filter(Boolean).join(' | ')}
-                        </p>
-                      ) : null}
                     </div>
-                    <span className="shrink-0 text-sm font-black text-secondary">
-                      {seat.surchargeLabel}
-                    </span>
+                    <div className="shrink-0 text-right">
+                      <span className="block text-sm font-black tabular-nums text-secondary">
+                        {seat.surchargeLabel}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1017,22 +1038,30 @@ function BookingSummaryPanel({
               {serviceItems.map((service) => (
                 <div
                   key={`${service.passengerId}-${service.serviceName}-${service.optionName}`}
-                  className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-4 py-3"
+                  className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-4 py-3.5"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-xs font-black uppercase tracking-[0.14em] text-on-surface-variant">
+                      <span className="inline-flex rounded-full bg-outline-variant/10 px-2.5 py-1 text-[0.68rem] font-black uppercase tracking-[0.14em] text-on-surface-variant">
                         {service.passengerName}
+                      </span>
+                      <p className="mt-3 text-base font-semibold leading-snug text-on-surface">
+                        {service.serviceName}
                       </p>
-                      <p className="mt-2 font-bold text-midnight-burgundy">{service.serviceName}</p>
                       <p className="mt-1 text-sm text-on-surface">
                         {service.optionName}
-                        {service.quantity > 1 ? ` x${service.quantity}` : ''}
+                        {service.quantity > 1 ? (
+                          <span className="ml-2 inline-flex rounded-full bg-secondary/10 px-2 py-0.5 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-secondary">
+                            x{service.quantity}
+                          </span>
+                        ) : null}
                       </p>
                     </div>
-                    <span className="shrink-0 text-sm font-black text-secondary">
-                      {service.totalPriceLabel}
-                    </span>
+                    <div className="shrink-0 text-right">
+                      <span className="block text-sm font-black tabular-nums text-secondary">
+                        {service.totalPriceLabel}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1042,17 +1071,14 @@ function BookingSummaryPanel({
       </div>
 
       {totalPriceLabel ? (
-        <div className="mt-6 rounded-[1.4rem] border border-midnight-burgundy/15 bg-[linear-gradient(135deg,rgba(124,9,55,0.06),rgba(199,154,46,0.16))] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className="text-[0.6875rem] font-black uppercase tracking-[0.18em] text-midnight-burgundy">
-                Tổng thanh toán
-              </p>
-              <p className="mt-2 text-3xl font-black leading-none text-secondary">{totalPriceLabel}</p>
-            </div>
-            <span className="rounded-full bg-white/80 px-3 py-1 text-[0.6875rem] font-bold uppercase tracking-[0.14em] text-midnight-burgundy">
-                Sẵn sàng thanh toán
-            </span>
+        <div className="mt-6 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-4 py-4">
+          <div className="grid grid-cols-1 gap-y-3">
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-midnight-burgundy">
+              Tổng thanh toán
+            </p>
+            <p className="text-[1.95rem] font-black leading-none tabular-nums text-secondary">
+              {totalPriceLabel}
+            </p>
           </div>
         </div>
       ) : null}
@@ -1228,24 +1254,31 @@ export default function SeatSelection() {
   );
 
   const assignSeatMutation = useMutation({
-    mutationFn: (vars: { bookingId: string | number; passengerId: number; seatId: number }) =>
+    mutationFn: (vars: {
+      bookingId: string | number;
+      passengerId: number;
+      seatId: number;
+      passengerName: string;
+    }) =>
       bookingService.putSeatAssignments(vars.bookingId, {
         assignments: [{ passengerId: vars.passengerId, seatId: vars.seatId }],
       }),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       if (bookingResponse) {
-        applySeatAssignmentResult(data);
+        applySeatAssignmentResult(data, [variables.passengerId]);
       }
       void seatMapQuery.refetch();
       if (isManageBookingFlow) {
         void manageOptionsQuery.refetch();
       }
-      toast.success('Da xac nhan ghe ngoi.');
+      toast.success(`Da xac nhan ghe ngoi cho ${variables.passengerName}.`);
     },
-    onError: (error) => {
+    onError: (error, variables) => {
       toast.error(
         getBookingSessionExpiredMessage(error) ??
-          (error instanceof Error ? error.message : 'Khong the gan ghe. Vui long thu lai.')
+          (error instanceof Error
+            ? error.message
+            : `Khong the gan ghe cho ${variables.passengerName}. Vui long thu lai.`)
       );
     },
   });
@@ -1256,50 +1289,60 @@ export default function SeatSelection() {
       passengerId: number;
       fromSeatId: number;
       toSeatId: number;
+      passengerName: string;
     }) =>
       bookingService.patchSeatAssignment(vars.bookingId, {
         passengerId: vars.passengerId,
         fromSeatId: vars.fromSeatId,
         toSeatId: vars.toSeatId,
       }),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       if (bookingResponse) {
-        applySeatAssignmentResult(data);
+        applySeatAssignmentResult(data, [variables.passengerId]);
       }
       void seatMapQuery.refetch();
       if (isManageBookingFlow) {
         void manageOptionsQuery.refetch();
       }
-      toast.success('Da doi ghe ngoi.');
+      toast.success(`Da doi ghe ngoi cho ${variables.passengerName}.`);
     },
-    onError: (error) => {
+    onError: (error, variables) => {
       toast.error(
         getBookingSessionExpiredMessage(error) ??
-          (error instanceof Error ? error.message : 'Khong the doi ghe. Vui long thu lai.')
+          (error instanceof Error
+            ? error.message
+            : `Khong the doi ghe cho ${variables.passengerName}. Vui long thu lai.`)
       );
     },
   });
 
   const cancelSeatMutation = useMutation({
-    mutationFn: (vars: { bookingId: string | number; passengerId: number; seatId: number }) =>
+    mutationFn: (vars: {
+      bookingId: string | number;
+      passengerId: number;
+      seatId: number;
+      passengerName: string;
+    }) =>
       bookingService.deleteSeatAssignments(vars.bookingId, {
         assignments: [{ passengerId: vars.passengerId, seatId: vars.seatId }],
       }),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       if (bookingResponse) {
-        applySeatAssignmentResult(data);
+        applySeatAssignmentResult(data, [variables.passengerId]);
       }
       setSelectedSeat(null);
       void seatMapQuery.refetch();
       if (isManageBookingFlow) {
         void manageOptionsQuery.refetch();
       }
-      toast.success('Da huy ghe ngoi.');
+      toast.success(`Da huy ghe ngoi cho ${variables.passengerName}.`);
     },
-    onError: (error) => {
+    onError: (error, variables) => {
       toast.error(
         getBookingSessionExpiredMessage(error) ??
-          (error instanceof Error ? error.message : 'Khong the huy ghe. Vui long thu lai.')
+          (error instanceof Error
+            ? error.message
+            : `Khong the huy ghe cho ${variables.passengerName}. Vui long thu lai.`)
       );
     },
   });
@@ -1564,7 +1607,16 @@ export default function SeatSelection() {
     [passengerSource, passengers]
   );
   const summaryFareAmountLabel =
-    pricing != null ? formatMoney(pricing.baseFare, pricing.currency || 'VND') : null;
+    pricing != null
+      ? formatMoney(
+          Math.max(0, (pricing.baseFare ?? 0) - (pricing.discountAmount ?? 0)),
+          pricing.currency || 'VND'
+        )
+      : null;
+  const summaryDiscountAmountLabel =
+    pricing != null && (pricing.discountAmount ?? 0) > 0
+      ? formatMoney(pricing.discountAmount, pricing.currency || 'VND')
+      : null;
   const summaryTaxFeeItems = pricing
     ? [
         { label: 'Thuế', value: formatMoney(pricing.taxes, pricing.currency || 'VND') },
@@ -1608,6 +1660,8 @@ export default function SeatSelection() {
           seatNumber,
           seatTypeLabel: seatCell?.seatTypeDisplay?.label ?? null,
           seatCategoryLabel: seatCell?.seatCategoryDisplay?.label ?? null,
+          surchargeAmount,
+          currency,
           surchargeLabel: formatMoney(surchargeAmount, currency),
         };
       })
@@ -1620,6 +1674,17 @@ export default function SeatSelection() {
     seatMapQuery.data?.rows,
     summaryPassengerItems,
   ]);
+  const summarySeatTotalAmount = summarySeatItems.reduce(
+    (total, seat) => total + seat.surchargeAmount,
+    0
+  );
+  const summarySeatTotalLabel =
+    summarySeatItems.length > 0
+      ? formatMoney(
+          summarySeatTotalAmount,
+          summarySeatItems[0]?.currency ?? pricing?.currency ?? manageOptions?.currency ?? 'VND'
+        )
+      : null;
   const summaryServiceItems = useMemo(() => {
     const next: Array<{
       passengerId: number;
@@ -1747,6 +1812,7 @@ export default function SeatSelection() {
     if (bookingIdNumeric == null) return;
     const passengerId = activePassengerId;
     if (passengerId == null) return;
+    const passengerName = activePassengerProfile?.fullName?.trim() || `Hanh khach ${activePassengerIndex + 1}`;
     if (assignInFlight.current) return;
     assignInFlight.current = true;
     const currentSeatId = confirmedSeatAssignment?.seatId;
@@ -1757,6 +1823,7 @@ export default function SeatSelection() {
           passengerId,
           fromSeatId: currentSeatId,
           toSeatId: seat.seatId,
+          passengerName,
         },
         {
           onSettled: () => {
@@ -1768,7 +1835,7 @@ export default function SeatSelection() {
     }
 
     assignSeatMutation.mutate(
-      { bookingId: bookingIdNumeric, passengerId, seatId: seat.seatId },
+      { bookingId: bookingIdNumeric, passengerId, seatId: seat.seatId, passengerName },
       {
         onSettled: () => {
           assignInFlight.current = false;
@@ -1783,10 +1850,11 @@ export default function SeatSelection() {
     if (bookingIdNumeric == null) return;
     const passengerId = activePassengerId;
     if (passengerId == null) return;
+    const passengerName = activePassengerProfile?.fullName?.trim() || `Hanh khach ${activePassengerIndex + 1}`;
     if (assignInFlight.current) return;
     assignInFlight.current = true;
     cancelSeatMutation.mutate(
-      { bookingId: bookingIdNumeric, passengerId, seatId: seat.seatId },
+      { bookingId: bookingIdNumeric, passengerId, seatId: seat.seatId, passengerName },
       {
         onSettled: () => {
           assignInFlight.current = false;
@@ -1972,6 +2040,7 @@ export default function SeatSelection() {
                 passengersCount={passengers.length}
                 passengerItems={summaryPassengerItems}
                 fareAmountLabel={summaryFareAmountLabel}
+                discountAmountLabel={summaryDiscountAmountLabel}
                 taxFeeTotalLabel={summaryTaxFeeTotalLabel}
                 taxFeeItems={summaryTaxFeeItems}
                 seatItems={summarySeatItems}

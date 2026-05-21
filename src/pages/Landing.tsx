@@ -24,6 +24,8 @@ import { toast } from 'sonner';
 import MarketingNav from '../components/layout/MarketingNav';
 import SiteFooter from '../components/layout/SiteFooter';
 import { airportService, type Airport } from '../services/airport.service';
+import { flightService } from '../services/flight.service';
+import type { FlightSearchCriteria, FlightSearchFilters } from '../types/flight.types';
 import { buildFlightResultsSearch, airportLabel } from '../utils/flightSearchUrl';
 
 //const HERO_WING = 'https://lh3.googleusercontent.com/aida-public/AB6AXuDhbnWHSXyZEIc2WLBnhOd8qPY45Y8JYORsa-L0oq7JPRn9I4oA9_W7OkkNhMz9zF8JD3bicGF4GrcM506MBeGkuKj4o9A6fHVkHaAMgcqxRr2xqWTzrWEdOFtljcl0_8qdOxagUmxX_oTMFP_3N2YaRyH0RGeVAXtvJvdRu6KhMFIrrcWTVzmVFSeaeNi7vqxkms17m4cZWkdLwWtdz1zZ17qMDCUZ_3_1otxOuya4kNUb_BN5Wc7E4sM56D5JgO3fZytmZtSOOyJU';
@@ -428,6 +430,7 @@ export default function Landing() {
     infants: 0,
   });
   const [promoCode, setPromoCode] = useState('');
+  const [searchingFlights, setSearchingFlights] = useState(false);
 
   const activePickerContext = isFromPicking ? 'from' : isToPicking ? 'to' : null;
   const airportExcludedFromPicker =
@@ -469,7 +472,7 @@ export default function Landing() {
     });
   }, [tripType, returnDateMin]);
 
-  const onSearch = () => {
+  const onSearch = async () => {
     if (
       !fromAirport ||
       !toAirport ||
@@ -483,7 +486,7 @@ export default function Landing() {
       return;
     }
 
-    const qs = buildFlightResultsSearch({
+    const criteria: FlightSearchCriteria = {
       tripType: tripType === 'round-trip' ? 'ROUND_TRIP' : 'ONE_WAY',
       from: fromAirport.code,
       to: toAirport.code,
@@ -495,7 +498,54 @@ export default function Landing() {
       promoCode: promoCode.trim() || undefined,
       fromCity: fromAirport.city,
       toCity: toAirport.city,
-    });
+    };
+
+    const qs = buildFlightResultsSearch(criteria);
+
+    const trimmedPromoCode = criteria.promoCode?.trim();
+    if (!trimmedPromoCode) {
+      navigate(`/flights?${qs}`);
+      return;
+    }
+
+    const defaultFilters: FlightSearchFilters = {
+      connectionFilter: 'ANY',
+      departureTimeBucket: 'ANY',
+      arrivalTimeBucket: 'ANY',
+      cabinClasses: [],
+      maxBudget: null,
+    };
+
+    setSearchingFlights(true);
+    try {
+      const preview = await flightService.searchFlights(criteria, defaultFilters, 'Recommended');
+      const fareStatuses = [...preview.outbound, ...preview.inbound].flatMap((leg) =>
+        leg.cabinFares.map((fare) => ({
+          status: fare.promoStatus?.trim().toUpperCase() ?? '',
+          message: fare.promoMessage?.trim() ?? '',
+          hasDiscount: fare.hasDiscount,
+        }))
+      );
+
+      const promoApplied = fareStatuses.some((fare) => fare.hasDiscount || fare.status === 'APPLIED');
+      if (!promoApplied) {
+        const promoMessage =
+          fareStatuses.find((fare) => fare.message)?.message ||
+          'Promo code is invalid or not applicable for this search.';
+        toast.error(promoMessage);
+        return;
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Unable to validate promo code right now. Please try again.'
+      );
+      return;
+    } finally {
+      setSearchingFlights(false);
+    }
+
     navigate(`/flights?${qs}`);
   };
 
@@ -941,14 +991,14 @@ export default function Landing() {
                         min={todayMin}
                         value={departDate}
                         onChange={(e) => setDepartDate(e.target.value)}
-                        className={`search-widget-date-input relative z-[1] min-w-0 w-full border-none bg-transparent p-0 font-headline text-lg font-bold shadow-none outline-none focus:border-transparent focus:shadow-none focus:outline-none focus:ring-0 focus-visible:outline-none ${
+                        className={`search-widget-date-input relative z-[1] min-w-0 w-full border-none bg-transparent p-0 font-headline text-lg font-bold shadow-none outline-none transition-opacity focus:border-transparent focus:shadow-none focus:outline-none focus:ring-0 focus-visible:outline-none ${
                           departDate
-                            ? 'text-midnight-burgundy'
-                            : 'search-widget-date-input--empty text-transparent'
+                            ? 'text-midnight-burgundy opacity-100'
+                            : 'search-widget-date-input--empty text-transparent opacity-0'
                         }`}
                       />
                       {!departDate ? (
-                        <span className="pointer-events-none absolute left-0 top-1/2 z-0 -translate-y-1/2 font-headline text-base font-bold text-midnight-burgundy/45 group-focus-within:hidden sm:text-lg">
+                        <span className="pointer-events-none absolute left-0 top-1/2 z-0 -translate-y-1/2 font-headline text-base font-bold text-midnight-burgundy/45 sm:text-lg">
                           mm/dd/yyyy
                         </span>
                       ) : null}
@@ -986,14 +1036,14 @@ export default function Landing() {
                           min={returnDateMin}
                           value={returnDate}
                           onChange={(e) => setReturnDate(e.target.value)}
-                          className={`search-widget-date-input relative z-[1] min-w-0 w-full border-none bg-transparent p-0 font-headline text-lg font-bold shadow-none outline-none focus:border-transparent focus:shadow-none focus:outline-none focus:ring-0 focus-visible:outline-none ${
+                          className={`search-widget-date-input relative z-[1] min-w-0 w-full border-none bg-transparent p-0 font-headline text-lg font-bold shadow-none outline-none transition-opacity focus:border-transparent focus:shadow-none focus:outline-none focus:ring-0 focus-visible:outline-none ${
                             returnDate
-                              ? 'text-midnight-burgundy'
-                              : 'search-widget-date-input--empty text-transparent'
+                              ? 'text-midnight-burgundy opacity-100'
+                              : 'search-widget-date-input--empty text-transparent opacity-0'
                           }`}
                         />
                         {!returnDate ? (
-                          <span className="pointer-events-none absolute left-0 top-1/2 z-0 -translate-y-1/2 font-headline text-base font-bold text-midnight-burgundy/45 group-focus-within:hidden sm:text-lg">
+                          <span className="pointer-events-none absolute left-0 top-1/2 z-0 -translate-y-1/2 font-headline text-base font-bold text-midnight-burgundy/45 sm:text-lg">
                             mm/dd/yyyy
                           </span>
                         ) : null}
@@ -1199,11 +1249,12 @@ export default function Landing() {
                     data-booking-search-submit
                     onClick={onSearch}
                     type="submit"
+                    disabled={searchingFlights}
                     onFocus={() => setSearchSubmitFocused(true)}
                     onBlur={() => setSearchSubmitFocused(false)}
-                    className="flex min-h-11 w-full shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-midnight-burgundy px-4 py-3 font-headline text-sm font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-95 sm:min-h-13 sm:py-4 sm:text-base"
+                    className="flex min-h-11 w-full shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-midnight-burgundy px-4 py-3 font-headline text-sm font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70 sm:min-h-13 sm:py-4 sm:text-base"
                   >
-                    SEARCH FLIGHTS
+                    {searchingFlights ? 'SEARCHING...' : 'SEARCH FLIGHTS'}
                     <ArrowRight className="h-5 w-5" strokeWidth={2} />
                   </button>
                 </div>

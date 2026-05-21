@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { toast } from 'sonner';
 import AmbientSweep from '../components/layout/AmbientSweep';
 import BookingStepper from '../components/booking/BookingStepper';
@@ -68,9 +69,34 @@ function paymentMethodsErrorMessage(status: number | undefined, data: unknown): 
   return fromApi || 'Không thể tải phương thức thanh toán. Vui lòng thử lại.';
 }
 
+function isPaymentRetryTooFastMessage(message: string | null | undefined): boolean {
+  if (!message) return false;
+  return (
+    /please wait\s*15\s*seconds/i.test(message) ||
+    /another payment/i.test(message) ||
+    /thao tác quá nhanh/i.test(message) ||
+    /vui lòng thử lại sau 15 giây/i.test(message)
+  );
+}
+
+function getPaymentRetryTooFastToastMessage(message: string | null | undefined): string {
+  if (isPaymentRetryTooFastMessage(message)) {
+    return 'Bạn đang thao tác quá nhanh. Vui lòng thử lại sau 15 giây.';
+  }
+  return message?.trim() || 'Bạn đang thao tác quá nhanh. Vui lòng thử lại sau 15 giây.';
+}
+
 function resolvePaymentId(payment: CreatePaymentResponse | null): string | number | null {
   const id = payment?.payment?.id ?? payment?.payment?.paymentId;
   return id == null ? null : id;
+}
+
+function normalizePaymentMethodCode(method: string | null | undefined): string | null {
+  const normalized = method?.trim().toUpperCase();
+  if (!normalized) return null;
+  if (normalized === 'PAYOS_QR') return 'PAYOS';
+  if (normalized === 'STRIPE') return 'STRIPE_CARD';
+  return normalized;
 }
 
 function isStripeMethod(method?: PaymentMethod | null): boolean {
@@ -83,6 +109,40 @@ function isPayLaterMethod(method?: PaymentMethod | null): boolean {
 
 function isSelectableMethod(method?: PaymentMethod | null): boolean {
   return !!method && (method.supported || isPayLaterMethod(method));
+}
+
+function parseIsoTime(value: unknown): number | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+}
+
+function isDisabledByUnsupportedImplementation(method?: PaymentMethod | null): boolean {
+  if (!method) return false;
+  const code = method.code.trim().toUpperCase();
+  return code === 'VNPAY' || code === 'MOMO';
+}
+
+function resolveDisabledMethodReason(
+  method: PaymentMethod,
+  bookingExpiresAtMs: number | null
+): string | null {
+  if (isSelectableMethod(method)) return null;
+  if (isDisabledByUnsupportedImplementation(method)) {
+    return 'Phương thức này hiện chưa được hỗ trợ.';
+  }
+
+  const remainingMs = bookingExpiresAtMs != null ? bookingExpiresAtMs - Date.now() : null;
+  if (
+    remainingMs != null &&
+    remainingMs > 0 &&
+    remainingMs < 5 * 60 * 1000 &&
+    !isPayLaterMethod(method)
+  ) {
+    return 'Tạo thanh toán không khả dụng.';
+  }
+
+  return 'Phương thức này hiện không khả dụng cho đặt chỗ này.';
 }
 
 function resolveRedirectUrl(res: CreatePaymentResponse): string | null {
@@ -116,45 +176,58 @@ function MethodIconButton({
   selected,
   onSelect,
   disabled,
+  disabledReason,
 }: {
   method: PaymentMethod;
   selected: boolean;
   onSelect: () => void;
   disabled: boolean;
+  disabledReason?: string | null;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const src = resolvePaymentIconUrl(method.icon);
   const title = formatPaymentMethodName(method);
 
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      className={`group flex min-h-[172px] flex-col rounded-2xl border bg-white px-4 py-4 text-center shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60 ${
-        selected
-          ? 'border-cabin-burgundy ring-2 ring-cabin-burgundy/15'
-          : 'border-outline-variant/20 hover:border-luxury-gold/35'
-      }`}
-      onClick={onSelect}
-    >
-      <div className="flex min-h-[88px] flex-1 items-center justify-center rounded-xl bg-surface-container-low/40 px-3 py-3">
-        {src && !imgFailed ? (
-          <img
-            src={src}
-            alt={method.label}
-            className="h-12 w-full object-contain object-center md:h-14"
-            onError={() => setImgFailed(true)}
-          />
-        ) : (
-          <div className="flex items-center justify-center">
-            <CreditCard className="h-9 w-9 text-on-surface-variant" strokeWidth={1.5} />
-          </div>
-        )}
-      </div>
-      <div className="mt-3 flex min-h-[48px] items-start justify-center">
-        <span className="text-sm font-semibold leading-5 text-on-surface">{title}</span>
-      </div>
-    </button>
+    <div className="group relative" title={disabledReason ?? undefined}>
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={disabledReason ? `${title}. ${disabledReason}` : title}
+        className={`flex min-h-[172px] w-full flex-col rounded-2xl border bg-white px-4 py-4 text-center shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60 ${
+          selected
+            ? 'border-cabin-burgundy ring-2 ring-cabin-burgundy/15'
+            : 'border-outline-variant/20 hover:border-luxury-gold/35'
+        }`}
+        onClick={onSelect}
+      >
+        <div className="flex min-h-[88px] flex-1 items-center justify-center rounded-xl bg-surface-container-low/40 px-3 py-3">
+          {src && !imgFailed ? (
+            <img
+              src={src}
+              alt={method.label}
+              className="h-12 w-full object-contain object-center md:h-14"
+              onError={() => setImgFailed(true)}
+            />
+          ) : (
+            <div className="flex items-center justify-center">
+              <CreditCard className="h-9 w-9 text-on-surface-variant" strokeWidth={1.5} />
+            </div>
+          )}
+        </div>
+        <div className="mt-3 flex min-h-[48px] items-start justify-center">
+          <span className="text-sm font-semibold leading-5 text-on-surface">{title}</span>
+        </div>
+      </button>
+      {disabled && disabledReason ? (
+        <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-64 -translate-x-1/2 rounded-xl border border-outline-variant/20 bg-white px-3 py-2 text-left text-xs font-medium text-on-surface shadow-lg group-hover:block">
+          {disabledReason}
+        </div>
+      ) : null}
+      {disabled && disabledReason ? (
+        <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-0.5 hidden h-3 w-3 -translate-x-1/2 rotate-45 border-l border-t border-outline-variant/20 bg-white group-hover:block" />
+      ) : null}
+    </div>
   );
 }
 
@@ -162,8 +235,10 @@ export default function Checkout() {
   const navigate = useNavigate();
   const paymentRedirectingRef = useRef(false);
   const hardBlockHandledRef = useRef(false);
+  const acceptTermsRef = useRef<HTMLInputElement | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
-  const [qrPayment, setQrPayment] = useState<CreatePaymentResponse | null>(null);
+  const [resumeVersion, setResumeVersion] = useState(0);
+  const [activePayment, setActivePayment] = useState<CreatePaymentResponse | null>(null);
   const [creatingPayment, setCreatingPayment] = useState(false);
   const [regeneratingPayment, setRegeneratingPayment] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
@@ -189,11 +264,19 @@ export default function Checkout() {
       acceptTerms: false,
     },
   });
+  const acceptTermsField = register('acceptTerms');
 
   const paymentMethodsQuery = useQuery({
     queryKey: ['payment-methods', bookingId],
-    queryFn: () => getPaymentMethods(bookingId as string | number),
+    queryFn: () =>
+      getPaymentMethods(bookingId as string | number, {
+        onlySupported: false,
+      }),
     enabled: Boolean(bookingId),
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   const groups = useMemo<PaymentMethodGroup[]>(
@@ -229,6 +312,7 @@ export default function Checkout() {
 
   const pricing = bookingResponse?.pricing ?? null;
   const hasBooking = Boolean(bookingResponse);
+  const bookingExpiresAtMs = parseIsoTime(bookingResponse?.raw?.booking?.expiresAt);
 
   useEffect(() => {
     if (!hasBooking && !paymentRedirectingRef.current) {
@@ -236,33 +320,79 @@ export default function Checkout() {
     }
   }, [hasBooking, navigate]);
 
+  const resetTransientPaymentState = () => {
+    setCreatingPayment(false);
+    setRegeneratingPayment(false);
+    setCheckingStatus(false);
+    setCancelingPayment(false);
+  };
+
+  const refreshReturnFromPaymentState = () => {
+    resetTransientPaymentState();
+    setValue('acceptTerms', Boolean(acceptTermsRef.current?.checked));
+    setResumeVersion((current) => current + 1);
+  };
+
   useEffect(() => {
-    const resetTransientPaymentState = () => {
-      setCreatingPayment(false);
-      setRegeneratingPayment(false);
-      setCheckingStatus(false);
-      setCancelingPayment(false);
+    const refreshPaymentMethods = () => {
+      if (!bookingId) return;
+      void paymentMethodsQuery.refetch();
     };
 
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted) {
-        resetTransientPaymentState();
+        refreshReturnFromPaymentState();
       }
+      refreshPaymentMethods();
     };
 
     const handleFocus = () => {
-      resetTransientPaymentState();
+      refreshReturnFromPaymentState();
+      refreshPaymentMethods();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      refreshReturnFromPaymentState();
+      refreshPaymentMethods();
     };
 
     window.addEventListener('pageshow', handlePageShow);
     window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       window.removeEventListener('pageshow', handlePageShow);
       window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [bookingId, paymentMethodsQuery.refetch]);
 
-  const acceptTerms = watch('acceptTerms');
+  const clearActivePaymentState = (options?: { keepError?: boolean }) => {
+    setActivePayment(null);
+    setStatusOverride(null);
+    setCheckingStatus(false);
+    setCancelingPayment(false);
+    setRegeneratingPayment(false);
+    if (!options?.keepError) {
+      setPaymentError(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!activePayment || !selectedCode) return;
+    const activeMethod = normalizePaymentMethodCode(activePayment.payment.method);
+    const requestedMethod = normalizePaymentMethodCode(selectedCode);
+    if (!activeMethod || !requestedMethod || activeMethod === requestedMethod) return;
+    setActivePayment(null);
+    setStatusOverride(null);
+    setCheckingStatus(false);
+    setCancelingPayment(false);
+    setRegeneratingPayment(false);
+    setPaymentError(null);
+  }, [activePayment, selectedCode]);
+
+  const watchedAcceptTerms = watch('acceptTerms');
+  const acceptTerms = watchedAcceptTerms || Boolean(acceptTermsRef.current?.checked);
 
   const errorStatus = axios.isAxiosError(paymentMethodsQuery.error)
     ? paymentMethodsQuery.error.response?.status
@@ -328,6 +458,7 @@ export default function Checkout() {
     e.preventDefault();
     if (!canPay || !acceptTerms || !bookingId || !selectedCode) return;
     void (async () => {
+      clearActivePaymentState({ keepError: true });
       setPaymentError(null);
       setStatusOverride(null);
       setCreatingPayment(true);
@@ -339,15 +470,17 @@ export default function Checkout() {
         if (stripeFlow) {
           const redirectUrl = resolveRedirectUrl(res);
           if (redirectUrl) {
-            setCreatingPayment(false);
+            paymentRedirectingRef.current = true;
+            flushSync(() => {
+              refreshReturnFromPaymentState();
+            });
             window.location.assign(redirectUrl);
             return;
           }
           const fallbackMsg = 'Không nhận được liên kết thanh toán Stripe. Vui lòng thử lại.';
           setPaymentError(fallbackMsg);
-          setQrPayment(null);
+          setActivePayment(null);
           toast.error(fallbackMsg);
-          setCreatingPayment(false);
           return;
         }
         if (payLaterFlow) {
@@ -363,18 +496,16 @@ export default function Checkout() {
             if (mockPaymentVariant) {
               nextParams.set('mockPaymentVariant', mockPaymentVariant);
             }
-            setCreatingPayment(false);
             navigate(`/booking/checkout/result?${nextParams.toString()}`);
             return;
           }
           const fallbackMsg = 'KhÃ´ng nháº­n Ä‘Æ°á»£c phiÃªn thanh toÃ¡n tráº£ sau. Vui lÃ²ng thá»­ láº¡i.';
           setPaymentError(fallbackMsg);
-          setQrPayment(null);
+          setActivePayment(null);
           toast.error(fallbackMsg);
-          setCreatingPayment(false);
           return;
         }
-        setQrPayment(res);
+        setActivePayment(res);
       } catch (err) {
         const status = axios.isAxiosError(err) ? err.response?.status : undefined;
         const data = axios.isAxiosError(err) ? err.response?.data : undefined;
@@ -385,8 +516,15 @@ export default function Checkout() {
             : status === 404 || status === 409 || status === 410
               ? paymentMethodsErrorMessage(status, data)
               : 'Không thể tạo mã thanh toán. Vui lòng thử lại.');
+        if (isPaymentRetryTooFastMessage(msg)) {
+          setPaymentError(null);
+          setActivePayment(null);
+          toast.error(getPaymentRetryTooFastToastMessage(msg));
+          setCreatingPayment(false);
+          return;
+        }
         setPaymentError(msg);
-        setQrPayment(null);
+        setActivePayment(null);
         toast.error(msg);
         setCreatingPayment(false);
         return;
@@ -396,9 +534,7 @@ export default function Checkout() {
   };
 
   const handleClosePayment = () => {
-    setQrPayment(null);
-    setStatusOverride(null);
-    setPaymentError(null);
+    clearActivePaymentState();
   };
 
   const handleRegenerate = async () => {
@@ -408,7 +544,7 @@ export default function Checkout() {
     setRegeneratingPayment(true);
     try {
       const res = await createPaymentLink({ bookingId, method: selectedCode });
-      setQrPayment(res);
+      setActivePayment(res);
     } catch (err) {
       const status = axios.isAxiosError(err) ? err.response?.status : undefined;
       const data = axios.isAxiosError(err) ? err.response?.data : undefined;
@@ -426,7 +562,7 @@ export default function Checkout() {
   };
 
   const handleCheckStatus = async () => {
-    const paymentId = resolvePaymentId(qrPayment);
+    const paymentId = resolvePaymentId(activePayment);
     if (paymentId == null) return;
     setPaymentError(null);
     setCheckingStatus(true);
@@ -449,7 +585,7 @@ export default function Checkout() {
   };
 
   const handleCancelPayment = async () => {
-    const paymentId = resolvePaymentId(qrPayment);
+    const paymentId = resolvePaymentId(activePayment);
     if (paymentId == null) {
       setPaymentError('Không tìm thấy mã thanh toán để hủy.');
       return;
@@ -457,20 +593,9 @@ export default function Checkout() {
     setPaymentError(null);
     setCancelingPayment(true);
     try {
-      const res = await cancelPayment(paymentId);
-      setStatusOverride('CANCELLED');
-      setQrPayment((current) =>
-        current
-          ? {
-              ...current,
-              payment: {
-                ...current.payment,
-                ...res,
-                id: res.id ?? res.paymentId ?? current.payment.id,
-              },
-            }
-          : current
-      );
+      await cancelPayment(paymentId);
+      handleClosePayment();
+      toast.success('Da huy thanh toan.');
     } catch (err) {
       const status = axios.isAxiosError(err) ? err.response?.status : undefined;
       const data = axios.isAxiosError(err) ? err.response?.data : undefined;
@@ -486,7 +611,7 @@ export default function Checkout() {
   };
 
   const handlePaymentExpired = async () => {
-    const paymentId = resolvePaymentId(qrPayment);
+    const paymentId = resolvePaymentId(activePayment);
     if (paymentId == null) return;
     setPaymentError(null);
     setCheckingStatus(true);
@@ -525,9 +650,9 @@ export default function Checkout() {
     <div className="relative min-h-screen bg-surface font-body text-on-surface antialiased">
       <AmbientSweep />
       <SiteHeader />
-      {qrPayment && (
+      {activePayment && (
         <PaymentCard
-          data={qrPayment}
+          data={activePayment}
           onClose={handleClosePayment}
           onRegenerate={handleRegenerate}
           onCheckStatus={handleCheckStatus}
@@ -637,7 +762,7 @@ export default function Checkout() {
                 </div>
               )}
 
-            {paymentError && !qrPayment && (
+            {paymentError && !activePayment && (
               <div
                 className="flex gap-3 rounded-xl border border-cabin-burgundy/40 bg-cabin-burgundy/5 p-4"
                 role="alert"
@@ -663,6 +788,7 @@ export default function Checkout() {
                           method={method}
                           selected={selectedCode === method.code}
                           onSelect={() => setSelectedCode(method.code)}
+                          disabledReason={resolveDisabledMethodReason(method, bookingExpiresAtMs)}
                           disabled={methodsDisabled || !isSelectableMethod(method)}
                         />
                       ))}
@@ -716,7 +842,11 @@ export default function Checkout() {
               <label className="flex items-start gap-4">
                 <input
                   type="checkbox"
-                  {...register('acceptTerms')}
+                  {...acceptTermsField}
+                  ref={(node) => {
+                    acceptTermsField.ref(node);
+                    acceptTermsRef.current = node;
+                  }}
                   className="mt-1 h-4 w-4 cursor-pointer"
                 />
                 <span className="text-sm text-on-surface-variant">
@@ -742,11 +872,12 @@ export default function Checkout() {
                 Mua thêm
               </Link>
               <Button
+                key={`checkout-submit-${resumeVersion}-${selectedCode ?? 'none'}-${acceptTerms ? '1' : '0'}-${creatingPayment ? 'busy' : 'idle'}`}
                 type="submit"
                 disabled={!acceptTerms || !canPay || creatingPayment}
                 icon={<ArrowRight className="h-4 w-4" strokeWidth={2} />}
               >
-                {creatingPayment ? 'Đang tạo mã...' : 'Thanh toán ngay'}
+                {creatingPayment ? 'Đang xử lý...' : 'Thanh toán ngay'}
               </Button>
             </div>
           </form>

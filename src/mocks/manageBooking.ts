@@ -75,7 +75,7 @@ const SEAT_ROW_SECONDARY_RETURN = {
 const SERVICE_MEAL = {
   serviceId: 5001,
   serviceType: 'MEAL',
-  serviceName: 'Suất ăn cao cấp',
+  serviceName: 'Premium meal',
   optionId: 5101,
   optionName: 'Mi y bo bam',
   price: 120000,
@@ -84,7 +84,7 @@ const SERVICE_MEAL = {
 const SERVICE_BAGGAGE = {
   serviceId: 5002,
   serviceType: 'BAGGAGE',
-  serviceName: 'Hành lý ký gửi',
+  serviceName: 'Checked baggage',
   optionId: 5201,
   optionName: 'Goi 20kg',
   price: 350000,
@@ -111,7 +111,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'CONFIRMED':
       return {
         status: 'CONFIRMED',
-        statusLabel: 'Đã xác nhận',
+        statusLabel: 'Confirmed',
         expiresAt: null,
         seatAssignmentStatus: 'BOOKED',
         includeSeats: true,
@@ -132,7 +132,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'CHECKIN_SINGLE':
       return {
         status: 'CONFIRMED',
-        statusLabel: 'Đã xác nhận',
+        statusLabel: 'Confirmed',
         expiresAt: null,
         seatAssignmentStatus: 'BOOKED',
         includeSeats: true,
@@ -153,7 +153,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'PENDING_PAYMENT':
       return {
         status: 'PENDING_PAYMENT',
-        statusLabel: 'Chờ thanh toán',
+        statusLabel: 'Pending payment',
         expiresAt: EXPIRES_AT_PENDING,
         seatAssignmentStatus: 'HELD',
         includeSeats: false,
@@ -174,7 +174,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'CHECKED_IN_LOCKED':
       return {
         status: 'CHECKED_IN',
-        statusLabel: 'Đã check-in',
+        statusLabel: 'Checked in',
         expiresAt: null,
         seatAssignmentStatus: 'CHECKED_IN',
         includeSeats: true,
@@ -195,7 +195,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
     case 'CANCELLED':
       return {
         status: 'CANCELLED',
-        statusLabel: 'Đã hủy',
+        statusLabel: 'Cancelled',
         expiresAt: null,
         seatAssignmentStatus: 'CANCELLED',
         includeSeats: false,
@@ -396,10 +396,10 @@ export function getMockBookingLookupResponse(
         departureTime: '2026-06-01T08:30:00+07:00',
         arrivalTime: '2026-06-01T10:35:00+07:00',
         departureAirportCode: 'SGN',
-        departureCity: 'TP. Hồ Chí Minh',
+        departureCity: 'Ho Chi Minh City',
         departureTerminal: 'T1',
         arrivalAirportCode: 'HAN',
-        arrivalCity: 'Hà Nội',
+        arrivalCity: 'Hanoi',
         arrivalTerminal: 'T1',
         flightStatus: 'SCHEDULED',
         fareName: 'Eco',
@@ -432,10 +432,10 @@ export function getMockBookingLookupResponse(
         departureTime: '2026-06-05T18:10:00+07:00',
         arrivalTime: '2026-06-05T20:20:00+07:00',
         departureAirportCode: 'HAN',
-        departureCity: 'Hà Nội',
+        departureCity: 'Hanoi',
         departureTerminal: 'T1',
         arrivalAirportCode: 'SGN',
-        arrivalCity: 'TP. Hồ Chí Minh',
+        arrivalCity: 'Ho Chi Minh City',
         arrivalTerminal: 'T1',
         flightStatus: 'SCHEDULED',
         fareName: 'Eco',
@@ -571,10 +571,10 @@ export function getMockManageOptionsResponse(
       departureTime: '2026-06-01T08:30:00+07:00',
       arrivalTime: '2026-06-01T10:35:00+07:00',
       departureAirportCode: 'SGN',
-      departureCity: 'TP. Hồ Chí Minh',
+      departureCity: 'Ho Chi Minh City',
       departureTerminal: 'T1',
       arrivalAirportCode: 'HAN',
-      arrivalCity: 'Hà Nội',
+      arrivalCity: 'Hanoi',
       arrivalTerminal: 'T1',
       fareName: 'Economy Flex',
       cabinClass: 'Economy',
@@ -596,10 +596,10 @@ export function getMockManageOptionsResponse(
       departureTime: '2026-06-05T18:10:00+07:00',
       arrivalTime: '2026-06-05T20:20:00+07:00',
       departureAirportCode: 'HAN',
-      departureCity: 'Hà Nội',
+      departureCity: 'Hanoi',
       departureTerminal: 'T1',
       arrivalAirportCode: 'SGN',
-      arrivalCity: 'TP. Hồ Chí Minh',
+      arrivalCity: 'Ho Chi Minh City',
       arrivalTerminal: 'T1',
       fareName: 'Economy Flex',
       cabinClass: 'Economy',
@@ -918,7 +918,7 @@ export function getMockCancellationPreviewResponse(
   );
 
   if (selectedTickets.length === 0 || selectedPassengerIds.size === 0) {
-    throw new Error('Không tìm thấy vé hợp lệ để xem trước hủy chuyến.');
+    throw new Error('No valid ticket was found for the cancellation preview.');
   }
 
   return {
@@ -982,7 +982,7 @@ export function getMockCancellationSelectionPreviewResponse(
     .filter((item): item is NonNullable<typeof item> => item != null);
 
   if (items.length === 0) {
-    throw new Error('Không tìm thấy lựa chọn hợp lệ để xem trước hủy chuyến.');
+    throw new Error('No valid selection was found for the cancellation preview.');
   }
 
   const summary = items.reduce(
@@ -1021,10 +1021,10 @@ export function getMockCancellationConfirmResponse(
   body: BookingCancellationConfirmRequest
 ): BookingCancellationConfirmResponse {
   if (variant === 'CANCELLED') {
-    throw new Error('Booking đã được hủy trước đó.');
+    throw new Error('This booking has already been cancelled.');
   }
   if (variant === 'CHECKED_IN_LOCKED') {
-    throw new Error('Booking đã check-in, không thể hủy.');
+    throw new Error('This booking has already been checked in and cannot be cancelled.');
   }
 
   const preview = getMockCancellationSelectionPreviewResponse(variant, body);
@@ -1032,6 +1032,6 @@ export function getMockCancellationConfirmResponse(
     ...preview,
     cancellationStatus: 'SUCCESS',
     cancelledAt: '2026-05-20T10:15:00+07:00',
-    message: 'Hủy chuyến bay thành công.',
+    message: 'Flight cancellation completed successfully.',
   };
 }

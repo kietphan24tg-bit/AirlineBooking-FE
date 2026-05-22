@@ -160,10 +160,10 @@ export default function AdditionalService({
     return (
       <div className="rounded-[1.75rem] border border-luxury-gold/15 bg-surface-container-lowest p-8 text-center shadow-[0_18px_45px_rgba(62,16,30,0.08)]">
         <p className="font-headline text-xl font-black text-midnight-burgundy">
-          Khong co dich vu bo sung
+          No additional services
         </p>
         <p className="mt-2 text-sm text-on-surface-variant">
-          Khong co dich vu bo sung kha dung cho chuyen bay va hang ve nay.
+          No additional services are available for this flight and fare.
         </p>
       </div>
     );
@@ -220,8 +220,8 @@ export default function AdditionalService({
                       </span>
                       <span className="mt-1 block text-sm text-on-surface-variant">
                         {service.selectionMode === 'MULTIPLE'
-                          ? 'Chon nhieu tuy chon'
-                          : 'Chon mot tuy chon'}
+                          ? 'Select multiple options'
+                          : 'Select one option'}
                       </span>
                     </span>
                     <span
@@ -249,7 +249,7 @@ export default function AdditionalService({
             Back to overview
           </button>
           <Button onClick={onConfirm} disabled={confirmLoading} className="h-12 w-full">
-            {confirmLoading ? 'Dang luu...' : 'Xac nhan'}
+            {confirmLoading ? 'Saving...' : 'Confirm'}
           </Button>
         </div>
       </div>
@@ -272,8 +272,8 @@ export default function AdditionalService({
               </p>
               <p className="mt-1 text-sm text-on-surface-variant">
                 {activeService.selectionMode === 'MULTIPLE'
-                  ? 'Co the chon nhieu dich vu trong nhom nay.'
-                  : 'Chi co the chon mot dich vu trong nhom nay.'}
+                  ? 'You can select multiple services in this group.'
+                  : 'You can select only one service in this group.'}
               </p>
             </div>
           </div>
@@ -300,19 +300,19 @@ export default function AdditionalService({
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h3 className="font-headline text-lg font-black text-midnight-burgundy">
+                    <h3 className="break-words pr-2 font-headline text-lg font-black text-midnight-burgundy">
                       {option.name}
                     </h3>
                     <p className="mt-2 text-sm font-bold text-secondary">{option.priceLabel}</p>
                   </div>
                   <span
-                    className={`inline-flex rounded-full border px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.18em] transition-colors ${
+                    className={`shrink-0 inline-flex rounded-full border px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.18em] transition-colors ${
                       selected
                         ? 'border-midnight-burgundy bg-midnight-burgundy text-white'
                         : 'border-midnight-burgundy/15 text-midnight-burgundy/70 group-hover:border-midnight-burgundy/35'
                     }`}
                   >
-                    {selected ? 'Da chon' : 'Chon'}
+                    {selected ? 'Selected' : 'Select'}
                   </span>
                 </div>
 

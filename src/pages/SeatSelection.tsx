@@ -22,12 +22,17 @@ import AdditionalService from '../components/booking/AdditionalService';
 import { useBookingStore } from '../stores/useBookingStore';
 import { bookingService } from '../services/booking.service';
 import { flightService } from '../services/flight.service';
-
-type SeatContext = {
-  flightId: number | null;
-  fareId: number | null;
-  fareCode: string | null;
-};
+import {
+  pickNumericId,
+  resolveConfirmedSeatAssignments,
+  resolveManageBookingId,
+  resolvePassengerDisplayData,
+  resolveSeatContextFromSources,
+  type ResolvedSeatAssignment,
+  type SeatContext,
+} from './seat-selection/seatSelectionResolvers';
+import { useSeatAssignmentActions } from './seat-selection/useSeatAssignmentActions';
+import { useSeatSelectionSummaryModel } from './seat-selection/useSeatSelectionSummaryModel';
 
 type ServiceSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 type ServicesByPassengerId = Record<number, SelectedServiceOption[]>;
@@ -42,51 +47,6 @@ function passengersFromNavigationState(
     fullName: [p.lastName, p.firstName].filter(Boolean).join(' ').trim(),
     seat: undefined,
   }));
-}
-
-function pickNumericId(value: unknown): number | null {
-  const numeric = typeof value === 'string' ? Number(value) : value;
-  return typeof numeric === 'number' && Number.isFinite(numeric) && numeric > 0 ? numeric : null;
-}
-
-function resolveSeatContext(source: unknown): SeatContext {
-  if (!source || typeof source !== 'object') {
-    return {
-      flightId: null,
-      fareId: null,
-      fareCode: null,
-    };
-  }
-
-  const raw = source as Record<string, unknown>;
-  const selectedFareContext =
-    raw.selectedFareContext && typeof raw.selectedFareContext === 'object'
-      ? (raw.selectedFareContext as Record<string, unknown>)
-      : null;
-  const rawResponse =
-    raw.raw && typeof raw.raw === 'object' ? (raw.raw as Record<string, unknown>) : null;
-  const flight =
-    raw.flight && typeof raw.flight === 'object'
-      ? (raw.flight as Record<string, unknown>)
-      : rawResponse?.flight && typeof rawResponse.flight === 'object'
-        ? (rawResponse.flight as Record<string, unknown>)
-        : null;
-  const fare =
-    raw.fare && typeof raw.fare === 'object'
-      ? (raw.fare as Record<string, unknown>)
-      : rawResponse?.fare && typeof rawResponse.fare === 'object'
-        ? (rawResponse.fare as Record<string, unknown>)
-        : null;
-
-  return {
-    flightId: pickNumericId(raw.flightId ?? selectedFareContext?.flightId ?? flight?.flightId),
-    fareId: pickNumericId(raw.fareId ?? selectedFareContext?.fareId ?? fare?.fareId),
-    fareCode:
-      typeof (raw.fareCode ?? selectedFareContext?.fareCode ?? fare?.code ?? fare?.fareCode) ===
-      'string'
-        ? String(raw.fareCode ?? selectedFareContext?.fareCode ?? fare?.code ?? fare?.fareCode)
-        : null,
-  };
 }
 
 function formatMoney(amount: number, currency: string): string {
@@ -326,10 +286,10 @@ function createInitialServiceStatusMap(
 }
 
 function getServiceStatusLabel(status: ServiceSaveStatus): string {
-  if (status === 'saved') return 'Da luu';
-  if (status === 'saving') return 'Dang luu';
+  if (status === 'saved') return 'Saved';
+  if (status === 'saving') return 'Saving';
   if (status === 'error') return 'Loi';
-  return 'Chua luu';
+  return 'Not saved';
 }
 
 function getBookingSessionExpiredMessage(error: unknown): string | null {
@@ -344,7 +304,7 @@ function getBookingSessionExpiredMessage(error: unknown): string | null {
       : null;
 
   return status === 409 || status === 410
-    ? 'Phiên đặt chỗ đã hết hạn. Vui lòng đặt lại chuyến bay.'
+    ? 'This booking session has expired. Please book the flight again.'
     : null;
 }
 
@@ -384,20 +344,20 @@ function resolveSeatSelectionBlockReason(params: {
       isTerminalBookingStatus(bookingLookupStatus) ||
       isExpiredTimestamp(bookingLookupExpiresAt)
     ) {
-      return 'Đặt chỗ này đã hết hạn hoặc không còn khả dụng để chọn ghế và dịch vụ.';
+      return 'This booking has expired or is no longer available for seat and service selection.';
     }
     return null;
   }
 
   if (draftExpired) {
-    return 'Phiên giữ giá đã hết hạn. Vui lòng chọn lại chuyến bay.';
+    return 'Your fare hold has expired. Please select your flight again.';
   }
 
   if (
     isTerminalBookingStatus(bookingResponseStatus) ||
     isExpiredTimestamp(bookingResponseExpiresAt)
   ) {
-    return 'Đặt chỗ của bạn đã hết hạn hoặc không còn khả dụng. Vui lòng đặt lại chuyến bay.';
+    return 'Your booking has expired or is no longer available. Please book the flight again.';
   }
 
   return null;
@@ -416,7 +376,7 @@ type SummaryPanelProps = {
   serviceCurrency: string;
 };
 
-export function SummaryPanel({
+function LegacySummaryPanel({
   seatContext,
   totalPriceLabel,
   passengersCount,
@@ -430,7 +390,7 @@ export function SummaryPanel({
 }: SummaryPanelProps) {
   return (
     <div className="w-full rounded-xl border border-luxury-gold/20 bg-surface-container-lowest p-5 shadow-lg xl:sticky xl:top-28 xl:w-[23rem]">
-      <h3 className="mb-4 font-headline text-lg font-black text-on-surface">Tóm tắt</h3>
+      <h3 className="mb-4 font-headline text-lg font-black text-on-surface">Summary</h3>
       <p className="text-sm text-on-surface-variant">
         Flight #{seatContext.flightId ?? '--'}
         {seatContext.fareCode ? ` | ${seatContext.fareCode}` : ''}
@@ -439,14 +399,14 @@ export function SummaryPanel({
       {totalPriceLabel ? (
         <p className="mt-6 text-2xl font-black text-secondary">{totalPriceLabel}</p>
       ) : null}
-      <p className="text-xs text-on-surface-variant">{passengersCount} khach</p>
+      <p className="text-xs text-on-surface-variant">{passengersCount} passengers</p>
 
       {(confirmedSeatNumber || activePassengerServices.length > 0) ? (
         <div className="mt-5 space-y-3 border-t border-outline-variant/20 pt-4">
           {confirmedSeatNumber ? (
             <div className="flex items-start justify-between gap-3 text-sm">
               <div>
-                <p className="font-bold text-midnight-burgundy">Ghế</p>
+                <p className="font-bold text-midnight-burgundy">Seat</p>
                 <p className="text-on-surface-variant">
                   {confirmedSeatNumber}
                   {(seatDetails?.seatCategoryDisplay?.label ??
@@ -469,7 +429,7 @@ export function SummaryPanel({
             <div className="space-y-2">
               <div className="flex items-start justify-between gap-3 text-sm">
                 <div>
-                  <p className="font-bold text-midnight-burgundy">Dịch vụ</p>
+                  <p className="font-bold text-midnight-burgundy">Services</p>
                   <p className="text-on-surface-variant">
                     {activePassengerServices
                       .map((service) => service.name)
@@ -491,13 +451,13 @@ export function SummaryPanel({
           to="/"
           className="inline-flex w-24 items-center justify-center gap-2 rounded-md bg-cabin-silver px-4"
         >
-          Huy
+          Cancel
         </Link>
         <Link
           to="/booking/checkout"
           className="auth-primary-btn inline-flex w-full items-center justify-center gap-2 rounded-md px-4 text-white transition-all hover:bg-midnight-burgundy/90"
         >
-          Thanh toan
+          Payment
         </Link>
       </div>
     </div>
@@ -537,22 +497,22 @@ function InspectorSummaryPanel({
     .map((service) => service.name)
     .filter((value, index, list) => list.indexOf(value) === index);
   const seatTypeLabel =
-    seatDetails?.seatTypeDisplay?.label ?? selectedSeat?.seatTypeDisplay?.label ?? 'Chua chon';
+    seatDetails?.seatTypeDisplay?.label ?? selectedSeat?.seatTypeDisplay?.label ?? 'Not selected';
   const seatCategoryLabel =
     seatDetails?.seatCategoryDisplay?.label ??
     selectedSeat?.seatCategoryDisplay?.label ??
     selectedSeat?.seatCategory ??
-    'Chua chon';
-  const seatStatusLabel = confirmedSeatNumber ? 'Da xac nhan' : 'Chua chon';
-  const seatIncludedLabel = seatDetails ? (seatDetails.included ? 'Co' : 'Khong') : '--';
+    'Not selected';
+  const seatStatusLabel = confirmedSeatNumber ? 'Confirmed' : 'Not selected';
+  const seatIncludedLabel = seatDetails ? (seatDetails.included ? 'Yes' : 'No') : '--';
   const serviceSummaryLabel =
-    serviceNames.length > 0 ? serviceNames.join(', ') : 'Chua chon dich vu';
+    serviceNames.length > 0 ? serviceNames.join(', ') : 'No service selected';
   const servicePriceLabel =
     activePassengerServices.length > 0 ? formatMoney(totalServicePrice, serviceCurrency) : '--';
-  const serviceHeroTitle = highlightedService?.name ?? 'Chua chon dich vu';
+  const serviceHeroTitle = highlightedService?.name ?? 'No service selected';
   const serviceHeroPrice = highlightedService?.priceLabel ?? servicePriceLabel;
   const serviceDescription = highlightedService?.description ?? 'Chon dich vu de xem thong tin chi tiet.';
-  const serviceTypeLabel = highlightedService?.serviceName ?? 'Dich vu bo sung';
+  const serviceTypeLabel = highlightedService?.serviceName ?? 'Additional service';
 
   return (
     <div className="w-full rounded-xl border border-outline-variant/20 bg-white/90 p-5 shadow-sm backdrop-blur-md xl:sticky xl:top-28 xl:w-[22rem]">
@@ -564,7 +524,7 @@ function InspectorSummaryPanel({
         {seatContext.fareCode ? ` | ${seatContext.fareCode}` : ''}
       </p>
       <p className="mt-1 text-sm font-semibold text-midnight-burgundy">
-        {activePassengerName ?? 'Hanh khach'}
+        {activePassengerName ?? 'Passenger'}
       </p>
 
       <div className="mt-5 rounded-lg bg-surface-container-lowest p-4">
@@ -589,7 +549,7 @@ function InspectorSummaryPanel({
           <span className="font-bold">Hang ghe:</span> {seatCategoryLabel}
         </p>
         <p>
-          <span className="font-bold">Dich vu:</span> {serviceTypeLabel}
+          <span className="font-bold">Service:</span> {serviceTypeLabel}
         </p>
         <p className="leading-6 text-on-surface-variant">
           <span className="font-bold text-on-surface">Mo ta:</span> {serviceDescription}
@@ -630,10 +590,10 @@ function InspectorSummaryPanel({
       {totalPriceLabel ? (
         <div className="mt-5 border-t border-outline-variant/20 pt-5">
           <p className="text-xs font-black uppercase tracking-[0.14em] text-on-surface-variant">
-            Tong tam tinh
+            Estimated total
           </p>
           <p className="mt-2 text-3xl font-black text-secondary">{totalPriceLabel}</p>
-          <p className="mt-1 text-xs text-on-surface-variant">{passengersCount} khach</p>
+          <p className="mt-1 text-xs text-on-surface-variant">{passengersCount} passengers</p>
         </div>
       ) : null}
 
@@ -642,13 +602,13 @@ function InspectorSummaryPanel({
           to="/"
           className="inline-flex w-24 items-center justify-center gap-2 rounded-md bg-cabin-silver px-4"
         >
-          Huy
+          Cancel
         </Link>
         <Link
           to="/booking/checkout"
           className="auth-primary-btn inline-flex w-full items-center justify-center gap-2 rounded-md px-4 text-white transition-all hover:bg-midnight-burgundy/90"
         >
-          Thanh toan
+          Payment
         </Link>
       </div>
     </div>
@@ -703,9 +663,6 @@ function ServiceDetailPanel({
     }, new Map<number, { optionId: number; name: string; serviceName: string; quantity: number; totalPrice: number; currency: string }>())
   ).map(([, value]) => value);
 
-  const highlightedGroup = highlightedService
-    ? groupedServices.find((service) => service.optionId === highlightedService.optionId) ?? null
-    : null;
   const totalServicesLabel =
     activePassengerServices.length > 0 ? formatMoney(totalServicePrice, serviceCurrency) : '--';
 
@@ -725,11 +682,7 @@ function ServiceDetailPanel({
               {groupedServices.map((service) => (
                 <div
                   key={service.optionId}
-                  className={`rounded-lg border px-3 py-3 ${
-                    highlightedGroup?.optionId === service.optionId
-                      ? 'border-midnight-burgundy/25 bg-midnight-burgundy/5'
-                      : 'border-outline-variant/15 bg-surface-container-lowest'
-                  }`}
+                  className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest px-3 py-3"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -750,7 +703,7 @@ function ServiceDetailPanel({
             </div>
           ) : (
             <div className="mt-3 rounded-lg border border-dashed border-outline-variant/30 bg-surface-container-lowest px-3 py-4 text-sm text-on-surface-variant">
-              Chua co dich vu nao duoc chon.
+              No services selected yet.
             </div>
           )}
         </div>
@@ -772,7 +725,7 @@ function ServiceDetailPanel({
           onClick={onConfirm}
           className="auth-primary-btn mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {confirmLoading ? 'Dang luu...' : 'Xac nhan dich vu'}
+          {confirmLoading ? 'Saving...' : 'Confirm services'}
         </button>
         <button
           type="button"
@@ -823,10 +776,10 @@ type BookingSummaryPanelProps = {
 };
 
 function bookingPassengerTypeLabel(value: string | null | undefined): string {
-  if (value === 'ADULT') return 'Người lớn';
-  if (value === 'CHILD') return 'Trẻ em';
-  if (value === 'INFANT') return 'Em bé';
-  return 'Hành khách';
+  if (value === 'ADULT') return 'Adult';
+  if (value === 'CHILD') return 'Child';
+  if (value === 'INFANT') return 'Infant';
+  return 'Passenger';
 }
 
 function formatSummarySeatLabel(seatNumber: string): string {
@@ -911,15 +864,15 @@ function BookingSummaryPanel({
         )
       : null;
 
-  const itineraryParts = itineraryLabel?.split('âœˆ').map((part) => part.trim()) ?? [];
-  const itineraryFrom = itineraryParts[0] ?? itineraryLabel ?? 'Tom tat';
+  const itineraryParts = itineraryLabel?.split('✈').map((part) => part.trim()) ?? [];
+  const itineraryFrom = itineraryParts[0] ?? itineraryLabel ?? 'Summary';
   const itineraryTo = itineraryParts[1] ?? null;
 
   return (
     <div className="w-full rounded-[1.75rem] border border-luxury-gold/20 bg-white/92 p-5 shadow-[0_22px_70px_rgba(81,35,20,0.12)] backdrop-blur-md xl:sticky xl:top-28 xl:w-[23rem]">
       <div className="border-b border-outline-variant/20 pb-5">
         <p className="text-[0.6875rem] font-black uppercase tracking-[0.22em] text-midnight-burgundy">
-          Tổng kết chuyến đi
+          Trip summary
         </p>
         <div className="mt-4 space-y-2">
           <h3 className="font-headline text-[1.05rem] font-black leading-snug text-on-surface sm:text-[1.15rem]">
@@ -935,11 +888,11 @@ function BookingSummaryPanel({
           ) : null}
         </div>
         {flightMetaLabel ? <p className="mt-2 text-sm text-on-surface-variant">{flightMetaLabel}</p> : null}
-        <p className="mt-1 text-xs text-on-surface-variant">{passengersCount} khách</p>
+        <p className="mt-1 text-xs text-on-surface-variant">{passengersCount} passengers</p>
       </div>
 
       <div className="mt-5 space-y-4">
-        <BookingSummarySection title="Thông tin hành khách">
+        <BookingSummarySection title="Passenger details">
           <div className="space-y-3">
             {Array.from(groupedPassengers.entries()).map(([groupLabel, items]) => (
               <div
@@ -965,15 +918,15 @@ function BookingSummaryPanel({
         </BookingSummarySection>
 
         {fareAmountLabel ? (
-          <BookingSummarySection title="Giá vé" value={fareAmountLabel}>
+          <BookingSummarySection title="Fare" value={fareAmountLabel}>
             <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-4 py-3">
               <div className="flex items-center justify-between gap-3 text-sm">
-                <p className="font-semibold text-on-surface">Vé chuyến đi</p>
+                <p className="font-semibold text-on-surface">Flight fare</p>
                 <span className="font-black text-secondary">{fareAmountLabel}</span>
               </div>
               {discountAmountLabel ? (
                 <div className="mt-3 flex items-center justify-between gap-3 border-t border-outline-variant/10 pt-3 text-sm">
-                  <p className="font-semibold text-on-surface">Giảm giá</p>
+                  <p className="font-semibold text-on-surface">Discount</p>
                   <span className="font-black text-secondary">-{discountAmountLabel}</span>
                 </div>
               ) : null}
@@ -982,7 +935,7 @@ function BookingSummaryPanel({
         ) : null}
 
         {taxFeeTotalLabel ? (
-          <BookingSummarySection title="Thuế, phí" value={taxFeeTotalLabel}>
+          <BookingSummarySection title="Taxes & fees" value={taxFeeTotalLabel}>
             <div className="space-y-2">
               {taxFeeItems.map((item) => (
                 <div
@@ -999,7 +952,7 @@ function BookingSummaryPanel({
 
         {seatItems.length > 0 ? (
           <BookingSummarySection
-            title="Ghế"
+            title="Seats"
             value={summarySeatTotalLabel}
           >
             <div className="space-y-3">
@@ -1014,7 +967,7 @@ function BookingSummaryPanel({
                         {seat.passengerName}
                       </span>
                       <p className="mt-3 text-sm font-semibold text-on-surface">
-                        Ghế đã chọn
+                        Selected seat
                       </p>
                       <p className="mt-1 text-lg font-bold leading-none tabular-nums text-on-surface">
                         {formatSummarySeatLabel(seat.seatNumber)}
@@ -1033,7 +986,7 @@ function BookingSummaryPanel({
         ) : null}
 
         {serviceItems.length > 0 ? (
-          <BookingSummarySection title="Dịch vụ" value={serviceTotalLabel}>
+          <BookingSummarySection title="Services" value={serviceTotalLabel}>
             <div className="space-y-3">
               {serviceItems.map((service) => (
                 <div
@@ -1074,7 +1027,7 @@ function BookingSummaryPanel({
         <div className="mt-6 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-4 py-4">
           <div className="grid grid-cols-1 gap-y-3">
             <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-midnight-burgundy">
-              Tổng thanh toán
+              Total payment
             </p>
             <p className="text-[1.95rem] font-black leading-none tabular-nums text-secondary">
               {totalPriceLabel}
@@ -1088,13 +1041,13 @@ function BookingSummaryPanel({
           to="/"
           className="inline-flex w-24 items-center justify-center gap-2 rounded-md bg-cabin-silver px-4"
         >
-          Huy
+          Cancel
         </Link>
         <Link
           to="/booking/checkout"
           className="auth-primary-btn inline-flex w-full items-center justify-center gap-2 rounded-md px-4 text-white transition-all hover:bg-midnight-burgundy/90"
         >
-          Thanh toan
+          Payment
         </Link>
       </div>
     </div>
@@ -1120,41 +1073,17 @@ export default function SeatSelection() {
   const navPassengers = passengersFromNavigationState(
     (location.state as Partial<PassengerInfoNavigationState> | null)?.passengers
   );
-  const storePassengers = bookingResponse?.passengers?.length
-    ? bookingResponse.passengers.map((passenger, index) => ({
-        id: String(index + 1),
-        fullName: [passenger.lastName, passenger.firstName].filter(Boolean).join(' ').trim(),
-        seat: undefined,
-      }))
-    : null;
-  const managePassengers = manageOptions?.passengers?.length
-    ? manageOptions.passengers.map((passenger, index) => ({
-        id: String(index + 1),
-        fullName: [passenger.lastName, passenger.firstName].filter(Boolean).join(' ').trim(),
-        seat:
-          manageOptions.seatAssignments.find(
-            (assignment) => assignment.passengerId === passenger.passengerId
-          )?.seatNumber ?? undefined,
-      }))
-    : null;
-  // For the manage-booking flow, prefer manageOptions/lookup; fall back to bookingResponse only in
-  // the original booking flow. The legacy `MOCK_PASSENGERS` placeholder was removed because the
-  // mock URL flag (`?mockManageBooking=1`) now hydrates real fixtures into the store instead.
-  const lookupPassengers = bookingLookup?.passengers?.length
-    ? bookingLookup.passengers.map((passenger, index) => ({
-        id: String(index + 1),
-        fullName: [passenger.lastName, passenger.firstName].filter(Boolean).join(' ').trim(),
-        seat:
-          (passenger.selections?.seats ?? passenger.seatAssignments ?? [])[0]?.seatNumber ??
-          undefined,
-      }))
-    : null;
-  const passengers: PassengerProfile[] = isManageBookingFlow
-    ? (managePassengers ?? lookupPassengers ?? [])
-    : (storePassengers ?? navPassengers ?? []);
-  const passengerSource = isManageBookingFlow
-    ? (manageOptions?.passengers ?? bookingLookup?.passengers ?? [])
-    : (bookingResponse?.passengers ?? []);
+  const { passengers, passengerSource } = useMemo(
+    () =>
+      resolvePassengerDisplayData({
+        isManageBookingFlow,
+        bookingResponse,
+        bookingLookup,
+        manageOptions,
+        navigationPassengers: navPassengers,
+      }),
+    [bookingLookup, bookingResponse, isManageBookingFlow, manageOptions, navPassengers]
+  );
 
   const [activePassengerIndex, setActivePassengerIndex] = useState(0);
   const [selectedSeat, setSelectedSeat] = useState<SeatSelectionValue | null>(null);
@@ -1174,9 +1103,11 @@ export default function SeatSelection() {
     );
   const hydratedPassengersRef = useRef<Set<number>>(new Set());
   const assignInFlight = useRef(false);
-  const manageBookingId = pickNumericId(
-    manageOptions?.bookingId ?? bookingLookup?.booking?.bookingId ?? bookingResponse?.bookingId
-  );
+  const manageBookingId = resolveManageBookingId({
+    manageOptions,
+    bookingLookup,
+    bookingResponse,
+  });
   const bookingResponseStatus =
     typeof bookingResponse?.raw?.booking === 'object' &&
     bookingResponse.raw.booking &&
@@ -1231,19 +1162,15 @@ export default function SeatSelection() {
     }
   }, [manageOptionsQuery.data, setManageOptions]);
 
-  const seatContext = useMemo(() => {
-    if (manageOptions?.itineraries?.length) {
-      const itinerary = manageOptions.itineraries[0];
-      return {
-        flightId: itinerary.flightId,
-        fareId: itinerary.fareId,
-        fareCode: null,
-      };
-    }
-    const responseContext = resolveSeatContext(bookingResponse);
-    if (responseContext.flightId && responseContext.fareId) return responseContext;
-    return resolveSeatContext(bookingDraft);
-  }, [bookingDraft, bookingResponse, manageOptions]);
+  const seatContext = useMemo(
+    () =>
+      resolveSeatContextFromSources({
+        manageOptions,
+        bookingResponse,
+        bookingDraft,
+      }),
+    [bookingDraft, bookingResponse, manageOptions]
+  );
   const canLoadSeatMap = isSeatSelecting && !!seatContext.flightId && !!seatContext.fareId;
   const canLoadServices = isServiceSelecting && !!seatContext.flightId && !!seatContext.fareId;
 
@@ -1252,100 +1179,6 @@ export default function SeatSelection() {
     () => resolveStorePassengerId(activePassenger),
     [activePassenger]
   );
-
-  const assignSeatMutation = useMutation({
-    mutationFn: (vars: {
-      bookingId: string | number;
-      passengerId: number;
-      seatId: number;
-      passengerName: string;
-    }) =>
-      bookingService.putSeatAssignments(vars.bookingId, {
-        assignments: [{ passengerId: vars.passengerId, seatId: vars.seatId }],
-      }),
-    onSuccess: (data, variables) => {
-      if (bookingResponse) {
-        applySeatAssignmentResult(data, [variables.passengerId]);
-      }
-      void seatMapQuery.refetch();
-      if (isManageBookingFlow) {
-        void manageOptionsQuery.refetch();
-      }
-      toast.success(`Da xac nhan ghe ngoi cho ${variables.passengerName}.`);
-    },
-    onError: (error, variables) => {
-      toast.error(
-        getBookingSessionExpiredMessage(error) ??
-          (error instanceof Error
-            ? error.message
-            : `Khong the gan ghe cho ${variables.passengerName}. Vui long thu lai.`)
-      );
-    },
-  });
-
-  const changeSeatMutation = useMutation({
-    mutationFn: (vars: {
-      bookingId: string | number;
-      passengerId: number;
-      fromSeatId: number;
-      toSeatId: number;
-      passengerName: string;
-    }) =>
-      bookingService.patchSeatAssignment(vars.bookingId, {
-        passengerId: vars.passengerId,
-        fromSeatId: vars.fromSeatId,
-        toSeatId: vars.toSeatId,
-      }),
-    onSuccess: (data, variables) => {
-      if (bookingResponse) {
-        applySeatAssignmentResult(data, [variables.passengerId]);
-      }
-      void seatMapQuery.refetch();
-      if (isManageBookingFlow) {
-        void manageOptionsQuery.refetch();
-      }
-      toast.success(`Da doi ghe ngoi cho ${variables.passengerName}.`);
-    },
-    onError: (error, variables) => {
-      toast.error(
-        getBookingSessionExpiredMessage(error) ??
-          (error instanceof Error
-            ? error.message
-            : `Khong the doi ghe cho ${variables.passengerName}. Vui long thu lai.`)
-      );
-    },
-  });
-
-  const cancelSeatMutation = useMutation({
-    mutationFn: (vars: {
-      bookingId: string | number;
-      passengerId: number;
-      seatId: number;
-      passengerName: string;
-    }) =>
-      bookingService.deleteSeatAssignments(vars.bookingId, {
-        assignments: [{ passengerId: vars.passengerId, seatId: vars.seatId }],
-      }),
-    onSuccess: (data, variables) => {
-      if (bookingResponse) {
-        applySeatAssignmentResult(data, [variables.passengerId]);
-      }
-      setSelectedSeat(null);
-      void seatMapQuery.refetch();
-      if (isManageBookingFlow) {
-        void manageOptionsQuery.refetch();
-      }
-      toast.success(`Da huy ghe ngoi cho ${variables.passengerName}.`);
-    },
-    onError: (error, variables) => {
-      toast.error(
-        getBookingSessionExpiredMessage(error) ??
-          (error instanceof Error
-            ? error.message
-            : `Khong the huy ghe cho ${variables.passengerName}. Vui long thu lai.`)
-      );
-    },
-  });
 
   const servicesMutation = useMutation({
     mutationFn: (vars: {
@@ -1359,34 +1192,26 @@ export default function SeatSelection() {
       }),
   });
 
+  const confirmedSeatAssignments = useMemo<ResolvedSeatAssignment[]>(
+    () => resolveConfirmedSeatAssignments({ bookingResponse, manageOptions }),
+    [bookingResponse, manageOptions]
+  );
+
   const assignedSeatMetaBySeatId = useMemo(() => {
-    const assignments =
-      bookingResponse?.lastSeatAssignment?.assignments ??
-      manageOptions?.seatAssignments?.map((assignment) => ({
-        passengerId: assignment.passengerId,
-        seatId: assignment.seatId,
-        status: assignment.status,
-        surchargeAmount: assignment.surchargeAmount,
-        currency: assignment.currency,
-      }));
-    if (!assignments?.length) return new Map<number, AssignedSeatMeta>();
+    if (!confirmedSeatAssignments.length) return new Map<number, AssignedSeatMeta>();
     const next = new Map<number, AssignedSeatMeta>();
-    for (const a of assignments) {
+    for (const a of confirmedSeatAssignments) {
       if (a.seatId == null || a.seatId <= 0) continue;
       const isYours = activePassengerId != null && a.passengerId === activePassengerId;
       next.set(a.seatId, {
-        label: isYours ? 'Đã chọn' : 'Đã giữ',
+        label: isYours ? 'Selected' : 'Reserved',
         isYours,
         surchargeAmount: a.surchargeAmount,
         currency: a.currency,
       });
     }
     return next;
-  }, [
-    bookingResponse?.lastSeatAssignment?.assignments,
-    manageOptions?.seatAssignments,
-    activePassengerId,
-  ]);
+  }, [confirmedSeatAssignments, activePassengerId]);
 
   const seatMapQuery = useQuery({
     queryKey: ['seat-map', seatContext.flightId, seatContext.fareId],
@@ -1402,6 +1227,21 @@ export default function SeatSelection() {
       flightService.getServices(seatContext.flightId as number, seatContext.fareId as number),
     enabled: canLoadServices,
     staleTime: 60_000,
+  });
+
+  const {
+    assignSeat,
+    changeSeat,
+    cancelSeat,
+    isSeatMutationPending,
+  } = useSeatAssignmentActions({
+    bookingResponse,
+    isManageBookingFlow,
+    applySeatAssignmentResult,
+    refetchSeatMap: seatMapQuery.refetch,
+    refetchManageOptions: manageOptionsQuery.refetch,
+    onCancelSuccess: () => setSelectedSeat(null),
+    getBookingSessionExpiredMessage,
   });
 
   useEffect(() => {
@@ -1470,7 +1310,8 @@ export default function SeatSelection() {
           optionId: selection.optionId,
           name: selection.optionName,
           serviceName: selection.serviceName,
-          quantity: Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1,
+          quantity:
+            Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1,
           price: selection.price,
         }));
     }
@@ -1482,8 +1323,9 @@ export default function SeatSelection() {
       .map((selection) => ({
         optionId: selection.optionId as number,
         name: selection.optionName ?? `Option ${selection.optionId}`,
-        serviceName: selection.serviceName ?? 'Dich vu bo sung',
-        quantity: Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1,
+        serviceName: selection.serviceName ?? 'Additional service',
+        quantity:
+          Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1,
         price: selection.price,
       }));
   }, [
@@ -1515,7 +1357,10 @@ export default function SeatSelection() {
   const totalPriceLabel = pricing
     ? formatMoney(pricing.discountedTotalPrice, pricing.currency || 'VND')
     : manageOptions && bookingLookup
-      ? formatMoney(bookingLookup.booking.totalAmount, bookingLookup.booking.currency || manageOptions.currency)
+      ? formatMoney(
+          bookingLookup.booking.totalAmount,
+          bookingLookup.booking.currency || manageOptions.currency
+        )
       : null;
   const confirmedSeatAssignment = useMemo(() => {
     if (activePassengerId == null) return null;
@@ -1581,17 +1426,6 @@ export default function SeatSelection() {
   const seatPriceLabel = normalizeSeatPriceText(
     confirmedSeat?.displayPrice?.text ?? seatDetails?.displayPrice?.text
   );
-  const summaryItinerary = manageOptions?.itineraries?.[0] ?? null;
-  const summaryHeader = useMemo(
-    () =>
-      summaryItinerary
-        ? {
-            itineraryLabel: formatItineraryRouteLabel(summaryItinerary),
-            flightMetaLabel: formatItineraryMetaLabel(summaryItinerary),
-          }
-        : buildSummaryHeaderFromRawBooking(bookingResponse, seatContext),
-    [bookingResponse, seatContext, summaryItinerary]
-  );
   const summaryPassengerItems = useMemo(
     () =>
       passengers.map((passenger, index) => ({
@@ -1606,21 +1440,10 @@ export default function SeatSelection() {
       })),
     [passengerSource, passengers]
   );
-  const summaryFareAmountLabel =
-    pricing != null
-      ? formatMoney(
-          Math.max(0, (pricing.baseFare ?? 0) - (pricing.discountAmount ?? 0)),
-          pricing.currency || 'VND'
-        )
-      : null;
-  const summaryDiscountAmountLabel =
-    pricing != null && (pricing.discountAmount ?? 0) > 0
-      ? formatMoney(pricing.discountAmount, pricing.currency || 'VND')
-      : null;
   const summaryTaxFeeItems = pricing
     ? [
-        { label: 'Thuế', value: formatMoney(pricing.taxes, pricing.currency || 'VND') },
-        { label: 'Phí', value: formatMoney(pricing.fees, pricing.currency || 'VND') },
+        { label: 'Taxes', value: formatMoney(pricing.taxes, pricing.currency || 'VND') },
+        { label: 'Fees', value: formatMoney(pricing.fees, pricing.currency || 'VND') },
       ]
     : [];
   const summaryTaxFeeTotalLabel =
@@ -1639,7 +1462,7 @@ export default function SeatSelection() {
         const seatCell = findSeatCellById(seatMapQuery.data?.rows, seatId);
         const passengerName =
           summaryPassengerItems.find((item) => item.passengerId === passengerId)?.fullName ??
-          `Hành khách ${passengerId}`;
+          `Passenger ${passengerId}`;
         const seatNumber =
           seatCell?.seatNumber ??
           ('seatNumber' in assignment && typeof assignment.seatNumber === 'string'
@@ -1705,7 +1528,7 @@ export default function SeatSelection() {
         if (!Number.isFinite(passengerId)) continue;
         const passengerName =
           summaryPassengerItems.find((item) => item.passengerId === passengerId)?.fullName ??
-          `Hành khách ${passengerId}`;
+          `Passenger ${passengerId}`;
 
         for (const selection of selections) {
           next.push({
@@ -1733,11 +1556,11 @@ export default function SeatSelection() {
         Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1;
       const passengerName =
         summaryPassengerItems.find((item) => item.passengerId === passengerId)?.fullName ??
-        `Hành khách ${passengerId}`;
+        `Passenger ${passengerId}`;
       next.push({
         passengerId,
         passengerName,
-        serviceName: selection.serviceName ?? 'Dich vu bo sung',
+        serviceName: selection.serviceName ?? 'Additional service',
         optionName: selection.optionName ?? `Option ${selection.optionId}`,
         quantity,
         totalPriceLabel: formatMoney(
@@ -1766,25 +1589,48 @@ export default function SeatSelection() {
   );
   const summaryServiceTotalLabel =
     summaryServiceItems.length > 0 ? formatMoney(summaryServiceTotalAmount, serviceCurrency) : null;
+  const {
+    totalPriceLabel: resolvedTotalPriceLabel,
+    summaryHeader: resolvedSummaryHeader,
+    summaryPassengerItems: resolvedSummaryPassengerItems,
+    summaryFareAmountLabel: resolvedSummaryFareAmountLabel,
+    summaryDiscountAmountLabel: resolvedSummaryDiscountAmountLabel,
+    summaryTaxFeeItems: resolvedSummaryTaxFeeItems,
+    summaryTaxFeeTotalLabel: resolvedSummaryTaxFeeTotalLabel,
+    summarySeatItems: resolvedSummarySeatItems,
+    summaryServiceItems: resolvedSummaryServiceItems,
+    summaryServiceTotalLabel: resolvedSummaryServiceTotalLabel,
+  } = useSeatSelectionSummaryModel({
+    bookingDraft,
+    bookingResponse,
+    bookingLookup,
+    manageOptions,
+    passengers,
+    passengerSource,
+    seatContext,
+    seatMapRows: seatMapQuery.data?.rows,
+    confirmedSeatAssignments,
+    serviceCurrency,
+  });
   const seatMapError =
     !seatContext.flightId || !seatContext.fareId
-      ? 'Khong tim thay flightId/fareId trong store de tai so do ghe.'
+      ? 'Flight ID or fare ID was not found in the store for loading the seat map.'
       : manageOptionsQuery.error instanceof Error
         ? manageOptionsQuery.error.message
       : seatMapQuery.error instanceof Error
         ? seatMapQuery.error.message
         : seatMapQuery.isError
-          ? 'Khong the tai so do ghe luc nay.'
+          ? 'Unable to load the seat map right now.'
           : null;
   const servicesError =
     !seatContext.flightId || !seatContext.fareId
-      ? 'Khong tim thay flightId/fareId trong store de tai danh sach dich vu.'
+      ? 'Flight ID or fare ID was not found in the store for loading the services list.'
       : manageOptionsQuery.error instanceof Error
         ? manageOptionsQuery.error.message
       : servicesQuery.error instanceof Error
         ? servicesQuery.error.message
         : servicesQuery.isError
-          ? 'Khong the tai danh sach dich vu luc nay.'
+          ? 'Unable to load the services list right now.'
           : null;
   const selectionMode = isSeatSelecting ? 'seat' : isServiceSelecting ? 'service' : 'overview';
   const openSeatSelection = () => {
@@ -1812,12 +1658,12 @@ export default function SeatSelection() {
     if (bookingIdNumeric == null) return;
     const passengerId = activePassengerId;
     if (passengerId == null) return;
-    const passengerName = activePassengerProfile?.fullName?.trim() || `Hanh khach ${activePassengerIndex + 1}`;
+    const passengerName = activePassengerProfile?.fullName?.trim() || `Passenger ${activePassengerIndex + 1}`;
     if (assignInFlight.current) return;
     assignInFlight.current = true;
     const currentSeatId = confirmedSeatAssignment?.seatId;
     if (currentSeatId != null) {
-      changeSeatMutation.mutate(
+      changeSeat(
         {
           bookingId: bookingIdNumeric,
           passengerId,
@@ -1834,7 +1680,7 @@ export default function SeatSelection() {
       return;
     }
 
-    assignSeatMutation.mutate(
+    assignSeat(
       { bookingId: bookingIdNumeric, passengerId, seatId: seat.seatId, passengerName },
       {
         onSettled: () => {
@@ -1850,10 +1696,10 @@ export default function SeatSelection() {
     if (bookingIdNumeric == null) return;
     const passengerId = activePassengerId;
     if (passengerId == null) return;
-    const passengerName = activePassengerProfile?.fullName?.trim() || `Hanh khach ${activePassengerIndex + 1}`;
+    const passengerName = activePassengerProfile?.fullName?.trim() || `Passenger ${activePassengerIndex + 1}`;
     if (assignInFlight.current) return;
     assignInFlight.current = true;
-    cancelSeatMutation.mutate(
+    cancelSeat(
       { bookingId: bookingIdNumeric, passengerId, seatId: seat.seatId, passengerName },
       {
         onSettled: () => {
@@ -1879,7 +1725,7 @@ export default function SeatSelection() {
   const handleServicesConfirm = () => {
     const bookingIdNumeric = manageBookingId;
     if (bookingIdNumeric == null || activePassengerId == null) return;
-    const passengerName = activePassengerProfile?.fullName?.trim() || `Hanh khach ${activePassengerIndex + 1}`;
+    const passengerName = activePassengerProfile?.fullName?.trim() || `Passenger ${activePassengerIndex + 1}`;
     const services = servicesByPassengerId[activePassengerId] ?? [];
     const selections = buildSelectionsFromSelectedServices(services);
 
@@ -1908,7 +1754,7 @@ export default function SeatSelection() {
             ...current,
             [variables.passengerId]: 'saved',
           }));
-          toast.success(`Da them dich vu cho ${variables.passengerName}.`);
+          toast.success(`Services added for ${variables.passengerName}.`);
         },
         onError: (error, variables) => {
           setServiceSaveStatusByPassengerId((current) => ({
@@ -1919,7 +1765,7 @@ export default function SeatSelection() {
             getBookingSessionExpiredMessage(error) ??
               (error instanceof Error
                 ? error.message
-                : 'Khong the cap nhat dich vu. Vui long thu lai.')
+                : 'Unable to update services. Please try again.')
           );
         },
       }
@@ -1994,10 +1840,10 @@ export default function SeatSelection() {
                 />
                 <div className="flex flex-col items-start">
                   <h2 className="mb-1 font-headline text-lg font-black text-midnight-burgundy">
-                    Chọn ghế ngồi
+                    Choose your seat
                   </h2>
                   <p className="text-sm text-on-surface-variant">
-                    Chọn chỗ ngồi yêu thích của bạn trên máy bay.
+                    Choose your preferred seat on the aircraft.
                   </p>
                 </div>
                 <ChevronRight
@@ -2019,10 +1865,10 @@ export default function SeatSelection() {
                 />
                 <div className="flex flex-col items-start">
                   <h2 className="mb-1 font-headline text-lg font-black text-midnight-burgundy">
-                    Chọn dịch vụ bổ sung
+                    Choose additional services
                   </h2>
                   <p className="text-sm text-on-surface-variant">
-                    Thêm hành lý, bữa ăn, bảo hiểm và nhiều hơn nữa.
+                    Add baggage, meals, insurance, and more.
                   </p>
                 </div>
                 <ChevronRight
@@ -2034,21 +1880,21 @@ export default function SeatSelection() {
 
             <div className="w-full xl:w-[23rem] xl:shrink-0">
               <BookingSummaryPanel
-                itineraryLabel={summaryHeader.itineraryLabel}
-                flightMetaLabel={summaryHeader.flightMetaLabel}
-                totalPriceLabel={totalPriceLabel}
+                itineraryLabel={resolvedSummaryHeader.itineraryLabel}
+                flightMetaLabel={resolvedSummaryHeader.flightMetaLabel}
+                totalPriceLabel={resolvedTotalPriceLabel}
                 passengersCount={passengers.length}
-                passengerItems={summaryPassengerItems}
-                fareAmountLabel={summaryFareAmountLabel}
-                discountAmountLabel={summaryDiscountAmountLabel}
-                taxFeeTotalLabel={summaryTaxFeeTotalLabel}
-                taxFeeItems={summaryTaxFeeItems}
-                seatItems={summarySeatItems}
-                serviceItems={summaryServiceItems}
-                serviceTotalLabel={summaryServiceTotalLabel}
+                passengerItems={resolvedSummaryPassengerItems}
+                fareAmountLabel={resolvedSummaryFareAmountLabel}
+                discountAmountLabel={resolvedSummaryDiscountAmountLabel}
+                taxFeeTotalLabel={resolvedSummaryTaxFeeTotalLabel}
+                taxFeeItems={resolvedSummaryTaxFeeItems}
+                seatItems={resolvedSummarySeatItems}
+                serviceItems={resolvedSummaryServiceItems}
+                serviceTotalLabel={resolvedSummaryServiceTotalLabel}
               />
               <div className="hidden w-full rounded-xl border border-luxury-gold/20 bg-surface-container-lowest p-5 shadow-lg xl:sticky xl:top-28 xl:w-[23rem]">
-              <h3 className="mb-4 font-headline text-lg font-black text-on-surface">Tóm tắt</h3>
+              <h3 className="mb-4 font-headline text-lg font-black text-on-surface">Summary</h3>
               <p className="text-sm text-on-surface-variant">
                 Flight #{seatContext.flightId ?? '--'}
                 {seatContext.fareCode ? ` | ${seatContext.fareCode}` : ''}
@@ -2056,7 +1902,7 @@ export default function SeatSelection() {
               {totalPriceLabel ? (
                 <p className="mt-6 text-2xl font-black text-secondary">{totalPriceLabel}</p>
               ) : null}
-              <p className="text-xs text-on-surface-variant">{passengers.length} khach</p>
+              <p className="text-xs text-on-surface-variant">{passengers.length} passengers</p>
 
               {confirmedSeatNumber ? (
                 <div className="mt-4 rounded-lg bg-midnight-burgundy/10 p-3">
@@ -2084,7 +1930,7 @@ export default function SeatSelection() {
               {confirmedActivePassengerServices.length > 0 && (
                 <div className="mt-6 space-y-2 border-t border-outline-variant/20 pt-4">
                   <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                    Dich vu bo sung
+                    Additional services
                   </p>
                   {confirmedActivePassengerServices.map((service) => (
                     <div
@@ -2102,7 +1948,7 @@ export default function SeatSelection() {
                   ))}
                   <div className="border-t border-outline-variant/20 pt-2">
                     <div className="flex justify-between font-bold text-midnight-burgundy">
-                      <span>Dich vu:</span>
+                      <span>Services:</span>
                       <span>{formatMoney(confirmedTotalServicePrice, serviceCurrency)}</span>
                     </div>
                   </div>
@@ -2114,13 +1960,13 @@ export default function SeatSelection() {
                     to="/"
                     className="inline-flex w-24 items-center justify-center gap-2 rounded-md bg-cabin-silver px-4"
                   >
-                    Huy
+                    Cancel
                   </Link>
                   <Link
                     to="/booking/checkout"
                     className="auth-primary-btn inline-flex w-full items-center justify-center gap-2 rounded-md px-4 text-white transition-all hover:bg-midnight-burgundy/90"
                   >
-                    Thanh toan
+                    Payment
                   </Link>
                 </div>
               </div>
@@ -2136,11 +1982,7 @@ export default function SeatSelection() {
               error={seatMapError}
               selectedSeat={selectedSeat}
               assignedSeatBySeatId={assignedSeatMetaBySeatId}
-              seatConfirmLoading={
-                assignSeatMutation.isPending ||
-                changeSeatMutation.isPending ||
-                cancelSeatMutation.isPending
-              }
+              seatConfirmLoading={isSeatMutationPending}
               showDetailPanel
               headerSubtitle={`Flight #${seatContext.flightId ?? '--'}${seatContext.fareCode ? ` - ${seatContext.fareCode}` : ''}`}
               onSeatPreview={handleSeatPreview}
@@ -2171,7 +2013,7 @@ export default function SeatSelection() {
             <div className="w-full xl:w-[22rem] xl:shrink-0 xl:self-start">
               <ServiceDetailPanel
                 seatContext={seatContext}
-                totalPriceLabel={totalPriceLabel}
+                totalPriceLabel={resolvedTotalPriceLabel}
                 passengersCount={passengers.length}
                 activePassengerName={activePassengerProfile?.fullName ?? null}
                 highlightedService={highlightedService}

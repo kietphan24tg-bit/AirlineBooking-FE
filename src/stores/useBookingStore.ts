@@ -76,7 +76,10 @@ interface BookingStore {
     passengers: BookingPassengerPayload[];
   }) => void;
   setBookingResponse: (data: BookingCreateResponse) => void;
-  applySeatAssignmentResult: (data: SeatAssignmentResponse) => void;
+  applySeatAssignmentResult: (
+    data: SeatAssignmentResponse,
+    replacedPassengerIds?: number[]
+  ) => void;
   applyServicesAssignmentResult: (
     data: PutBookingServicesResponse,
     submittedPassengerIds: number[]
@@ -219,14 +222,17 @@ export const useBookingStore = create<BookingStore>()(
         set((state) => ({
           bookingResponse: normalizeBookingResponse(state.bookingDraft, data),
         })),
-      applySeatAssignmentResult: (data) =>
+      applySeatAssignmentResult: (data, replacedPassengerIds = []) =>
         set((state) => {
           const { bookingResponse } = state;
           if (!bookingResponse) return state;
           const merged = mergeSessionPricingFromTotal(bookingResponse, data.totalAmount);
           if (!merged) {
             return {
-              bookingResponse: { ...bookingResponse, lastSeatAssignment: data },
+              bookingResponse: {
+                ...bookingResponse,
+                lastSeatAssignment: data,
+              },
             };
           }
           return {

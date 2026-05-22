@@ -27,6 +27,23 @@ interface PaymentCardProps {
   errorMessage?: string | null;
 }
 
+type ParsedRecipientDetails = {
+  bankBin: string | null;
+  bankName: string | null;
+  bankShortName: string | null;
+  accountNumber: string | null;
+};
+
+const BANK_BIN_MAP: Record<string, { name: string; shortName: string }> = {
+  '970407': { name: 'Techcombank', shortName: 'TCB' },
+  '970415': { name: 'VietinBank', shortName: 'CTG' },
+  '970418': { name: 'BIDV', shortName: 'BIDV' },
+  '970422': { name: 'Military Commercial Joint Stock Bank', shortName: 'MB' },
+  '970423': { name: 'Tien Phong Bank', shortName: 'TPBank' },
+  '970432': { name: 'Vietnam Prosperity Joint Stock Commercial Bank', shortName: 'VPBank' },
+  '970436': { name: 'Vietcombank', shortName: 'VCB' },
+};
+
 function formatTimeLeft(msLeft: number): string {
   const totalSeconds = Math.max(0, Math.floor(msLeft / 1000));
   const mm = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
@@ -78,12 +95,58 @@ function getTransferContent(qrData: string | null, paymentId: number): string {
   return billNumber || purpose || `PAYMENT ${paymentId}`;
 }
 
+function parseVietQrRecipientDetails(qrData: string | null): ParsedRecipientDetails {
+  const fallback: ParsedRecipientDetails = {
+    bankBin: null,
+    bankName: null,
+    bankShortName: null,
+    accountNumber: null,
+  };
+  const rootFields = parseEmvFields(qrData);
+
+  for (let tag = 26; tag <= 51; tag += 1) {
+    const merchantAccountInfo = rootFields.get(String(tag).padStart(2, '0'));
+    if (!merchantAccountInfo) continue;
+
+    const nestedFields = parseEmvFields(merchantAccountInfo);
+    const guid = nestedFields.get('00');
+    if (guid !== 'A000000727') continue;
+
+    const rawBankAndAccount = nestedFields.get('01') ?? '';
+    const compact = rawBankAndAccount.replace(/\s+/g, '');
+    let bankBin: string | null = null;
+    let accountNumber: string | null = null;
+
+    const prefixedMatch = compact.match(/^0006(\d{6})(.+)$/);
+    if (prefixedMatch) {
+      bankBin = prefixedMatch[1] ?? null;
+      accountNumber = prefixedMatch[2] ?? null;
+    } else {
+      const directMatch = compact.match(/^(\d{6})(.+)$/);
+      if (directMatch) {
+        bankBin = directMatch[1] ?? null;
+        accountNumber = directMatch[2] ?? null;
+      }
+    }
+
+    const mappedBank = bankBin ? BANK_BIN_MAP[bankBin] : null;
+    return {
+      bankBin,
+      bankName: mappedBank?.name ?? (bankBin ? `Receiving bank (${bankBin})` : null),
+      bankShortName: mappedBank?.shortName ?? null,
+      accountNumber,
+    };
+  }
+
+  return fallback;
+}
+
 async function copyToClipboard(label: string, value: string) {
   try {
     await navigator.clipboard.writeText(value);
-    toast.success(`Đã sao chép ${label}`);
+    toast.success(`Copied ${label}`);
   } catch {
-    toast.error('Không thể sao chép. Vui lòng thử lại.');
+    toast.error('Unable to copy. Please try again.');
   }
 }
 
@@ -113,6 +176,7 @@ export default function PaymentCard({
     (qrData ? getQrImageUrlFromData(qrData) : null);
   const amountText = formatMoney(data.payment.amount, data.payment.currency || 'VND');
   const transferContent = getTransferContent(qrData, data.payment.id);
+  const recipientDetails = useMemo(() => parseVietQrRecipientDetails(qrData), [qrData]);
   const isCanceled = status === 'CANCELLED' || status === 'CANCELED';
 
   useEffect(() => {
@@ -194,15 +258,15 @@ export default function PaymentCard({
             </span>
             <div className="min-w-0">
               <p className="text-sm leading-6 text-on-surface md:text-base">
-                Mở App Ngân hàng bất kỳ để <span className="font-black">quét mã VietQR</span> hoặc{' '}
-                <span className="font-black">chuyển khoản</span> chính xác số tiền, nội dung bên
-                dưới.
+                Open any banking app to <span className="font-black">scan the VietQR code</span> or{' '}
+                <span className="font-black">make a bank transfer</span> using the exact amount and
+                transfer note shown below.
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {badge}
                 {status === 'PENDING' ? (
                   <span className="rounded-full bg-luxury-gold/10 px-3 py-1 text-xs font-semibold text-on-surface-variant">
-                    Còn lại:{' '}
+                    Time left:{' '}
                     <span className="font-black text-midnight-burgundy">
                       {formatTimeLeft(msLeft)}
                     </span>
@@ -215,15 +279,15 @@ export default function PaymentCard({
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
-            {status === 'PENDING' ? (
+          <div className={status === 'PENDING' ? 'hidden' : 'flex shrink-0 items-center gap-2'}>
+            {status !== 'PENDING' ? (
               <button
                 type="button"
-                onClick={onCancel}
+                onClick={onClose}
                 disabled={canceling || checkingStatus || regenerating}
                 className="inline-flex h-10 items-center justify-center rounded-md border border-outline-variant/30 px-4 text-sm font-semibold text-on-surface-variant transition hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {canceling ? 'Đang hủy...' : 'Hủy'}
+                {canceling ? 'Cancelling...' : 'Cancel'}
               </button>
             ) : (
               <button
@@ -232,7 +296,7 @@ export default function PaymentCard({
                 disabled={checkingStatus || regenerating}
                 className="inline-flex h-10 items-center justify-center rounded-md border border-outline-variant/30 px-4 text-sm font-semibold text-on-surface-variant transition hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Đóng
+                Close
               </button>
             )}
           </div>
@@ -248,7 +312,7 @@ export default function PaymentCard({
             {qrImageUrl ? (
               <img
                 src={qrImageUrl}
-                alt="QR Code thanh toán"
+                alt="Payment QR code"
                 className={`h-[250px] w-[250px] bg-white object-contain p-1 md:h-[280px] md:w-[280px] ${
                   status !== 'PENDING' ? 'opacity-60' : ''
                 }`}
@@ -256,27 +320,31 @@ export default function PaymentCard({
             ) : (
               <div className="flex h-[250px] w-[250px] flex-col items-center justify-center border border-outline-variant/30 bg-white p-4 text-center md:h-[280px] md:w-[280px]">
                 <AlertCircle className="h-7 w-7 text-on-surface-variant" />
-                <p className="mt-2 text-sm font-semibold text-on-surface">Không có dữ liệu QR</p>
+                <p className="mt-2 text-sm font-semibold text-on-surface">No QR data available</p>
                 <p className="mt-1 text-xs text-on-surface-variant">
-                  Vui lòng tạo lại mã thanh toán.
+                  Please generate a new payment code.
                 </p>
               </div>
             )}
 
             <div className="mt-5 flex items-center gap-4 text-sm font-black">
               <span className="text-[#25529b]">napas 247</span>
-              <span className="h-7 w-px bg-outline-variant/40" />
-              <span className="text-[#d71920]">MB</span>
+              {recipientDetails.bankShortName ? (
+                <>
+                  <span className="h-7 w-px bg-outline-variant/40" />
+                  <span className="text-[#d71920]">{recipientDetails.bankShortName}</span>
+                </>
+              ) : null}
             </div>
 
-            {status === 'PENDING' ? (
+            {false ? (
               <button
                 type="button"
                 onClick={onCancel}
                 disabled={checkingStatus || regenerating || canceling}
                 className="mt-8 inline-flex h-11 min-w-28 items-center justify-center rounded-md border border-outline-variant/40 px-7 text-sm font-semibold text-on-surface-variant transition hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {canceling ? 'Đang hủy...' : 'Hủy'}
+                {canceling ? 'Cancelling...' : 'Cancel'}
               </button>
             ) : null}
           </div>
@@ -309,13 +377,13 @@ export default function PaymentCard({
                 <div className="min-w-0">
                   <p className="text-sm font-black text-on-surface">
                     {status === 'FAILED'
-                      ? 'Thanh toán thất bại'
+                      ? 'Payment failed'
                       : status === 'EXPIRED'
-                        ? 'Mã thanh toán đã hết hạn'
-                        : 'Có lỗi xảy ra'}
+                        ? 'Payment code has expired'
+                        : 'An error occurred'}
                   </p>
                   <p className="mt-1 text-sm text-on-surface-variant">
-                    {errorMessage || 'Vui lòng tạo mã mới để tiếp tục thanh toán.'}
+                    {errorMessage || 'Please create a new code to continue the payment.'}
                   </p>
                 </div>
               </div>
@@ -323,41 +391,46 @@ export default function PaymentCard({
 
             {status === 'SUCCESS' ? (
               <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                <p className="text-sm font-black text-emerald-800">Thanh toán đã được ghi nhận.</p>
+                <p className="text-sm font-black text-emerald-800">Payment has been received.</p>
                 <p className="mt-1 text-sm text-emerald-800/80">
-                  Bạn có thể đóng cửa sổ này và tiếp tục.
+                  You can close this window and continue.
                 </p>
               </div>
             ) : null}
 
-            <div className="flex items-start gap-3">
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-700 text-white">
-                <Building2 className="h-5 w-5" />
-              </span>
-              <div>
-                <p className="text-sm text-on-surface-variant">Ngân hàng</p>
-                <p className="font-black text-on-surface">Ngân hàng TMCP Quân đội</p>
+            {recipientDetails.bankName ? (
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-700 text-white">
+                  <Building2 className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-sm text-on-surface-variant">Bank</p>
+                  <p className="font-black text-on-surface">{recipientDetails.bankName}</p>
+                </div>
               </div>
-            </div>
+            ) : null}
 
             <div className="mt-5 grid gap-4">
-              <div>
-                <p className="text-sm text-on-surface-variant">Chủ tài khoản:</p>
-                <p className="mt-1 text-base font-black text-on-surface">THE SOVEREIGN AIRWAYS</p>
-              </div>
-
-              <TransferRow label="Số tài khoản:" value="0357097635" copyLabel="số tài khoản" />
-              <TransferRow label="Số tiền:" value={amountText} copyLabel="số tiền" />
+              {recipientDetails.accountNumber ? (
+                <TransferRow
+                  label="Account number:"
+                  value={recipientDetails.accountNumber}
+                  copyLabel="account number"
+                />
+              ) : null}
+              <TransferRow label="Amount:" value={amountText} copyLabel="amount" />
               <TransferRow
-                label="Nội dung:"
+                label="Transfer note:"
                 value={transferContent}
-                copyLabel="nội dung chuyển khoản"
+                copyLabel="transfer note"
               />
             </div>
 
             <p className="mt-9 text-base leading-7 text-on-surface">
-              Lưu ý: Nhập chính xác số tiền <span className="font-black">{amountText}</span>, nội
-              dung <span className="font-black">{transferContent}</span> khi chuyển khoản.
+              Note: Enter the exact amount <span className="font-black">{amountText}</span> and
+              transfer note <span className="font-black">{transferContent}</span> when making the
+              payment. Recipient details should match what your banking app shows after scanning the
+              QR code.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -370,7 +443,7 @@ export default function PaymentCard({
                     <RotateCw className={checkingStatus ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
                   }
                 >
-                  Kiểm tra lại
+                  Check again
                 </Button>
               ) : null}
 
@@ -381,7 +454,7 @@ export default function PaymentCard({
                   disabled={checkingStatus || regenerating || canceling}
                   icon={<XCircle className="h-4 w-4" />}
                 >
-                  {canceling ? 'Đang hủy...' : 'Hủy thanh toán'}
+                  {canceling ? 'Cancelling...' : 'Cancel payment'}
                 </Button>
               ) : null}
 
@@ -392,7 +465,7 @@ export default function PaymentCard({
                   disabled={regenerating || checkingStatus}
                   icon={<RotateCw className={regenerating ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />}
                 >
-                  Tạo mã mới
+                  Create new code
                 </Button>
               ) : null}
             </div>
@@ -424,7 +497,7 @@ function TransferRow({
         className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-emerald-50 px-3 text-sm font-bold text-on-surface-variant transition hover:bg-emerald-100"
       >
         <Copy className="h-3.5 w-3.5" />
-        Sao chép
+        Copy
       </button>
     </div>
   );

@@ -31,14 +31,14 @@ type PassengerSection = {
 };
 
 const PASSENGER_TYPE_LABELS: Record<PassengerType, string> = {
-  ADULT: 'Người lớn',
-  CHILD: 'Trẻ em',
-  INFANT: 'Em bé',
+  ADULT: 'Adult',
+  CHILD: 'Child',
+  INFANT: 'Infant',
 };
 
 const PASSENGER_TYPE_DESCRIPTIONS: Partial<Record<PassengerType, string>> = {
-  CHILD: 'Từ 2 đến dưới 12 tuổi',
-  INFANT: 'Dưới 2 tuổi',
+  CHILD: 'From 2 to under 12 years old',
+  INFANT: 'Under 2 years old',
 };
 
 const PASSENGER_TYPE_ICONS = {
@@ -48,17 +48,17 @@ const PASSENGER_TYPE_ICONS = {
 } as const;
 
 const GENDER_OPTIONS = [
-  { value: 'MALE', label: 'Nam' },
-  { value: 'FEMALE', label: 'Nữ' },
-  { value: 'OTHER', label: 'Khác' },
+  { value: 'MALE', label: 'Male' },
+  { value: 'FEMALE', label: 'Female' },
+  { value: 'OTHER', label: 'Other' },
 ] as const;
 
 const IDENTIFY_TYPE_OPTIONS: { value: IdentifyType; label: string }[] = [
-  { value: 'ID_CARD', label: 'CCCD' },
-  { value: 'PASSPORT', label: 'Hộ chiếu' },
+  { value: 'ID_CARD', label: 'ID Card' },
+  { value: 'PASSPORT', label: 'Passport' },
 ];
 
-const DEFAULT_NATIONALITY = 'Việt Nam';
+const DEFAULT_NATIONALITY = 'Vietnam';
 
 function normalizeIdentifyType(value: string | undefined): IdentifyType {
   return value === 'PASSPORT' ? 'PASSPORT' : 'ID_CARD';
@@ -186,7 +186,7 @@ export default function PassengerInfo() {
     );
   }, [bookingDraft.passengers, passengerSections.length, primaryContact]);
   const [expandedSections, setExpandedSections] = useState<boolean[]>(() =>
-    passengerSections.map((_, index) => index === 0)
+    passengerSections.map(() => true)
   );
   const bookingMutation = useMutation({
     mutationFn: bookingService.createBooking,
@@ -212,7 +212,7 @@ export default function PassengerInfo() {
   useEffect(() => {
     if (!hasValidRevalidation) {
       if (!isPreviewMode) {
-        toast.error('Phiên giữ giá đã hết hạn. Vui lòng chọn lại chuyến bay.');
+        toast.error('Your fare hold has expired. Please select your flight again.');
       }
       navigate('/flights', { replace: true });
     }
@@ -222,7 +222,7 @@ export default function PassengerInfo() {
     const nextPassengers =
       persistedPassengerDefaults ?? passengerSections.map(createPassengerDefaults);
     reset({ passengers: nextPassengers });
-    setExpandedSections(passengerSections.map((_, index) => index === 0));
+    setExpandedSections(passengerSections.map(() => true));
   }, [passengerSections, persistedPassengerDefaults, reset]);
 
   useEffect(() => {
@@ -246,7 +246,7 @@ export default function PassengerInfo() {
         <main className="relative z-10 mx-auto max-w-4xl px-6 pb-24 pt-28">
           <BookingStepper current="details" />
           <div className="rounded-xl border border-error/30 bg-error/5 p-6 text-sm text-error">
-            Không tìm thấy thông tin hành khách từ bước chọn chuyến bay.
+            Passenger information from the flight selection step was not found.
           </div>
         </main>
         <SiteFooter />
@@ -255,6 +255,8 @@ export default function PassengerInfo() {
   }
 
   const onSubmit = async (data: PassengerInfoFormValues) => {
+    setExpandedSections(passengerSections.map(() => true));
+
     const passengers = data.passengers.map(
       (passenger): BookingPassengerPayload => ({
         firstName: passenger.firstName.trim(),
@@ -311,7 +313,7 @@ export default function PassengerInfo() {
     } catch (error) {
       console.error(error);
       toast.error(
-        error instanceof Error ? error.message : 'Không thể tạo booking. Vui lòng thử lại.'
+        error instanceof Error ? error.message : 'Unable to create the booking. Please try again.'
       );
     }
   };
@@ -323,10 +325,10 @@ export default function PassengerInfo() {
       <main className="relative z-10 mx-auto max-w-5xl px-4 pb-20 pt-24 sm:px-6 sm:pb-24 sm:pt-28">
         <BookingStepper current="details" />
         <h1 className="mb-2 font-headline text-[2.1rem] font-black leading-[0.95] tracking-tight text-on-surface sm:text-5xl">
-          Thông tin hành khách
+          Passenger Information
         </h1>
         <p className="mb-8 max-w-2xl text-[1.05rem] leading-8 text-on-surface-variant sm:mb-10">
-          Nhập đúng thông tin theo giấy tờ tùy thân để làm thủ tục nhanh hơn tại sân bay.
+          Enter the details exactly as shown on the travel document to speed up airport check-in.
         </p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -334,7 +336,7 @@ export default function PassengerInfo() {
             <div className="rounded-xl border border-error/30 bg-error/5 p-4 text-sm text-error">
               {bookingMutation.error instanceof Error
                 ? bookingMutation.error.message
-                : 'Không thể tạo booking. Vui lòng thử lại.'}
+                : 'Unable to create the booking. Please try again.'}
             </div>
           ) : null}
 
@@ -401,7 +403,7 @@ export default function PassengerInfo() {
                   />
                   <div className="grid gap-5 sm:gap-6 md:grid-cols-2">
                     <div>
-                      <FieldLabel htmlFor={`passenger-${index}-lastName`}>Họ</FieldLabel>
+                      <FieldLabel htmlFor={`passenger-${index}-lastName`}>Last name</FieldLabel>
                       <TextInput
                         id={`passenger-${index}-lastName`}
                         hasError={!!lastNameError}
@@ -409,7 +411,7 @@ export default function PassengerInfo() {
                           lastNameError ? `passenger-${index}-lastName-error` : undefined
                         }
                         {...register(`passengers.${index}.lastName`)}
-                        placeholder="Nguyễn"
+                        placeholder="Nguyen"
                       />
                       {lastNameError ? (
                         <p
@@ -422,7 +424,7 @@ export default function PassengerInfo() {
                     </div>
                     <div>
                       <FieldLabel htmlFor={`passenger-${index}-firstName`}>
-                        Tên đệm và tên
+                        First and middle name
                       </FieldLabel>
                       <TextInput
                         id={`passenger-${index}-firstName`}
@@ -431,7 +433,7 @@ export default function PassengerInfo() {
                           firstNameError ? `passenger-${index}-firstName-error` : undefined
                         }
                         {...register(`passengers.${index}.firstName`)}
-                        placeholder="Văn A"
+                        placeholder="Van A"
                       />
                       {firstNameError ? (
                         <p
@@ -448,7 +450,7 @@ export default function PassengerInfo() {
                     <>
                       <div className="grid gap-5 sm:gap-6 md:grid-cols-2">
                         <div>
-                          <FieldLabel htmlFor={`passenger-${index}-gender`}>Giới tính</FieldLabel>
+                          <FieldLabel htmlFor={`passenger-${index}-gender`}>Gender</FieldLabel>
                           <select
                             id={`passenger-${index}-gender`}
                             {...register(`passengers.${index}.gender`)}
@@ -466,7 +468,9 @@ export default function PassengerInfo() {
                           ) : null}
                         </div>
                         <div>
-                          <FieldLabel htmlFor={`passenger-${index}-dob`}>Ngày sinh</FieldLabel>
+                          <FieldLabel htmlFor={`passenger-${index}-dob`}>
+                            Date of birth
+                          </FieldLabel>
                           <TextInput
                             id={`passenger-${index}-dob`}
                             type="date"
@@ -494,7 +498,7 @@ export default function PassengerInfo() {
 
                       <div className="grid gap-5 sm:gap-6 md:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
                         <div>
-                          <FieldLabel htmlFor={documentTypeId}>Loại giấy tờ</FieldLabel>
+                          <FieldLabel htmlFor={documentTypeId}>Document type</FieldLabel>
                           <select
                             id={documentTypeId}
                             {...register(`passengers.${index}.identifyType`)}
@@ -521,7 +525,7 @@ export default function PassengerInfo() {
                                 : undefined
                             }
                             {...register(`passengers.${index}.identifyNumber`)}
-                            placeholder="CCCD / Hộ chiếu"
+                            placeholder="ID card / Passport"
                           />
                           {identifyNumberError ? (
                             <p
@@ -558,7 +562,7 @@ export default function PassengerInfo() {
                         </div>
                         <div>
                           <FieldLabel htmlFor={`passenger-${index}-phone`}>
-                            Số điện thoại
+                            Phone number
                           </FieldLabel>
                           <TextInput
                             id={`passenger-${index}-phone`}
@@ -585,7 +589,9 @@ export default function PassengerInfo() {
                     <>
                       <div className="grid gap-5 sm:gap-6 md:grid-cols-2">
                         <div>
-                          <FieldLabel htmlFor={`passenger-${index}-dob`}>Ngày sinh</FieldLabel>
+                          <FieldLabel htmlFor={`passenger-${index}-dob`}>
+                            Date of birth
+                          </FieldLabel>
                           <TextInput
                             id={`passenger-${index}-dob`}
                             type="date"
@@ -605,7 +611,7 @@ export default function PassengerInfo() {
                           ) : null}
                         </div>
                         <div>
-                          <FieldLabel htmlFor={`passenger-${index}-gender`}>Giới tính</FieldLabel>
+                          <FieldLabel htmlFor={`passenger-${index}-gender`}>Gender</FieldLabel>
                           <select
                             id={`passenger-${index}-gender`}
                             {...register(`passengers.${index}.gender`)}
@@ -657,14 +663,14 @@ export default function PassengerInfo() {
               to="/flights"
               className="inline-flex min-h-12 items-center justify-center rounded-md border border-outline-variant/30 px-5 py-3 text-center text-sm font-semibold text-on-surface hover:bg-surface-container-low sm:min-w-28 sm:whitespace-nowrap"
             >
-              Quay lại
+              Back
             </Link>
             <Button
               type="submit"
               disabled={bookingMutation.isPending}
               icon={<ArrowRight className="h-4 w-4" strokeWidth={2} />}
             >
-              {bookingMutation.isPending ? 'Đang tạo booking...' : 'Tiếp tục chọn ghế'}
+              {bookingMutation.isPending ? 'Creating booking...' : 'Continue to seat selection'}
             </Button>
           </div>
         </form>

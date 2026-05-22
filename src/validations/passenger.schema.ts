@@ -45,11 +45,11 @@ function isUnderAgeLimit(dateOfBirth: Date, today: Date, years: number): boolean
 }
 
 const passengerSchema = z.object({
-  firstName: z.string().trim().min(1, 'Vui lòng nhập tên đệm và tên.'),
-  lastName: z.string().trim().min(1, 'Vui lòng nhập họ.'),
-  dateOfBirth: z.string().min(1, 'Vui lòng chọn ngày sinh.'),
+  firstName: z.string().trim().min(1, 'Please enter the first and middle name.'),
+  lastName: z.string().trim().min(1, 'Please enter the last name.'),
+  dateOfBirth: z.string().min(1, 'Please select a date of birth.'),
   gender: genderEnum,
-  nationality: z.string().trim().min(1, 'Thiếu quốc tịch.'),
+  nationality: z.string().trim().min(1, 'Nationality is required.'),
   passengerType: passengerTypeEnum,
   identifyType: identifyTypeEnum,
   identifyNumber: z.string().trim(),
@@ -60,7 +60,7 @@ const passengerSchema = z.object({
 
 export const passengerInfoSchema = z
   .object({
-    passengers: z.array(passengerSchema).min(1, 'Cần ít nhất một hành khách.'),
+    passengers: z.array(passengerSchema).min(1, 'At least one passenger is required.'),
   })
   .superRefine((data, ctx) => {
     const today = startOfToday();
@@ -71,14 +71,14 @@ export const passengerInfoSchema = z
         ctx.addIssue({
           code: 'custom',
           path: ['passengers', index, 'dateOfBirth'],
-          message: 'Ngày sinh không hợp lệ.',
+          message: 'Date of birth is invalid.',
         });
       } else {
         if (dateOfBirth.getTime() > today.getTime()) {
           ctx.addIssue({
             code: 'custom',
             path: ['passengers', index, 'dateOfBirth'],
-            message: 'Ngày sinh không được ở tương lai.',
+            message: 'Date of birth cannot be in the future.',
           });
         }
 
@@ -87,21 +87,21 @@ export const passengerInfoSchema = z
           ctx.addIssue({
             code: 'custom',
             path: ['passengers', index, 'dateOfBirth'],
-            message: 'Người lớn phải từ 12 tuổi trở lên.',
+            message: 'Adult passengers must be at least 12 years old.',
           });
         }
         if (passenger.passengerType === 'CHILD' && (age < 2 || age >= 12)) {
           ctx.addIssue({
             code: 'custom',
             path: ['passengers', index, 'dateOfBirth'],
-            message: 'Trẻ em phải từ 2 đến dưới 12 tuổi.',
+            message: 'Child passengers must be between 2 and under 12 years old.',
           });
         }
         if (passenger.passengerType === 'INFANT' && !isUnderAgeLimit(dateOfBirth, today, 2)) {
           ctx.addIssue({
             code: 'custom',
             path: ['passengers', index, 'dateOfBirth'],
-            message: 'Em bé phải dưới 2 tuổi.',
+            message: 'Infant passengers must be under 2 years old.',
           });
         }
       }
@@ -111,7 +111,7 @@ export const passengerInfoSchema = z
           ctx.addIssue({
             code: 'custom',
             path: ['passengers', index, 'identifyNumber'],
-            message: 'Vui lòng nhập số giấy tờ.',
+            message: 'Please enter the document number.',
           });
         }
 
@@ -121,13 +121,13 @@ export const passengerInfoSchema = z
             ctx.addIssue({
               code: 'custom',
               path: ['passengers', index, 'email'],
-              message: 'Vui lòng nhập email liên hệ.',
+              message: 'Please enter a contact email.',
             });
           } else if (!z.email().safeParse(passenger.email).success) {
             ctx.addIssue({
               code: 'custom',
               path: ['passengers', index, 'email'],
-              message: 'Email không đúng định dạng.',
+              message: 'Email format is invalid.',
             });
           }
 
@@ -135,20 +135,20 @@ export const passengerInfoSchema = z
             ctx.addIssue({
               code: 'custom',
               path: ['passengers', index, 'phone'],
-              message: 'Vui lòng nhập số điện thoại liên hệ.',
+              message: 'Please enter a contact phone number.',
             });
           } else if (!/^\+?[0-9\s()-]{8,15}$/.test(passenger.phone)) {
             ctx.addIssue({
               code: 'custom',
               path: ['passengers', index, 'phone'],
-              message: 'Số điện thoại không hợp lệ.',
+              message: 'Phone number is invalid.',
             });
           }
         } else if (passenger.phone && passenger.phone.length > MAX_PHONE_LENGTH) {
           ctx.addIssue({
             code: 'custom',
             path: ['passengers', index, 'phone'],
-            message: 'Số điện thoại không hợp lệ.',
+            message: 'Phone number is invalid.',
           });
         }
       }

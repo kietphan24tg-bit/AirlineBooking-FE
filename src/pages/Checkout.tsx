@@ -55,18 +55,18 @@ function pickBackendMessage(data: unknown): string | null {
 function paymentMethodsErrorMessage(status: number | undefined, data: unknown): string {
   const fromApi = pickBackendMessage(data);
   if (status === 404) {
-    return fromApi || 'Không tìm thấy đặt chỗ hoặc đặt chỗ không thuộc về tài khoản của bạn.';
+    return fromApi || 'Booking not found or it does not belong to your account.';
   }
   if (status === 409) {
     return (
       fromApi ||
-      'Trạng thái đặt chỗ không cho phép thanh toán. Chỉ các đặt chỗ ở trạng thái PENDING hoặc PENDING_PAYMENT mới được thanh toán.'
+      'This booking status does not allow payment. Only bookings in PENDING or PENDING_PAYMENT can be paid.'
     );
   }
   if (status === 410) {
-    return fromApi || 'Thời gian giữ vé đã hết hạn (pnrExpiresAt). Vui lòng đặt vé lại.';
+    return fromApi || 'Your booking hold has expired (pnrExpiresAt). Please book again.';
   }
-  return fromApi || 'Không thể tải phương thức thanh toán. Vui lòng thử lại.';
+  return fromApi || 'Unable to load payment methods. Please try again.';
 }
 
 function isPaymentRetryTooFastMessage(message: string | null | undefined): boolean {
@@ -74,16 +74,16 @@ function isPaymentRetryTooFastMessage(message: string | null | undefined): boole
   return (
     /please wait\s*15\s*seconds/i.test(message) ||
     /another payment/i.test(message) ||
-    /thao tác quá nhanh/i.test(message) ||
-    /vui lòng thử lại sau 15 giây/i.test(message)
+    /too fast/i.test(message) ||
+    /please try again after 15 seconds/i.test(message)
   );
 }
 
 function getPaymentRetryTooFastToastMessage(message: string | null | undefined): string {
   if (isPaymentRetryTooFastMessage(message)) {
-    return 'Bạn đang thao tác quá nhanh. Vui lòng thử lại sau 15 giây.';
+    return 'You are trying too quickly. Please try again after 15 seconds.';
   }
-  return message?.trim() || 'Bạn đang thao tác quá nhanh. Vui lòng thử lại sau 15 giây.';
+  return message?.trim() || 'You are trying too quickly. Please try again after 15 seconds.';
 }
 
 function showCheckoutErrorToast(message: string) {
@@ -133,7 +133,7 @@ function resolveDisabledMethodReason(
 ): string | null {
   if (isSelectableMethod(method)) return null;
   if (isDisabledByUnsupportedImplementation(method)) {
-    return 'Phương thức này hiện chưa được hỗ trợ.';
+    return 'This payment method is not supported yet.';
   }
 
   const remainingMs = bookingExpiresAtMs != null ? bookingExpiresAtMs - Date.now() : null;
@@ -143,18 +143,10 @@ function resolveDisabledMethodReason(
     remainingMs > 0 &&
     remainingMs < 5 * 60 * 1000
   ) {
-    return 'Thanh toán VietQR không khả dụng vì thời gian giữ chỗ còn quá ít. Vui lòng chọn phương thức thanh toán khác.';
-  }
-  if (
-    remainingMs != null &&
-    remainingMs > 0 &&
-    remainingMs < 5 * 60 * 1000 &&
-    !isPayLaterMethod(method)
-  ) {
-    return 'Tạo thanh toán không khả dụng.';
+    return 'VietQR payment is unavailable because too little hold time remains. Please choose another payment method.';
   }
 
-  return 'Phương thức này hiện không khả dụng cho đặt chỗ này.';
+  return 'This payment method is currently unavailable for this booking.';
 }
 
 function resolveRedirectUrl(res: CreatePaymentResponse): string | null {
@@ -169,15 +161,15 @@ function formatPaymentMethodName(method: PaymentMethod): string {
 
   switch (code) {
     case 'STRIPE_CARD':
-      return 'Thẻ tín dụng, thẻ ghi nợ quốc tế';
+      return 'International credit or debit card';
     case 'PAYOS_QR':
       return 'Mobile Banking VietQR';
     case 'VNPAY':
-      return 'Thanh toán VNPAY';
+      return 'VNPAY payment';
     case 'MOMO':
-      return 'Ví MoMo';
+      return 'MoMo wallet';
     case 'PAY_LATER':
-      return 'Giữ chỗ, thanh toán sau';
+      return 'Hold booking, pay later';
     default:
       return method.label;
   }
@@ -246,7 +238,6 @@ function MethodIconButton({
 export default function Checkout() {
   const navigate = useNavigate();
   const paymentRedirectingRef = useRef(false);
-  const hardBlockHandledRef = useRef(false);
   const paymentMethodsToastMessageRef = useRef<string | null>(null);
   const acceptTermsRef = useRef<HTMLInputElement | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
@@ -261,6 +252,18 @@ export default function Checkout() {
   const bookingResponse = useBookingStore((state) => state.bookingResponse);
   const clearBooking = useBookingStore((state) => state.clearBooking);
   const bookingId = bookingResponse?.bookingId ?? null;
+
+  const redirectHomeForExpiredPayment = (message?: string | null) => {
+    paymentRedirectingRef.current = true;
+    clearBooking();
+    navigate('/', {
+      replace: true,
+      state: {
+        paymentExpired: true,
+        ...(message?.trim() ? { paymentRedirectMessage: message.trim() } : {}),
+      },
+    });
+  };
 
   const { register, watch, setValue } = useForm<CheckoutFormValues>({
     defaultValues: {
@@ -421,39 +424,33 @@ export default function Checkout() {
       : null;
 
   useEffect(() => {
-    if (!paymentMethodsQuery.isError || !isHardBlock || !paymentMethodsError) {
-      hardBlockHandledRef.current = false;
+    if (!paymentMethodsQuery.isError || !paymentMethodsError) {
+      paymentMethodsToastMessageRef.current = null;
       return;
     }
-    if (hardBlockHandledRef.current) return;
-    hardBlockHandledRef.current = true;
-    paymentRedirectingRef.current = true;
-    clearBooking();
-    navigate('/', {
-      replace: true,
-      state: { paymentRedirectMessage: paymentMethodsError },
-    });
-  }, [clearBooking, isHardBlock, navigate, paymentMethodsError, paymentMethodsQuery.isError]);
-
-  useEffect(() => {
-    if (!paymentMethodsQuery.isError || !paymentMethodsError || isHardBlock) {
-      paymentMethodsToastMessageRef.current = null;
+    if (errorStatus === 410) {
+      redirectHomeForExpiredPayment(paymentMethodsError);
       return;
     }
     if (paymentMethodsToastMessageRef.current === paymentMethodsError) return;
     paymentMethodsToastMessageRef.current = paymentMethodsError;
     showCheckoutErrorToast(paymentMethodsError);
-  }, [isHardBlock, paymentMethodsError, paymentMethodsQuery.isError]);
+  }, [errorStatus, navigate, paymentMethodsError, paymentMethodsQuery.isError]);
 
   const canPay =
     paymentMethodsQuery.isSuccess &&
     supportedMethods.length > 0 &&
     !paymentMethodsQuery.isError &&
     Boolean(selectedCode) &&
-    supportedMethods.some((m) => m.code === selectedCode);
+    supportedMethods.some(
+      (m) => m.code === selectedCode && !resolveDisabledMethodReason(m, bookingExpiresAtMs)
+    );
   const showInlinePaymentMethodsError = false;
   const showInlinePaymentError = false;
   const selectedMethod = flatMethods.find((m) => m.code === selectedCode) ?? null;
+  const selectedMethodDisabledReason = selectedMethod
+    ? resolveDisabledMethodReason(selectedMethod, bookingExpiresAtMs)
+    : null;
   const payLaterSelected = isPayLaterMethod(selectedMethod);
 
   if (!hasBooking || !pricing) return null;
@@ -482,6 +479,11 @@ export default function Checkout() {
   const onPaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canPay || !acceptTerms || !bookingId || !selectedCode) return;
+    if (selectedMethodDisabledReason) {
+      setPaymentError(selectedMethodDisabledReason);
+      showCheckoutErrorToast(selectedMethodDisabledReason);
+      return;
+    }
     void (async () => {
       clearActivePaymentState({ keepError: true });
       setPaymentError(null);
@@ -502,7 +504,7 @@ export default function Checkout() {
             window.location.assign(redirectUrl);
             return;
           }
-          const fallbackMsg = 'Không nhận được liên kết thanh toán Stripe. Vui lòng thử lại.';
+          const fallbackMsg = 'Could not get the Stripe payment link. Please try again.';
           setPaymentError(fallbackMsg);
           setActivePayment(null);
           showCheckoutErrorToast(fallbackMsg);
@@ -524,8 +526,7 @@ export default function Checkout() {
             navigate(`/booking/checkout/result?${nextParams.toString()}`);
             return;
           }
-          const fallbackMsg =
-            'KhÃ´ng nháº­n Ä‘Æ°á»£c phiÃªn thanh toÃ¡n tráº£ sau. Vui lÃ²ng thá»­ láº¡i.';
+          const fallbackMsg = 'Could not create the pay-later payment session. Please try again.';
           setPaymentError(fallbackMsg);
           setActivePayment(null);
           showCheckoutErrorToast(fallbackMsg);
@@ -538,15 +539,22 @@ export default function Checkout() {
         const msg =
           pickBackendMessage(data) ||
           (status === 401 || status === 403
-            ? 'Vui lòng đăng nhập lại để tiếp tục thanh toán.'
+            ? 'Please sign in again to continue payment.'
             : status === 404 || status === 409 || status === 410
               ? paymentMethodsErrorMessage(status, data)
-              : 'Không thể tạo mã thanh toán. Vui lòng thử lại.');
+              : 'Could not create the payment code. Please try again.');
         if (isPaymentRetryTooFastMessage(msg)) {
           setPaymentError(null);
           setActivePayment(null);
           showCheckoutErrorToast(getPaymentRetryTooFastToastMessage(msg));
           setCreatingPayment(false);
+          return;
+        }
+        if (status === 410) {
+          setPaymentError(null);
+          setActivePayment(null);
+          setCreatingPayment(false);
+          redirectHomeForExpiredPayment(msg);
           return;
         }
         setPaymentError(msg);
@@ -577,10 +585,16 @@ export default function Checkout() {
       const msg =
         pickBackendMessage(data) ||
         (status === 401 || status === 403
-          ? 'Vui lòng đăng nhập lại để tiếp tục thanh toán.'
+          ? 'Please sign in again to continue payment.'
           : status === 404 || status === 409 || status === 410
             ? paymentMethodsErrorMessage(status, data)
-            : 'Không thể tạo mã thanh toán. Vui lòng thử lại.');
+            : 'Could not create the payment code. Please try again.');
+      if (status === 410) {
+        setPaymentError(null);
+        setRegeneratingPayment(false);
+        redirectHomeForExpiredPayment(msg);
+        return;
+      }
       setPaymentError(msg);
     } finally {
       setRegeneratingPayment(false);
@@ -602,8 +616,15 @@ export default function Checkout() {
       const msg =
         pickBackendMessage(data) ||
         (status === 401 || status === 403
-          ? 'Vui lòng đăng nhập lại để kiểm tra trạng thái thanh toán.'
-          : 'Không thể kiểm tra trạng thái thanh toán. Vui lòng thử lại.');
+          ? 'Please sign in again to check payment status.'
+          : status === 410
+            ? paymentMethodsErrorMessage(status, data)
+          : 'Could not check payment status. Please try again.');
+      if (status === 410) {
+        setPaymentError(null);
+        redirectHomeForExpiredPayment(msg);
+        return;
+      }
       setPaymentError(msg);
     } finally {
       setCheckingStatus(false);
@@ -613,7 +634,7 @@ export default function Checkout() {
   const handleCancelPayment = async () => {
     const paymentId = resolvePaymentId(activePayment);
     if (paymentId == null) {
-      setPaymentError('Không tìm thấy mã thanh toán để hủy.');
+      setPaymentError('No payment code was found to cancel.');
       return;
     }
     setPaymentError(null);
@@ -621,15 +642,15 @@ export default function Checkout() {
     try {
       await cancelPayment(paymentId);
       handleClosePayment();
-      toast.success('Da huy thanh toan.');
+      toast.success('Payment canceled.');
     } catch (err) {
       const status = axios.isAxiosError(err) ? err.response?.status : undefined;
       const data = axios.isAxiosError(err) ? err.response?.data : undefined;
       const msg =
         pickBackendMessage(data) ||
         (status === 401 || status === 403
-          ? 'Vui lòng đăng nhập lại để hủy thanh toán.'
-          : 'Không thể hủy thanh toán. Vui lòng thử lại.');
+          ? 'Please sign in again to cancel the payment.'
+          : 'Could not cancel the payment. Please try again.');
       setPaymentError(msg);
     } finally {
       setCancelingPayment(false);
@@ -649,20 +670,22 @@ export default function Checkout() {
         return;
       }
       setStatusOverride(next ?? 'EXPIRED');
-      paymentRedirectingRef.current = true;
-      clearBooking();
-      navigate('/', {
-        replace: true,
-        state: { paymentExpired: true },
-      });
+      redirectHomeForExpiredPayment();
     } catch (err) {
       const status = axios.isAxiosError(err) ? err.response?.status : undefined;
       const data = axios.isAxiosError(err) ? err.response?.data : undefined;
       const msg =
         pickBackendMessage(data) ||
         (status === 401 || status === 403
-          ? 'Vui lòng đăng nhập lại để kiểm tra trạng thái thanh toán.'
-          : 'Không thể kiểm tra trạng thái thanh toán. Vui lòng thử lại.');
+          ? 'Please sign in again to check payment status.'
+          : status === 410
+            ? paymentMethodsErrorMessage(status, data)
+          : 'Could not check payment status. Please try again.');
+      if (status === 410) {
+        setPaymentError(null);
+        redirectHomeForExpiredPayment(msg);
+        return;
+      }
       setPaymentError(msg);
     } finally {
       setCheckingStatus(false);
@@ -691,10 +714,7 @@ export default function Checkout() {
           errorMessage={paymentError}
         />
       )}
-      {paymentMethodsQuery.isError &&
-        paymentMethodsError &&
-        isHardBlock &&
-        !hardBlockHandledRef.current && (
+      {false && (
           <div
             className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-6"
             role="dialog"
@@ -706,7 +726,7 @@ export default function Checkout() {
                   <AlertCircle className="h-5 w-5 text-cabin-burgundy" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-base font-black text-on-surface">Không thể thanh toán</p>
+                  <p className="text-base font-black text-on-surface">Unable to pay</p>
                   <p className="mt-2 text-sm text-on-surface-variant">{paymentMethodsError}</p>
                 </div>
               </div>
@@ -717,7 +737,7 @@ export default function Checkout() {
                   onClick={() => navigate('/', { replace: true })}
                   icon={<ArrowRight className="h-4 w-4" strokeWidth={2} />}
                 >
-                  Quay lại trang chủ
+                  Back to home
                 </Button>
               </div>
             </div>
@@ -726,10 +746,10 @@ export default function Checkout() {
       <main className="relative z-10 mx-auto max-w-6xl px-6 pb-24 pt-28">
         <BookingStepper current="pay" />
         <h1 className="mb-2 font-headline text-3xl font-black text-on-surface md:text-4xl">
-          Thanh toán
+          Payment
         </h1>
         <p className="mb-10 text-on-surface-variant">
-          Hoàn tất thanh toán để xác nhận đặt vé của bạn.
+          Complete your payment to confirm your booking.
         </p>
 
         <div>
@@ -773,7 +793,7 @@ export default function Checkout() {
                       {paymentMethodsQuery.isFetching ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : null}
-                      Thử lại
+                      Retry
                     </button>
                   )}
                 </div>
@@ -789,7 +809,7 @@ export default function Checkout() {
                 >
                   <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-on-surface-variant" />
                   <p className="text-sm font-medium text-on-surface">
-                    Hiện tại chưa có phương thức thanh toán nào được hỗ trợ cho đặt chỗ này.
+                    There are currently no supported payment methods for this booking.
                   </p>
                 </div>
               )}
@@ -819,7 +839,11 @@ export default function Checkout() {
                           selected={selectedCode === method.code}
                           onSelect={() => setSelectedCode(method.code)}
                           disabledReason={resolveDisabledMethodReason(method, bookingExpiresAtMs)}
-                          disabled={methodsDisabled || !isSelectableMethod(method)}
+                          disabled={
+                            methodsDisabled ||
+                            !isSelectableMethod(method) ||
+                            Boolean(resolveDisabledMethodReason(method, bookingExpiresAtMs))
+                          }
                         />
                       ))}
                     </div>
@@ -830,37 +854,37 @@ export default function Checkout() {
 
             <div className="rounded-xl border border-luxury-gold/15 bg-white p-8 shadow-sm">
               <h2 className="mb-6 font-headline text-xl font-black text-on-surface">
-                Tóm tắt đơn hàng
+                Order summary
               </h2>
               <div className="space-y-4">
                 <div className="flex justify-between border-b border-outline-variant/20 pb-3">
-                  <span className="text-on-surface-variant">Giá vé cơ bản</span>
+                  <span className="text-on-surface-variant">Base fare</span>
                   <span className="font-bold text-on-surface">
                     {formatCurrency(pricing.baseFare)}
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-outline-variant/20 pb-3">
-                  <span className="text-on-surface-variant">Giảm giá</span>
+                  <span className="text-on-surface-variant">Discount</span>
                   <span className="font-bold text-secondary">
                     -{formatCurrency(pricing.discountAmount)}
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-outline-variant/20 pb-3">
-                  <span className="text-on-surface-variant">Thuế</span>
+                  <span className="text-on-surface-variant">Taxes</span>
                   <span className="font-bold text-on-surface">{formatCurrency(pricing.taxes)}</span>
                 </div>
                 <div className="flex justify-between border-b border-outline-variant/20 pb-3">
-                  <span className="text-on-surface-variant">Phí</span>
+                  <span className="text-on-surface-variant">Fees</span>
                   <span className="font-bold text-on-surface">{formatCurrency(pricing.fees)}</span>
                 </div>
                 <div className="flex justify-between border-b border-outline-variant/20 pb-3">
-                  <span className="text-on-surface-variant">Phí dịch vụ</span>
+                  <span className="text-on-surface-variant">Service fee</span>
                   <span className="font-bold text-on-surface">
                     {formatCurrency(checkoutServiceFee)}
                   </span>
                 </div>
                 <div className="flex justify-between pt-3">
-                  <span className="font-bold text-on-surface">Tổng cộng</span>
+                  <span className="font-bold text-on-surface">Total</span>
                   <span className="text-2xl font-black text-secondary">
                     {formatCurrency(pricing.discountedTotalPrice)}
                   </span>
@@ -880,13 +904,13 @@ export default function Checkout() {
                   className="mt-1 h-4 w-4 cursor-pointer"
                 />
                 <span className="text-sm text-on-surface-variant">
-                  Tôi đồng ý với{' '}
+                  I agree to the{' '}
                   <Link to="#" className="font-bold text-midnight-burgundy hover:underline">
-                    Điều khoản và Điều kiện
+                    Terms and Conditions
                   </Link>{' '}
-                  và{' '}
+                  and{' '}
                   <Link to="#" className="font-bold text-midnight-burgundy hover:underline">
-                    Chính sách Bảo mật
+                    Privacy Policy
                   </Link>
                 </span>
               </label>
@@ -899,7 +923,7 @@ export default function Checkout() {
                   payLaterSelected ? 'hidden' : ''
                 }`}
               >
-                Mua thêm
+                Add extras
               </Link>
               <Button
                 key={`checkout-submit-${resumeVersion}-${selectedCode ?? 'none'}-${acceptTerms ? '1' : '0'}-${creatingPayment ? 'busy' : 'idle'}`}
@@ -907,7 +931,7 @@ export default function Checkout() {
                 disabled={!acceptTerms || !canPay || creatingPayment}
                 icon={<ArrowRight className="h-4 w-4" strokeWidth={2} />}
               >
-                {creatingPayment ? 'Đang xử lý...' : 'Thanh toán ngay'}
+                {creatingPayment ? 'Processing...' : 'Pay now'}
               </Button>
             </div>
           </form>

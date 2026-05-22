@@ -34,7 +34,6 @@ export default function ManageBooking() {
 
     setMockManageBookingMode(true);
     resetMockManageBookingVariant(mockVariant);
-    // Drop any stale persisted lookup/manage data so the mock variant fully owns the screen.
     clearBooking();
 
     if (autoSearchedRef.current) return;
@@ -58,7 +57,7 @@ export default function ManageBooking() {
         setShowResult(true);
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : 'Không thể tải dữ liệu booking mẫu.'
+          error instanceof Error ? error.message : 'Unable to load the sample booking data.'
         );
       } finally {
         setSearching(false);
@@ -77,7 +76,7 @@ export default function ManageBooking() {
     const pnrTrimmed = pnr.trim();
     const nameTrimmed = name.trim();
     if (!pnrTrimmed || !nameTrimmed) {
-      alert('Vui lòng nhập mã đặt chỗ (PNR) và họ của hành khách.');
+      alert('Please enter the booking reference (PNR) and the passenger last name.');
       return;
     }
 
@@ -95,7 +94,6 @@ export default function ManageBooking() {
         lastName: nameTrimmed,
       });
       setBookingLookup(lookup);
-      // Manage-options is a non-blocking enrichment; the overview still renders if it fails.
       try {
         const options = await bookingService.getManageOptions(lookup.booking.bookingId);
         setManageOptions(options);
@@ -106,7 +104,9 @@ export default function ManageBooking() {
     } catch (error) {
       setManageOptions(null);
       setShowResult(false);
-      setErrorMessage(error instanceof Error ? error.message : 'Không tìm thấy thông tin đặt chỗ.');
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Booking information could not be found.'
+      );
     } finally {
       setSearching(false);
     }
@@ -119,10 +119,10 @@ export default function ManageBooking() {
         <div className="flex flex-row items-center justify-between">
           <div>
             <h1 className="mb-2 font-headline text-3xl font-black text-on-surface md:text-5xl">
-              Quản lý đặt chỗ
+              Manage Booking
             </h1>
             <p className="mb-5 text-on-surface-variant">
-              Nhập thông tin chính xác theo giấy tờ tùy thân để làm thủ tục suôn sẻ.
+              Enter the details exactly as shown on the travel document for a smoother check-in.
             </p>
           </div>
           {showResult ? (
@@ -130,7 +130,7 @@ export default function ManageBooking() {
               onClick={() => setShowResult(false)}
               className="flex h-full w-50 items-center justify-center gap-2 rounded-lg bg-midnight-burgundy py-4 font-headline font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-95"
             >
-              Tìm kiếm đặt chỗ mới
+              Search another booking
             </button>
           ) : null}
         </div>
@@ -146,7 +146,7 @@ export default function ManageBooking() {
                   htmlFor="pnr"
                   className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
                 >
-                  MÃ ĐẶT CHỖ (PNR)
+                  BOOKING REFERENCE (PNR)
                 </label>
                 <div className="flex items-center gap-2">
                   <Ticket className="h-5 w-5 shrink-0 text-midnight-burgundy" strokeWidth={1.75} />
@@ -154,7 +154,7 @@ export default function ManageBooking() {
                     id="pnr"
                     name="pnr"
                     type="text"
-                    placeholder="Nhập mã đặt chỗ"
+                    placeholder="Enter booking reference"
                     value={pnr}
                     onChange={(e) => setPnr(e.target.value)}
                     autoComplete="off"
@@ -168,7 +168,7 @@ export default function ManageBooking() {
                   htmlFor="name"
                   className="font-label block text-[0.6875rem] font-bold uppercase tracking-widest text-midnight-burgundy/60"
                 >
-                  HỌ (THEO GIẤY TỜ)
+                  LAST NAME (ON DOCUMENT)
                 </label>
                 <div className="flex items-center gap-2">
                   <User className="h-5 w-5 shrink-0 text-midnight-burgundy" strokeWidth={1.75} />
@@ -176,7 +176,7 @@ export default function ManageBooking() {
                     id="name"
                     name="name"
                     type="text"
-                    placeholder="Nhập họ của hành khách"
+                    placeholder="Enter passenger last name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     autoComplete="name"
@@ -191,7 +191,7 @@ export default function ManageBooking() {
                 disabled={searching}
                 className="flex h-full w-full items-center justify-center gap-2 rounded-lg bg-midnight-burgundy py-4 font-headline font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {searching ? 'ĐANG TÌM KIẾM...' : 'TÌM ĐẶT CHỖ'}
+                {searching ? 'SEARCHING...' : 'FIND BOOKING'}
                 <ArrowRight className="h-5 w-5" strokeWidth={2} />
               </button>
             </div>

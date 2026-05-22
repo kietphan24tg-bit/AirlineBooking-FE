@@ -26,7 +26,7 @@ const MOCK_PAYMENT_METHODS: PaymentMethodsResponse = {
   groups: [
     {
       type: 'CARD',
-      label: 'Thẻ & ngân hàng',
+      label: 'Cards & banking',
       methods: [
         {
           code: 'PAYOS_QR',
@@ -40,11 +40,11 @@ const MOCK_PAYMENT_METHODS: PaymentMethodsResponse = {
     },
     {
       type: 'PAY_LATER',
-      label: 'Thanh toán sau',
+      label: 'Pay later',
       methods: [
         {
           code: 'PAY_LATER',
-          label: 'Giữ chỗ, thanh toán sau',
+          label: 'Hold booking, pay later',
           provider: 'PAYOS',
           icon: null,
           supported: true,

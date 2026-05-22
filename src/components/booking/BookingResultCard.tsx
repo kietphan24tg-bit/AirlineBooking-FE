@@ -41,21 +41,21 @@ function resolveStatusDisplay(status: string): StatusDisplay {
         textClass: 'text-green-600',
         iconBgClass: 'bg-green-500',
         showSuccessIcon: true,
-        caption: 'Đặt chỗ đã được xác nhận và thanh toán',
+        caption: 'This booking has been confirmed and paid.',
       };
     case 'CHECKED_IN':
       return {
         textClass: 'text-emerald-700',
         iconBgClass: 'bg-emerald-600',
         showSuccessIcon: true,
-        caption: 'Hành khách đã hoàn tất check-in trực tuyến',
+        caption: 'Passengers have completed online check-in.',
       };
     case 'CANCELLED':
       return {
         textClass: 'text-red-600',
         iconBgClass: 'bg-red-500',
         showSuccessIcon: false,
-        caption: 'Đặt chỗ đã bị hủy. Vui lòng liên hệ tổng đài nếu cần hoàn tiền.',
+        caption: 'This booking has been cancelled. Contact support if you need a refund.',
       };
     case 'PENDING_PAYMENT':
     case 'PENDING':
@@ -63,14 +63,14 @@ function resolveStatusDisplay(status: string): StatusDisplay {
         textClass: 'text-amber-600',
         iconBgClass: 'bg-amber-500',
         showSuccessIcon: false,
-        caption: 'Đặt chỗ đang chờ thanh toán. Hoàn tất trước khi hết thời gian giữ chỗ.',
+        caption: 'This booking is awaiting payment. Complete it before the hold expires.',
       };
     default:
       return {
         textClass: 'text-on-surface',
         iconBgClass: 'bg-surface-container-high',
         showSuccessIcon: false,
-        caption: 'Trạng thái đặt chỗ',
+        caption: 'Booking status',
       };
   }
 }
@@ -103,8 +103,8 @@ function buildManageActions(
     {
       key: 'check-in',
       enabled: actions.canCheckIn,
-      label: 'Check-in trực tuyến',
-      description: 'Làm thủ tục trực tuyến và nhận thẻ lên máy bay',
+      label: 'Online check-in',
+      description: 'Check in online and receive your boarding pass',
       icon: SquareCheckBig,
       iconClass: 'bg-midnight-burgundy stroke-luxury-gold',
       onClick: () => navigate('/manage-booking/check-in'),
@@ -112,8 +112,8 @@ function buildManageActions(
     {
       key: 'ancillaries',
       enabled: actions.canBuyAncillaries || Boolean(actions.canBuyAancillaries),
-      label: 'Mua thêm tiện ích',
-      description: 'Hành lý, suất ăn',
+      label: 'Add extras',
+      description: 'Baggage, meals',
       icon: PlaneTakeoff,
       iconClass: 'bg-midnight-burgundy stroke-luxury-gold',
       onClick: () => navigate('/manage-booking/add-services'),
@@ -121,8 +121,8 @@ function buildManageActions(
     {
       key: 'seat',
       enabled: actions.canSelectSeat,
-      label: 'Chọn chỗ ngồi',
-      description: 'Lựa chọn chỗ ngồi thoải mái cho chuyến đi',
+      label: 'Choose seats',
+      description: 'Pick a comfortable seat for your trip',
       icon: Armchair,
       iconClass: 'bg-midnight-burgundy stroke-luxury-gold',
       onClick: () => navigate('/manage-booking/seat-selection'),
@@ -130,8 +130,8 @@ function buildManageActions(
     {
       key: 'change-flight',
       enabled: actions.canChangeFlight,
-      label: 'Thay đổi chuyến bay',
-      description: 'Thay đổi ngày giờ hoặc hành trình',
+      label: 'Change flight',
+      description: 'Change the date, time, or itinerary',
       icon: PlaneTakeoff,
       iconClass: 'bg-midnight-burgundy stroke-luxury-gold',
       onClick: () => navigate('/manage-booking/change-flight'),
@@ -139,8 +139,8 @@ function buildManageActions(
     {
       key: 'cancel',
       enabled: actions.canCancel,
-      label: 'Hủy chuyến bay',
-      description: 'Hủy chuyến và yêu cầu hoàn tiền',
+      label: 'Cancel flight',
+      description: 'Cancel the trip and request a refund',
       icon: CircleX,
       iconClass: 'bg-midnight-burgundy stroke-red-300',
       textClass: 'text-on-surface',
@@ -195,7 +195,7 @@ function PassengerCard({
       ? `${service.optionName} x${service.quantity}`
       : service.serviceName
         ? `${service.serviceName}${service.quantity > 1 ? ` x${service.quantity}` : ''}`
-        : 'Dịch vụ'
+        : 'Service'
   );
 
   return (
@@ -223,7 +223,7 @@ function PassengerCard({
 
           <span className="inline-flex w-fit items-center gap-2 rounded-full border border-[#d7f0df] bg-[#f5fbf7] px-3 py-1.5 text-xs font-semibold text-[#0f8a5f]">
             <span className="h-2 w-2 rounded-full bg-[#10b981]" />
-            Đã xác nhận
+            Confirmed
           </span>
         </div>
 
@@ -246,7 +246,7 @@ function PassengerCard({
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
-                SĐT
+                Phone
               </p>
               <p className="mt-1 truncate text-sm font-medium text-[#0f172a]">{phone}</p>
             </div>
@@ -256,12 +256,12 @@ function PassengerCard({
         <div className="flex flex-wrap gap-2">
           {seats.length > 0 ? (
             <span className="inline-flex rounded-full border border-[#dbe3ec] bg-[#f8fafc] px-3 py-1.5 text-sm font-medium text-[#334155]">
-              Ghế {seats.map((seat) => seat.seatNumber).join(', ')}
+              Seat {seats.map((seat) => seat.seatNumber).join(', ')}
             </span>
           ) : null}
 
           <span className="inline-flex rounded-full border border-[#dbe3ec] bg-[#f8fafc] px-3 py-1.5 text-sm font-medium text-[#334155]">
-            {carryOnWeight}kg miễn cước
+            {carryOnWeight}kg included
           </span>
 
           {serviceLabels.map((label) => (
@@ -314,7 +314,7 @@ export default function BookingResultCard() {
           <div className="flex flex-row items-start justify-between">
             <div className="flex flex-col">
               <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Trạng thái đặt chỗ
+                Booking status
               </p>
               <div className="mt-1 flex items-center gap-2">
                 {status.showSuccessIcon ? (
@@ -329,7 +329,7 @@ export default function BookingResultCard() {
                   <p className="mt-0.5 text-xs text-on-surface-variant">{status.caption}</p>
                   {booking.expiresAt ? (
                     <p className="mt-0.5 flex items-center gap-1 text-xs text-amber-600">
-                      <Clock className="h-3 w-3" /> Hết hạn: {booking.expiresAt}
+                      <Clock className="h-3 w-3" /> Expires: {booking.expiresAt}
                     </p>
                   ) : null}
                 </div>
@@ -338,7 +338,7 @@ export default function BookingResultCard() {
 
             <div className="flex flex-col">
               <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Mã đặt chỗ (PNR)
+                Booking reference (PNR)
               </p>
               <h1 className="mt-1 text-lg font-bold text-on-surface">{booking.pnrCode}</h1>
             </div>
@@ -349,7 +349,7 @@ export default function BookingResultCard() {
               onClick={() => setShowPriceDetail(!showPriceDetail)}
             >
               <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Tổng tiền
+                Total amount
               </p>
               <div className="mt-1 flex items-center gap-1">
                 <h1 className="text-lg font-bold text-midnight-burgundy">
@@ -366,37 +366,37 @@ export default function BookingResultCard() {
                 <div className="absolute right-0 top-full z-10 mt-2 flex w-64 animate-in flex-col rounded-lg border border-gray-100 bg-white p-4 text-sm shadow-xl fade-in slide-in-from-top-2">
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-on-surface-variant">Giá vé cơ bản:</span>
+                      <span className="text-on-surface-variant">Base fare:</span>
                       <span className="font-medium">
                         {formatMoney(price.baseFare, price.currency)}
                       </span>
                     </div>
                     {price.discount !== 0 ? (
                       <div className="flex justify-between text-green-600">
-                        <span>Giảm giá:</span>
+                        <span>Discount:</span>
                         <span className="font-medium">
                           {formatMoney(price.discount, price.currency)}
                         </span>
                       </div>
                     ) : null}
                     <div className="flex justify-between">
-                      <span className="text-on-surface-variant">Thuế:</span>
+                      <span className="text-on-surface-variant">Taxes:</span>
                       <span className="font-medium">{formatMoney(price.tax, price.currency)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-on-surface-variant">Phí dịch vụ:</span>
+                      <span className="text-on-surface-variant">Service fee:</span>
                       <span className="font-medium">
                         {formatMoney(price.serviceFee, price.currency)}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-on-surface-variant">Phí chọn chỗ:</span>
+                      <span className="text-on-surface-variant">Seat selection fee:</span>
                       <span className="font-medium">
                         {formatMoney(price.seatFee, price.currency)}
                       </span>
                     </div>
                     <div className="mt-2 flex justify-between border-t border-gray-100 pt-2">
-                      <span className="text-base font-bold">Tổng cộng:</span>
+                      <span className="text-base font-bold">Grand total:</span>
                       <span className="text-base font-bold text-midnight-burgundy">
                         {formatMoney(price.total, price.currency)}
                       </span>
@@ -409,7 +409,7 @@ export default function BookingResultCard() {
         </div>
 
         <div className="flex flex-col rounded-xl bg-white p-7">
-          <p className="text-sm font-bold text-on-surface-variant">Thông tin chuyến bay</p>
+          <p className="text-sm font-bold text-on-surface-variant">Flight information</p>
           {itineraries.map((itin, idx) => {
             const isReturn = idx > 0;
             const date = new Date(itin.departureTime);
@@ -427,9 +427,9 @@ export default function BookingResultCard() {
               <div key={itin.flightId} className="mb-5 mt-5 flex flex-row">
                 <div className="flex w-40 flex-col items-center justify-center">
                   <div className="flex w-23 items-center justify-center rounded-sm bg-secondary-fixed">
-                    {isReturn ? 'Chuyến về' : 'Chuyến đi'}
+                    {isReturn ? 'Return' : 'Outbound'}
                   </div>
-                  <p className="text-xs text-on-surface-variant">Ngày</p>
+                  <p className="text-xs text-on-surface-variant">Date</p>
                   <p className="font-bold text-on-surface">{dateStr}</p>
                 </div>
 
@@ -457,8 +457,8 @@ export default function BookingResultCard() {
                 </div>
 
                 <div className="flex w-50 flex-col items-start justify-center pl-3">
-                  <p>Hạng vé: {itin.fareName}</p>
-                  <p>Tình trạng: {itin.flightStatus}</p>
+                  <p>Fare: {itin.fareName}</p>
+                  <p>Status: {itin.flightStatus}</p>
                 </div>
               </div>
             );
@@ -466,9 +466,9 @@ export default function BookingResultCard() {
         </div>
 
         <div className="flex flex-col rounded-xl bg-white p-7">
-          <p className="mb-2 text-base font-semibold text-[#0f172a]">Danh sách hành khách</p>
+          <p className="mb-2 text-base font-semibold text-[#0f172a]">Passenger list</p>
           <p className="mb-6 max-w-2xl text-sm leading-6 text-[#64748b]">
-            Thông tin liên hệ và dịch vụ đi kèm của từng hành khách.
+            Contact details and included services for each passenger.
           </p>
           <div className="space-y-4">
             {passengers.map((passenger, idx) => (
@@ -486,11 +486,11 @@ export default function BookingResultCard() {
       </div>
 
       <div className="flex w-full flex-col rounded-xl bg-white p-7">
-        <p className="mb-4 text-xl font-bold">Quản lý đặt chỗ</p>
+        <p className="mb-4 text-xl font-bold">Manage booking</p>
 
         {enabledManageActions.length === 0 ? (
           <p className="rounded-lg border border-dashed border-gray-200 p-4 text-sm text-on-surface-variant">
-            Hiện không có thao tác nào khả dụng cho trạng thái{' '}
+            No actions are currently available for status{' '}
             <span className="font-semibold">{booking.statusLabel}</span>.
           </p>
         ) : (
@@ -520,3 +520,4 @@ export default function BookingResultCard() {
     </div>
   );
 }
+

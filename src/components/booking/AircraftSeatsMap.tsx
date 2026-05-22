@@ -91,8 +91,8 @@ function getDisplayPriceText(
   assigned?: AssignedSeatMeta | null
 ): string {
   if (assigned?.label?.trim()) return assigned.label.trim();
-  if (assigned?.isYours) return 'Đã chọn';
-  if (assigned && !assigned.isYours) return 'Đã giữ';
+  if (assigned?.isYours) return 'Reserved';
+  if (assigned && !assigned.isYours) return 'Reserved';
 
   const text = cell.displayPrice?.text?.trim();
   if (text) return normalizeSeatPriceText(text);
@@ -102,15 +102,15 @@ function getDisplayPriceText(
 
   if (!cell.selectable) {
     return cell.pricingBadge?.code === 'NOT_ALLOWED' || cell.reason === 'SEAT_NOT_ALLOWED_FOR_FARE'
-      ? 'Không được phép'
-      : 'Không khả dụng';
+      ? 'Not allowed'
+      : 'Unavailable';
   }
 
-  if (cell.displayPrice?.type === 'FREE' || cell.pricingBadge?.code === 'FREE') return 'Miễn phí';
+  if (cell.displayPrice?.type === 'FREE' || cell.pricingBadge?.code === 'FREE') return 'Free';
   if (cell.extraPrice != null && cell.extraPrice > 0) {
     return `${cell.extraPrice.toLocaleString('vi-VN')} ${cell.currency ?? ''}`.trim();
   }
-  return 'Miễn phí';
+  return 'Free';
 }
 
 function getSeatCellViewModel(
@@ -121,7 +121,7 @@ function getSeatCellViewModel(
   if (assigned) {
     return {
       title: cell.seatNumber,
-      subtitle: assigned.isYours ? 'Đã chọn' : 'Đã giữ',
+      subtitle: 'Reserved',
       appearance: 'assigned',
       disabled: true,
     };
@@ -248,8 +248,8 @@ function getSeatDetailViewModel(
       seatType: typeDisplay.label,
       seatCategory: categoryDisplay.label,
       description: categoryDisplay.description || typeDisplay.description || '',
-      status: assigned.isYours ? 'Đã chọn' : 'Đã xác nhận (hành khách khác)',
-      includedInFare: seat.included ? 'Có' : 'Không',
+      status: 'Reserved',
+      includedInFare: seat.included ? 'Yes' : 'No',
       surchargeText:
         effectiveSurchargeAmount == null || effectiveSurchargeCurrency == null
           ? '-'
@@ -267,7 +267,7 @@ function getSeatDetailViewModel(
     seatCategory: categoryDisplay.label,
     description: categoryDisplay.description || typeDisplay.description || '',
     status: statusDisplay.label,
-    includedInFare: seat.included ? 'Có' : 'Không',
+    includedInFare: seat.included ? 'Yes' : 'No',
     surchargeText:
       seat.extraPrice == null || seat.currency == null
         ? '-'
@@ -433,7 +433,7 @@ function DetailPanel({
         ) : (
           <div className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-md border border-slate-400/30 bg-slate-100/90 text-sm font-bold text-slate-800">
             <Check className="h-4 w-4" />
-            Ghe da duoc giao
+            This seat is reserved by another passenger
           </div>
         )
       ) : (
@@ -512,7 +512,7 @@ function CompactSelectionBar({
         ) : (
           <div className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md border border-slate-400/30 bg-slate-100/90 px-5 text-sm font-bold text-slate-800">
             <Check className="h-4 w-4" />
-            Đã chọn
+            Selected
           </div>
         )
       ) : (
@@ -572,11 +572,11 @@ export default function AircraftSeatsMap({
         <div>
           <h1 className="mb-2 flex items-center gap-2 font-headline text-xl font-black text-midnight-burgundy">
             <List className="h-5 w-5" />
-            Chọn ghế
+            Select seat
           </h1>
           <p className="text-sm text-on-surface-variant">
             {headerSubtitle ??
-              (seatMap ? `${seatMap.fareCode} seat map` : 'Chọn ghế phù hợp theo điều kiện hạng vé của bạn.')}
+              (seatMap ? `${seatMap.fareCode} seat map` : 'Choose a seat that matches your fare conditions.')}
           </p>
           {seatMap?.policyDisplay ? (
             <div className="mt-3 max-w-3xl">
@@ -593,7 +593,7 @@ export default function AircraftSeatsMap({
         {loading ? (
           <div className="flex min-h-[24rem] flex-col items-center justify-center rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-10 text-center text-sm text-on-surface-variant">
             <Loader2 className="h-8 w-8 animate-spin text-midnight-burgundy mb-3" />
-            Đang tải sơ đồ chỗ ngồi...
+            Loading seat map...
           </div>
         ) : null}
 
@@ -605,7 +605,7 @@ export default function AircraftSeatsMap({
 
         {!loading && !error && !seatMap ? (
           <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-10 text-center text-sm text-on-surface-variant">
-            Không tìm thấy flightId hoặc fareId trong store để tải sơ đồ ghế.
+            Flight ID or fare ID was not found in the store for loading the seat map.
           </div>
         ) : null}
 
@@ -616,25 +616,25 @@ export default function AircraftSeatsMap({
                 <div className="grid gap-4 text-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                   <div>
                     <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-on-surface-variant">
-                      Trạng thái ghế
+                      Seat status
                     </p>
                     <div className="flex flex-wrap gap-4">
-                      <LegendSwatch className="border-emerald-300 bg-emerald-50" label="Có thể chọn" />
+                      <LegendSwatch className="border-emerald-300 bg-emerald-50" label="Selectable" />
                       <LegendSwatch
                         className="border-outline-variant/30 bg-surface-container-high"
-                        label="Không khả dụng"
+                        label="Unavailable"
                       />
-                      <LegendSwatch className="border-rose-200 bg-rose-50" label="Không được phép" />
-                      <LegendSwatch className="border-slate-500 bg-slate-200" label="Ghế của bạn" />
+                      <LegendSwatch className="border-rose-200 bg-rose-50" label="Not allowed" />
+                      <LegendSwatch className="border-slate-500 bg-slate-200" label="Reserved" />
                     </div>
                   </div>
                   <div>
                     <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-on-surface-variant">
-                      Mức giá
+                      Price
                     </p>
                     <div className="flex flex-wrap gap-4">
-                      <LegendSwatch className="border-emerald-300 bg-emerald-50" label="Miễn phí" />
-                      <LegendSwatch className="border-amber-300 bg-amber-50" label="Có phí" />
+                      <LegendSwatch className="border-emerald-300 bg-emerald-50" label="Free" />
+                      <LegendSwatch className="border-amber-300 bg-amber-50" label="Paid" />
                     </div>
                   </div>
                 </div>

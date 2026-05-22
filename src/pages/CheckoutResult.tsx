@@ -14,7 +14,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import AmbientSweep from '../components/layout/AmbientSweep';
 import SiteFooter from '../components/layout/SiteFooter';
@@ -50,20 +50,20 @@ function pickBackendMessage(data: unknown): string | null {
 function formatCurrency(amount: number | null | undefined, currency = 'VND'): string {
   if (amount == null) return '--';
   try {
-    return new Intl.NumberFormat('vi-VN', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency,
       maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
     }).format(amount);
   } catch {
-    return `${amount.toLocaleString('vi-VN')} ${currency}`;
+    return `${amount.toLocaleString('en-US')} ${currency}`;
   }
 }
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return '--';
   try {
-    return new Intl.DateTimeFormat('vi-VN', {
+    return new Intl.DateTimeFormat('en-US', {
       hour: '2-digit',
       minute: '2-digit',
       day: '2-digit',
@@ -78,7 +78,7 @@ function formatDateTime(value: string | null | undefined): string {
 function formatDate(value: string | null | undefined): string {
   if (!value) return '--';
   try {
-    return new Intl.DateTimeFormat('vi-VN', {
+    return new Intl.DateTimeFormat('en-US', {
       weekday: 'short',
       day: '2-digit',
       month: '2-digit',
@@ -92,7 +92,7 @@ function formatDate(value: string | null | undefined): string {
 function formatTime(value: string | null | undefined): string {
   if (!value) return '--';
   try {
-    return new Intl.DateTimeFormat('vi-VN', {
+    return new Intl.DateTimeFormat('en-US', {
       hour: '2-digit',
       minute: '2-digit',
     }).format(new Date(value));
@@ -128,7 +128,7 @@ function maskPhone(phone: string | null | undefined): string {
 function paymentMethodLabel(method: string | null | undefined): string {
   if (!method) return '--';
   const normalized = method.trim().toUpperCase();
-  if (normalized.includes('PAY_LATER')) return 'Thanh toán sau';
+  if (normalized.includes('PAY_LATER')) return 'Pay later';
   if (normalized.includes('STRIPE')) return 'Stripe';
   if (normalized.includes('PAYOS') || normalized.includes('VIETQR')) return 'VietQR / PayOS';
   return method;
@@ -150,14 +150,14 @@ function getQrImageUrlFromData(qrData: string): string {
 
 function passengerTypeLabel(type: string | null | undefined): string {
   const normalized = (type ?? '').trim().toUpperCase();
-  if (normalized === 'ADULT') return 'Người lớn';
-  if (normalized === 'CHILD') return 'Trẻ em';
-  if (normalized === 'INFANT') return 'Em bé';
-  return type || 'Hành khách';
+  if (normalized === 'ADULT') return 'Adult';
+  if (normalized === 'CHILD') return 'Child';
+  if (normalized === 'INFANT') return 'Infant';
+  return type || 'Passenger';
 }
 
 function resolveSeatText(seat: PaymentResultSummarySeat | null | undefined): string {
-  if (!seat || !seat.assigned || !seat.seatNumber) return 'Chưa chọn ghế';
+  if (!seat || !seat.assigned || !seat.seatNumber) return 'Seat not selected';
   return seat.seatNumber;
 }
 
@@ -186,16 +186,16 @@ function servicesForSegment(
 function statusErrorMessage(error: unknown): string {
   const status = axios.isAxiosError(error) ? error.response?.status : undefined;
   const data = axios.isAxiosError(error) ? error.response?.data : undefined;
-  if (status === 404) return 'Không tìm thấy phiên thanh toán.';
-  return pickBackendMessage(data) || 'Không thể kiểm tra trạng thái thanh toán.';
+  if (status === 404) return 'Payment session not found.';
+  return pickBackendMessage(data) || 'Unable to check payment status.';
 }
 
 function summaryErrorMessage(error: unknown): string {
   const status = axios.isAxiosError(error) ? error.response?.status : undefined;
   const data = axios.isAxiosError(error) ? error.response?.data : undefined;
-  if (status === 404) return 'Không tìm thấy thông tin thanh toán.';
-  if (status === 409) return 'Thanh toán đang được xác nhận, vui lòng đợi trong giây lát.';
-  return pickBackendMessage(data) || 'Không thể tải thông tin thanh toán thành công.';
+  if (status === 404) return 'Payment details not found.';
+  if (status === 409) return 'Payment is being confirmed. Please wait a moment.';
+  return pickBackendMessage(data) || 'Unable to load payment confirmation details.';
 }
 
 function isSummaryConflict(error: unknown): boolean {
@@ -413,18 +413,18 @@ function SuccessHero({ summary }: { summary: PaymentResultSummaryResponse }) {
           <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-luxury-gold/50 to-transparent" />
           <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
             <CheckCircle2 className="h-4 w-4" strokeWidth={2.2} />
-            Thanh toÃƒÂ¡n hoÃƒÂ n tÃ¡ÂºÂ¥t
+            Payment complete
           </div>
           <p className="mt-6 font-headline text-sm font-black uppercase tracking-[0.22em] text-midnight-burgundy">
             The Sovereign
           </p>
           <h1 className="mt-3 max-w-3xl font-headline text-3xl font-black tracking-tight text-on-surface sm:text-4xl lg:text-[2.8rem]">
-            Thanh toÃƒÂ¡n thÃƒÂ nh cÃƒÂ´ng
+            Payment successful
           </h1>
           <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                MÃƒÂ£ Ã„â€˜Ã¡ÂºÂ·t chÃ¡Â»â€”
+                Booking code
               </p>
               <p className="mt-2 font-mono text-xl font-black tracking-[0.18em] text-midnight-burgundy">
                 {summary.booking.pnrCode}
@@ -432,7 +432,7 @@ function SuccessHero({ summary }: { summary: PaymentResultSummaryResponse }) {
             </div>
             <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                NgÃ†Â°Ã¡Â»Âi liÃƒÂªn hÃ¡Â»â€¡
+                Contact person
               </p>
               <p className="mt-2 text-sm font-bold text-on-surface">{summary.contact.fullName || '--'}</p>
             </div>
@@ -444,13 +444,13 @@ function SuccessHero({ summary }: { summary: PaymentResultSummaryResponse }) {
             </div>
             <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                SÃ¡Â»â€˜ Ã„â€˜iÃ¡Â»â€¡n thoÃ¡ÂºÂ¡i
+                Phone number
               </p>
               <p className="mt-2 text-sm font-bold text-on-surface">{maskPhone(summary.contact.phone)}</p>
             </div>
             <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                Ã„ÂÃƒÂ£ thanh toÃƒÂ¡n lÃƒÂºc
+                Paid at
               </p>
               <p className="mt-2 text-sm font-bold text-on-surface">
                 {formatDateTime(summary.booking.paidAt)}
@@ -458,10 +458,10 @@ function SuccessHero({ summary }: { summary: PaymentResultSummaryResponse }) {
             </div>
             <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                HÃƒÂ nh khÃƒÂ¡ch
+                Passengers
               </p>
               <p className="mt-2 text-sm font-bold text-on-surface">
-                {summary.summary.passengerCount ?? summary.passengers.length} hÃƒÂ nh khÃƒÂ¡ch
+                {summary.summary.passengerCount ?? summary.passengers.length} passengers
               </p>
             </div>
           </div>
@@ -470,27 +470,27 @@ function SuccessHero({ summary }: { summary: PaymentResultSummaryResponse }) {
         <div className="relative overflow-hidden border-t border-luxury-gold/10 bg-[linear-gradient(180deg,rgba(125,6,51,0.96),rgba(62,16,30,0.96))] px-7 py-8 text-white lg:border-l lg:border-t-0 lg:px-8 lg:py-10">
           <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-luxury-gold/10 blur-3xl" />
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-luxury-gold/80">
-            TÃ¡Â»â€¢ng thanh toÃƒÂ¡n
+            Total payment
           </p>
           <p className="mt-3 font-headline text-4xl font-black tracking-tight text-luxury-gold">
             {formatCurrency(summary.summary.totalAmount ?? summary.payment.amount, summary.summary.currency)}
           </p>
           <div className="mt-8 space-y-4 border-t border-luxury-gold/15 pt-6">
             <div className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-white/70">TrÃ¡ÂºÂ¡ng thÃƒÂ¡i</span>
+              <span className="text-white/70">Status</span>
               <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-luxury-gold">
                 <CheckCircle2 className="h-4 w-4" />
-                ThÃƒÂ nh cÃƒÂ´ng
+                Successful
               </span>
             </div>
             <div className="flex items-start justify-between gap-4 text-sm">
-              <span className="text-white/70">PhÃ†Â°Ã†Â¡ng thÃ¡Â»Â©c</span>
+              <span className="text-white/70">Payment method</span>
               <span className="max-w-[11rem] text-right font-semibold text-white">
                 {paymentMethodLabel(summary.payment.method)}
               </span>
             </div>
             <div className="flex items-start justify-between gap-4 text-sm">
-              <span className="text-white/70">MÃƒÂ£ giao dÃ¡Â»â€¹ch</span>
+              <span className="text-white/70">Transaction ID</span>
               <span className="max-w-[11rem] text-right font-semibold text-white">
                 {summary.payment.transactionId || '--'}
               </span>
@@ -509,45 +509,45 @@ function PostPaymentInfo({ summary }: { summary: PaymentResultSummaryResponse })
         <div className="flex flex-col gap-2 border-b border-luxury-gold/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.22em] text-midnight-burgundy">
-              LiÃƒÂªn hÃ¡Â»â€¡ Ã„â€˜Ã¡ÂºÂ·t chÃ¡Â»â€”
+              Booking contact
             </p>
             <h2 className="mt-2 font-headline text-2xl font-black tracking-tight text-on-surface">
-              HÃ¡Â»â€œ sÃ†Â¡ sau thanh toÃƒÂ¡n
+              Post-payment record
             </h2>
           </div>
           <p className="text-sm text-on-surface-variant">
-            ThÃƒÂ´ng tin liÃƒÂªn hÃ¡Â»â€¡ Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c Ã„â€˜Ã†Â°a lÃƒÂªn khu vÃ¡Â»Â±c xÃƒÂ¡c nhÃ¡ÂºÂ­n phÃƒÂ­a trÃƒÂªn Ã„â€˜Ã¡Â»Æ’ dÃ¡Â»â€¦ theo dÃƒÂµi.
+            Contact details are shown in the confirmation area above for easy reference.
           </p>
         </div>
 
         <div className="mt-6 space-y-4">
           <div className="rounded-[1.5rem] border border-luxury-gold/12 bg-surface-container-low px-5 py-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-              TrÃ¡ÂºÂ¡ng thÃƒÂ¡i xÃ¡Â»Â­ lÃƒÂ½
+              Status xử lý
             </p>
-            <p className="mt-2 text-lg font-black text-on-surface">Ã„ÂÃ¡ÂºÂ·t chÃ¡Â»â€” Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c xÃƒÂ¡c nhÃ¡ÂºÂ­n</p>
+            <p className="mt-2 text-lg font-black text-on-surface">Booking confirmed</p>
             <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-              HÃ¡Â»â€¡ thÃ¡Â»â€˜ng Ã„â€˜ÃƒÂ£ ghi nhÃ¡ÂºÂ­n thanh toÃƒÂ¡n vÃƒÂ  Ã„â€˜ang hoÃƒÂ n tÃ¡ÂºÂ¥t hÃ¡Â»â€œ sÃ†Â¡ vÃƒÂ© Ã„â€˜iÃ¡Â»â€¡n tÃ¡Â»Â­, dÃ¡Â»â€¹ch vÃ¡Â»Â¥ Ã„â€˜i kÃƒÂ¨m vÃƒÂ  cÃƒÂ¡c bÃ†Â°Ã¡Â»â€ºc hÃ¡Â»â€” trÃ¡Â»Â£ sau Ã„â€˜Ã¡ÂºÂ·t chÃ¡Â»â€”.
+              Your payment has been recorded. We are finalizing your e-tickets, add-on services, and post-booking support steps.
             </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-2xl bg-surface-container-low px-5 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                KÃƒÂªnh hÃ¡Â»â€” trÃ¡Â»Â£
+                Support channel
               </p>
-              <p className="mt-2 text-sm font-semibold text-on-surface">Email liÃƒÂªn hÃ¡Â»â€¡ trong Ã„â€˜Ã¡ÂºÂ·t chÃ¡Â»â€”</p>
+              <p className="mt-2 text-sm font-semibold text-on-surface">Booking contact email</p>
               <p className="mt-1 text-sm text-on-surface-variant">
-                DÃƒÂ¹ng Ã„â€˜Ã¡Â»Æ’ nhÃ¡ÂºÂ­n xÃƒÂ¡c nhÃ¡ÂºÂ­n, cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t vÃƒÂ  phÃ¡ÂºÂ£n hÃ¡Â»â€œi tÃ¡Â»Â« hÃ¡Â»â€¡ thÃ¡Â»â€˜ng.
+                Use this email to receive confirmations, updates, and messages from the system.
               </p>
             </div>
             <div className="rounded-2xl bg-surface-container-low px-5 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                LÃ†Â°u ÃƒÂ½
+                Note
               </p>
-              <p className="mt-2 text-sm font-semibold text-on-surface">KiÃ¡Â»Æ’m tra hÃƒÂ nh trÃƒÂ¬nh vÃƒÂ  dÃ¡Â»â€¹ch vÃ¡Â»Â¥ Ã„â€˜i kÃƒÂ¨m</p>
+              <p className="mt-2 text-sm font-semibold text-on-surface">Review your itinerary and add-on services</p>
               <p className="mt-1 text-sm text-on-surface-variant">
-                NÃ¡ÂºÂ¿u cÃ¡ÂºÂ§n Ã„â€˜iÃ¡Â»Âu chÃ¡Â»â€°nh, hÃƒÂ£y thao tÃƒÂ¡c trÃ†Â°Ã¡Â»â€ºc thÃ¡Â»Âi hÃ¡ÂºÂ¡n lÃƒÂ m thÃ¡Â»Â§ tÃ¡Â»Â¥c.
+                Make any changes before the check-in deadline.
               </p>
             </div>
           </div>
@@ -564,24 +564,24 @@ function BookingInfo({ summary }: { summary: PaymentResultSummaryResponse }) {
         <div className="flex flex-col gap-2 border-b border-luxury-gold/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.22em] text-midnight-burgundy">
-              LiÃƒÂªn hÃ¡Â»â€¡ Ã„â€˜Ã¡ÂºÂ·t chÃ¡Â»â€”
+              Booking contact
             </p>
             <h2 className="mt-2 font-headline text-2xl font-black tracking-tight text-on-surface">
-              ThÃƒÂ´ng tin Ã„â€˜Ã¡ÂºÂ·t chÃ¡Â»â€”
+              Booking details
             </h2>
           </div>
-          <p className="text-sm text-on-surface-variant">ThÃƒÂ´ng tin liÃƒÂªn hÃ¡Â»â€¡ dÃƒÂ¹ng cho xÃƒÂ¡c nhÃ¡ÂºÂ­n vÃƒÂ  hÃ¡Â»â€” trÃ¡Â»Â£ sau thanh toÃƒÂ¡n.</p>
+          <p className="text-sm text-on-surface-variant">Contact details used for confirmation and post-payment support.</p>
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           <div className="rounded-2xl bg-surface-container-low px-5 py-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">MÃƒÂ£ Ã„â€˜Ã¡ÂºÂ·t chÃ¡Â»â€”</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Booking code</p>
             <p className="mt-2 font-mono text-2xl font-black tracking-[0.18em] text-midnight-burgundy">
               {summary.booking.pnrCode}
             </p>
           </div>
           <div className="rounded-2xl bg-surface-container-low px-5 py-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">NgÃ†Â°Ã¡Â»Âi liÃƒÂªn hÃ¡Â»â€¡</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Contact person</p>
             <p className="mt-2 text-lg font-black text-on-surface">{summary.contact.fullName || '--'}</p>
           </div>
           <div className="rounded-2xl bg-surface-container-low px-5 py-4">
@@ -589,7 +589,7 @@ function BookingInfo({ summary }: { summary: PaymentResultSummaryResponse }) {
             <p className="mt-2 text-sm font-semibold text-on-surface">{maskEmail(summary.contact.email)}</p>
           </div>
           <div className="rounded-2xl bg-surface-container-low px-5 py-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">SÃ¡Â»â€˜ Ã„â€˜iÃ¡Â»â€¡n thoÃ¡ÂºÂ¡i</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Phone number</p>
             <p className="mt-2 text-sm font-semibold text-on-surface">{maskPhone(summary.contact.phone)}</p>
           </div>
         </div>
@@ -597,24 +597,24 @@ function BookingInfo({ summary }: { summary: PaymentResultSummaryResponse }) {
 
       <article className="rounded-[1.75rem] border border-luxury-gold/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(247,244,240,0.92))] p-7 shadow-[0_18px_50px_rgba(15,23,42,0.06)] backdrop-blur-sm">
         <p className="text-[11px] font-black uppercase tracking-[0.22em] text-midnight-burgundy">
-          VÃƒÂ© Ã„â€˜iÃ¡Â»â€¡n tÃ¡Â»Â­
+          E-ticket
         </p>
         <h2 className="mt-2 font-headline text-2xl font-black tracking-tight text-on-surface">
-          TÃƒÂ³m tÃ¡ÂºÂ¯t thanh toÃƒÂ¡n
+          Payment summary
         </h2>
         <div className="mt-6 space-y-4 text-sm">
           <div className="flex items-start justify-between gap-4 border-b border-luxury-gold/10 pb-4">
-            <span className="text-on-surface-variant">TrÃ¡ÂºÂ¡ng thÃƒÂ¡i hÃ¡Â»â€œ sÃ†Â¡</span>
+            <span className="text-on-surface-variant">Status hồ sơ</span>
             <span className="font-semibold text-on-surface">
-              {summary.tickets.length > 0 ? 'VÃƒÂ© Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c phÃƒÂ¡t hÃƒÂ nh trong hÃ¡Â»â€¡ thÃ¡Â»â€˜ng' : 'VÃƒÂ© Ã„â€˜ang Ã„â€˜Ã†Â°Ã¡Â»Â£c hoÃƒÂ n tÃ¡ÂºÂ¥t'}
+              {summary.tickets.length > 0 ? 'Ticket issued in the system' : 'Ticket is being finalized'}
             </span>
           </div>
           <div className="rounded-2xl border border-luxury-gold/12 bg-white/80 px-5 py-4">
-            <p className="text-sm font-semibold text-on-surface">Truy cÃ¡ÂºÂ­p vÃƒÂ© Ã„â€˜iÃ¡Â»â€¡n tÃ¡Â»Â­</p>
+            <p className="text-sm font-semibold text-on-surface">Access e-ticket</p>
             <p className="mt-2 text-sm leading-6 text-on-surface-variant">
               {summary.tickets.length > 0
-                ? 'VÃƒÂ© Ã„â€˜iÃ¡Â»â€¡n tÃ¡Â»Â­ Ã„â€˜ÃƒÂ£ cÃƒÂ³ trong hÃ¡Â»â€¡ thÃ¡Â»â€˜ng. NÃƒÂºt tÃ¡ÂºÂ£i file sÃ¡ÂºÂ½ Ã„â€˜Ã†Â°Ã¡Â»Â£c kÃƒÂ­ch hoÃ¡ÂºÂ¡t khi backend cung cÃ¡ÂºÂ¥p endpoint download.'
-                : 'HÃ¡Â»â€¡ thÃ¡Â»â€˜ng Ã„â€˜ang Ã„â€˜Ã¡Â»â€œng bÃ¡Â»â„¢ dÃ¡Â»Â¯ liÃ¡Â»â€¡u vÃƒÂ© Ã„â€˜iÃ¡Â»â€¡n tÃ¡Â»Â­ tÃ¡Â»Â« backend.'}
+                ? 'Your e-ticket is available in the system. Download will be enabled once the backend provides a download endpoint.'
+                : 'The system is syncing e-ticket data from the backend.'}
             </p>
           </div>
         </div>
@@ -629,7 +629,7 @@ function FlightInfo({ segments }: { segments: PaymentResultSummarySegment[] }) {
       <div className="flex flex-col gap-2 border-b border-luxury-gold/10 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <PlaneTakeoff className="h-5 w-5 text-midnight-burgundy" />
-          <h2 className="text-sm font-black uppercase tracking-[0.18em] text-on-surface">ThÃƒÂ´ng tin chuyÃ¡ÂºÂ¿n bay</h2>
+          <h2 className="text-sm font-black uppercase tracking-[0.18em] text-on-surface">Flight information</h2>
         </div>
       </div>
 
@@ -643,7 +643,7 @@ function FlightInfo({ segments }: { segments: PaymentResultSummarySegment[] }) {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
                   <span className="rounded-full bg-white px-3 py-1 text-midnight-burgundy">
-                    {segment.journeyType || 'ChuyÃ¡ÂºÂ¿n Ã„â€˜i'}
+                    {segment.journeyType || 'Outbound'}
                   </span>
                   <span>{segment.airlineName || 'Airline'}</span>
                   <span>{segment.flightNumber || '--'}</span>
@@ -661,7 +661,7 @@ function FlightInfo({ segments }: { segments: PaymentResultSummarySegment[] }) {
                       {segment.departure.city || segment.departure.airportName || '--'}
                     </p>
                     <p className="text-xs text-on-surface-variant">
-                      {segment.departure.terminal ? `NhÃƒÂ  ga ${segment.departure.terminal}` : ' '}
+                      {segment.departure.terminal ? `Terminal ${segment.departure.terminal}` : ' '}
                     </p>
                   </div>
 
@@ -670,7 +670,7 @@ function FlightInfo({ segments }: { segments: PaymentResultSummarySegment[] }) {
                       {formatDuration(segment.durationMinutes)}
                     </p>
                     <p className="mt-1 text-xs uppercase tracking-[0.14em] text-on-surface-variant">
-                      {(segment.stops ?? 0) > 0 ? `${segment.stops} Ã„â€˜iÃ¡Â»Æ’m dÃ¡Â»Â«ng` : 'Bay thÃ¡ÂºÂ³ng'}
+                      {(segment.stops ?? 0) > 0 ? `${segment.stops} stop(s)` : 'Non-stop'}
                     </p>
                     <div className="mt-3 flex items-center gap-2">
                       <div className="h-px flex-1 bg-luxury-gold/30" />
@@ -690,7 +690,7 @@ function FlightInfo({ segments }: { segments: PaymentResultSummarySegment[] }) {
                       {segment.arrival.city || segment.arrival.airportName || '--'}
                     </p>
                     <p className="text-xs text-on-surface-variant">
-                      {segment.arrival.terminal ? `NhÃƒÂ  ga ${segment.arrival.terminal}` : ' '}
+                      {segment.arrival.terminal ? `Terminal ${segment.arrival.terminal}` : ' '}
                     </p>
                   </div>
                 </div>
@@ -701,7 +701,7 @@ function FlightInfo({ segments }: { segments: PaymentResultSummarySegment[] }) {
               </div>
 
               <div className="rounded-2xl border border-luxury-gold/10 bg-white/90 px-4 py-4 lg:min-w-[180px]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">HÃ¡ÂºÂ¡ng vÃƒÂ©</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Fare class</p>
                 <p className="mt-2 text-sm font-black text-on-surface">
                   {segment.fare?.cabinClass || '--'}
                 </p>
@@ -727,7 +727,7 @@ function PassengerInfo({
       <div className="flex flex-col gap-2 border-b border-luxury-gold/10 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <UserRound className="h-5 w-5 text-midnight-burgundy" />
-          <h2 className="text-sm font-black uppercase tracking-[0.18em] text-on-surface">HÃƒÂ nh khÃƒÂ¡ch</h2>
+          <h2 className="text-sm font-black uppercase tracking-[0.18em] text-on-surface">Passengers</h2>
         </div>
       </div>
 
@@ -740,14 +740,14 @@ function PassengerInfo({
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                  HÃƒÂ nh khÃƒÂ¡ch {String(index + 1).padStart(2, '0')}
+                  Passengers {String(index + 1).padStart(2, '0')}
                 </p>
                 <h3 className="mt-2 text-lg font-black text-on-surface">
                   {passengerTypeLabel(passenger.passengerType)}: {passenger.fullName || '--'}
                 </h3>
               </div>
               <div className="rounded-2xl border border-luxury-gold/10 bg-white/90 px-4 py-3 text-sm text-on-surface-variant">
-                {passenger.segments.length} chÃ¡ÂºÂ·ng
+                {passenger.segments.length} segment(s)
               </div>
             </div>
 
@@ -761,43 +761,43 @@ function PassengerInfo({
                     className="rounded-2xl border border-luxury-gold/8 bg-white/90 p-4"
                   >
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                      ChÃ¡ÂºÂ·ng bay
+                      Flight segment
                     </p>
                     <p className="mt-1 text-sm font-black text-on-surface">{routeLabel(segment)}</p>
                     <div className="mt-3 space-y-2 text-sm text-on-surface-variant">
                       <p>
-                        GhÃ¡ÂºÂ¿: <span className="font-semibold text-on-surface">{resolveSeatText(passengerSegment?.seat)}</span>
+                        Seat: <span className="font-semibold text-on-surface">{resolveSeatText(passengerSegment?.seat)}</span>
                       </p>
                       <p>
-                        HÃƒÂ nh lÃƒÂ½ kÃƒÂ½ gÃ¡Â»Â­i:{' '}
+                        Checked baggage:{' '}
                         <span className="font-semibold text-on-surface">
                           {segment.fare?.checkedBaggageKg != null
-                            ? `GÃƒÂ³i ${segment.fare.checkedBaggageKg}kg`
-                            : 'Theo Ã„â€˜iÃ¡Â»Âu kiÃ¡Â»â€¡n vÃƒÂ©'}
+                            ? `Package ${segment.fare.checkedBaggageKg}kg`
+                            : 'Per fare rules'}
                         </span>
                       </p>
                       <p>
-                        XÃƒÂ¡ch tay:{' '}
+                        Carry-on:{' '}
                         <span className="font-semibold text-on-surface">
                           {segment.fare?.carryOnBaggageKg != null
                             ? `${segment.fare.carryOnBaggageKg}kg`
-                            : 'Theo Ã„â€˜iÃ¡Â»Âu kiÃ¡Â»â€¡n vÃƒÂ©'}
+                            : 'Per fare rules'}
                         </span>
                       </p>
                       <p>
-                        VÃƒÂ© Ã„â€˜iÃ¡Â»â€¡n tÃ¡Â»Â­:{' '}
+                        E-ticket:{' '}
                         <span className="font-semibold text-on-surface">
-                          {passengerSegment?.ticket?.ticketNumber || 'Ã„Âang cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t'}
+                          {passengerSegment?.ticket?.ticketNumber || 'Updating'}
                         </span>
                       </p>
                       <p>
-                        DÃ¡Â»â€¹ch vÃ¡Â»Â¥ thÃƒÂªm:{' '}
+                        Add-on services:{' '}
                         <span className="font-semibold text-on-surface">
                           {segmentServices.length > 0
                             ? segmentServices
-                                .map((service) => service.optionName || service.serviceName || 'DÃ¡Â»â€¹ch vÃ¡Â»Â¥')
+                                .map((service) => service.optionName || service.serviceName || 'Service')
                                 .join(', ')
-                            : 'KhÃƒÂ´ng cÃƒÂ³'}
+                            : 'None'}
                         </span>
                       </p>
                     </div>
@@ -827,9 +827,9 @@ function FareBreakdown({
       <div className="flex flex-col gap-2 border-b border-luxury-gold/10 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <FileText className="h-5 w-5 text-midnight-burgundy" />
-          <h2 className="text-sm font-black uppercase tracking-[0.18em] text-on-surface">Chi tiÃ¡ÂºÂ¿t giÃƒÂ¡ vÃƒÂ©</h2>
+          <h2 className="text-sm font-black uppercase tracking-[0.18em] text-on-surface">Fare breakdown</h2>
         </div>
-        <p className="text-sm text-on-surface-variant">TÃ¡Â»â€¢ng hÃ¡Â»Â£p giÃƒÂ¡ vÃƒÂ©, thuÃ¡ÂºÂ¿ phÃƒÂ­ vÃƒÂ  dÃ¡Â»â€¹ch vÃ¡Â»Â¥ theo tÃ¡Â»Â«ng hÃƒÂ nh khÃƒÂ¡ch.</p>
+        <p className="text-sm text-on-surface-variant">Tổng hợp giá vé, thuế phí và dịch vụ theo từng passengers.</p>
       </div>
 
       <div className="mt-6 space-y-5">
@@ -846,21 +846,21 @@ function FareBreakdown({
       <div className="mt-6 rounded-[1.5rem] border border-luxury-gold/10 bg-[linear-gradient(180deg,rgba(125,6,51,0.04),rgba(255,255,255,0.95))] p-5">
         <div className="grid gap-3 text-sm text-on-surface-variant sm:grid-cols-2">
           <div className="flex items-center justify-between gap-4">
-            <span>GiÃƒÂ¡ vÃƒÂ©</span>
+            <span>Base fare</span>
             <span className="font-semibold text-on-surface">{formatCurrency(totals.baseFare, currency)}</span>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <span>ThuÃ¡ÂºÂ¿, phÃƒÂ­</span>
+            <span>Taxes & fees</span>
             <span className="font-semibold text-on-surface">{formatCurrency(totals.tax, currency)}</span>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <span>DÃ¡Â»â€¹ch vÃ¡Â»Â¥</span>
+            <span>Service</span>
             <span className="font-semibold text-on-surface">
               {formatCurrency((totals.serviceFee ?? 0) + (totals.seatFee ?? 0), currency)}
             </span>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <span>GiÃ¡ÂºÂ£m giÃƒÂ¡</span>
+            <span>Discount</span>
             <span className="font-semibold text-on-surface">{formatCurrency(totals.discount, currency)}</span>
           </div>
         </div>
@@ -868,7 +868,7 @@ function FareBreakdown({
         <div className="my-5 h-px bg-outline-variant/30" />
 
         <div className="flex items-center justify-between gap-4">
-          <span className="text-sm font-black uppercase tracking-[0.16em] text-on-surface">TÃ¡Â»â€¢ng tiÃ¡Â»Ân</span>
+          <span className="text-sm font-black uppercase tracking-[0.16em] text-on-surface">Grand total</span>
           <span className="text-2xl font-black text-emerald-600">
             {formatCurrency(totals.total, currency)}
           </span>
@@ -905,26 +905,26 @@ function PassengerFareCard({
               <p className="text-sm font-black text-on-surface">{header}</p>
               <div className="mt-3 space-y-2 text-sm text-on-surface-variant">
                 <div className="flex items-center justify-between gap-4">
-                  <span>GiÃƒÂ¡ vÃƒÂ©</span>
+                  <span>Base fare</span>
                   <span className="font-semibold text-on-surface">
                     {formatCurrency(segment.fare.baseFare, currency)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <span>ThuÃ¡ÂºÂ¿, phÃƒÂ­</span>
+                  <span>Taxes & fees</span>
                   <span className="font-semibold text-on-surface">
                     {formatCurrency(taxesTotal + segment.fare.vatOnFare, currency)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <span>DÃ¡Â»â€¹ch vÃ¡Â»Â¥</span>
+                  <span>Service</span>
                   <span className="font-semibold text-on-surface">
                     {formatCurrency(serviceTotal, currency)}
                   </span>
                 </div>
                 <div className="h-px bg-outline-variant/20" />
                 <div className="flex items-center justify-between gap-4">
-                  <span className="font-semibold text-on-surface">TÃ¡Â»â€¢ng chÃ¡ÂºÂ·ng</span>
+                  <span className="font-semibold text-on-surface">Tổng segment(s)</span>
                   <span className="font-black text-on-surface">
                     {formatCurrency(segment.segmentTotal, currency)}
                   </span>
@@ -935,7 +935,7 @@ function PassengerFareCard({
         })}
       </div>
       <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-luxury-gold/8 bg-white/90 px-4 py-3">
-        <span className="text-sm font-semibold text-on-surface">TÃ¡Â»â€¢ng hÃƒÂ nh khÃƒÂ¡ch</span>
+        <span className="text-sm font-semibold text-on-surface">Tổng passengers</span>
         <span className="text-lg font-black text-on-surface">
           {formatCurrency(passenger.passengerTotal, currency)}
         </span>
@@ -952,13 +952,13 @@ function ResultActions({ hasTickets }: { hasTickets: boolean }) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-midnight-burgundy">
-            Ã„ÂiÃ¡Â»Âu hÃ†Â°Ã¡Â»â€ºng tiÃ¡ÂºÂ¿p theo
+            Next steps
           </p>
           <h2 className="mt-2 font-headline text-2xl font-black tracking-tight text-on-surface">
-            TiÃ¡ÂºÂ¿p tÃ¡Â»Â¥c hÃƒÂ nh trÃƒÂ¬nh
+            Continue your journey
           </h2>
         </div>
-        <p className="text-sm text-on-surface-variant">Quay vÃ¡Â»Â trang chÃ¡Â»Â§ hoÃ¡ÂºÂ·c mÃ¡Â»Å¸ khu vÃ¡Â»Â±c quÃ¡ÂºÂ£n lÃƒÂ½ chuyÃ¡ÂºÂ¿n Ã„â€˜i cÃ¡Â»Â§a bÃ¡ÂºÂ¡n.</p>
+        <p className="text-sm text-on-surface-variant">Return home or open your trips area to manage your booking.</p>
       </div>
       <div className="mt-5 flex flex-col gap-3 lg:flex-row">
         <Link
@@ -966,17 +966,17 @@ function ResultActions({ hasTickets }: { hasTickets: boolean }) {
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-luxury-gold/20 bg-surface-container-low px-6 py-3 text-sm font-semibold text-on-surface transition hover:border-midnight-burgundy/25 hover:bg-white"
         >
           <Ticket className="h-4 w-4" />
-          Xem chuyÃ¡ÂºÂ¿n Ã„â€˜i cÃ¡Â»Â§a tÃƒÂ´i
+          View my trips
         </Link>
         {hasTickets ? (
           <button
             type="button"
             disabled
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-luxury-gold/20 bg-surface-container-low px-6 py-3 text-sm font-semibold text-on-surface-variant opacity-70"
-            title="ChÃ¡Â»Â©c nÃ„Æ’ng tÃ¡ÂºÂ£i file sÃ¡ÂºÂ½ Ã„â€˜Ã†Â°Ã¡Â»Â£c bÃ¡ÂºÂ­t khi backend hÃ¡Â»â€” trÃ¡Â»Â£ endpoint download"
+            title="Download will be enabled when the backend supports a download endpoint"
           >
             <FileText className="h-4 w-4" />
-            TÃ¡ÂºÂ£i vÃƒÂ© Ã„â€˜iÃ¡Â»â€¡n tÃ¡Â»Â­
+            Download e-ticket
           </button>
         ) : null}
         <Button
@@ -985,7 +985,7 @@ function ResultActions({ hasTickets }: { hasTickets: boolean }) {
           onClick={() => navigate('/', { replace: true })}
           icon={<Home className="h-4 w-4" strokeWidth={2} />}
         >
-          VÃ¡Â»Â trang chÃ¡Â»Â§
+          Back to home
         </Button>
       </div>
     </section>
@@ -1008,14 +1008,14 @@ function PendingResultActions({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-midnight-burgundy">
-            HÃ†Â°Ã¡Â»â€ºng tiÃ¡ÂºÂ¿p theo
+            Next steps
           </p>
           <h2 className="mt-2 font-headline text-2xl font-black tracking-tight text-on-surface">
-            HoÃƒÂ n tÃ¡ÂºÂ¥t thanh toÃƒÂ¡n Ã„â€˜Ã¡Â»Æ’ xÃƒÂ¡c nhÃ¡ÂºÂ­n vÃƒÂ©
+            Complete payment to confirm your ticket
           </h2>
         </div>
         <p className="text-sm text-on-surface-variant">
-          MÃ¡Â»Å¸ lÃ¡ÂºÂ¡i link thanh toÃƒÂ¡n hoÃ¡ÂºÂ·c kiÃ¡Â»Æ’m tra thÃ¡Â»Â§ cÃƒÂ´ng Ã„â€˜Ã¡Â»Æ’ cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t ngay khi giao dÃ¡Â»â€¹ch hoÃƒÂ n tÃ¡ÂºÂ¥t.
+          Reopen the payment link or check manually to refresh as soon as the transaction completes.
         </p>
       </div>
       <div className="mt-5 flex flex-col gap-3 lg:flex-row">
@@ -1026,7 +1026,7 @@ function PendingResultActions({
             rel="noreferrer"
             className="inline-flex items-center justify-center rounded-xl border border-luxury-gold/20 bg-surface-container-low px-6 py-3 text-sm font-semibold text-on-surface transition hover:border-midnight-burgundy/25 hover:bg-white"
           >
-            Thanh toÃƒÂ¡n ngay
+            Pay now
           </a>
         ) : null}
         <Button
@@ -1037,7 +1037,7 @@ function PendingResultActions({
           disabled={refreshing}
           icon={<RefreshCcw className={`h-4 w-4${refreshing ? ' animate-spin' : ''}`} />}
         >
-          KiÃ¡Â»Æ’m tra thanh toÃƒÂ¡n
+          Check payment
         </Button>
         <Button
           type="button"
@@ -1045,7 +1045,7 @@ function PendingResultActions({
           onClick={() => navigate('/', { replace: true })}
           icon={<Home className="h-4 w-4" strokeWidth={2} />}
         >
-          VÃ¡Â»Â trang chÃ¡Â»Â§
+          Back to home
         </Button>
       </div>
     </section>
@@ -1076,13 +1076,13 @@ function FailureView({
   const navigate = useNavigate();
   const message =
     statusData?.failure?.message ||
-    (statusError ? statusErrorMessage(statusError) : 'Giao dÃ¡Â»â€¹ch chÃ†Â°a thÃ¡Â»Æ’ hoÃƒÂ n tÃ¡ÂºÂ¥t.');
+    (statusError ? statusErrorMessage(statusError) : 'The transaction could not be completed.');
 
   return (
     <StateCard
       tone="danger"
       icon={<XCircle className="h-12 w-12 text-cabin-burgundy" strokeWidth={2.5} />}
-      title="Thanh toÃƒÂ¡n khÃƒÂ´ng thÃƒÂ nh cÃƒÂ´ng"
+      title="Payment unsuccessful"
       message={message}
       actions={
         <>
@@ -1093,7 +1093,7 @@ function FailureView({
             onClick={() => navigate(-1)}
             icon={<RefreshCcw className="h-4 w-4" strokeWidth={2} />}
           >
-            Quay lÃ¡ÂºÂ¡i
+            Go back
           </Button>
           <Button
             type="button"
@@ -1101,7 +1101,7 @@ function FailureView({
             onClick={() => navigate('/', { replace: true })}
             icon={<Home className="h-4 w-4" strokeWidth={2} />}
           >
-            VÃ¡Â»Â trang chÃ¡Â»Â§
+            Back to home
           </Button>
         </>
       }
@@ -1149,23 +1149,22 @@ function PendingPaymentView({
         <div className="px-7 py-8 sm:px-10 sm:py-10">
           <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-sm font-black uppercase tracking-[0.18em] text-amber-700">
             <Clock3 className="h-4 w-4" strokeWidth={2.2} />
-            ChÃƒÂ¡Ã‚Â»Ã‚Â thanh toÃƒÆ’Ã‚Â¡n
+            Awaiting payment
           </div>
           <p className="mt-6 font-headline text-sm font-black uppercase tracking-[0.22em] text-midnight-burgundy">
             The Sovereign
           </p>
           <h1 className="mt-3 max-w-3xl font-headline text-3xl font-black tracking-tight text-on-surface sm:text-4xl">
-            MÃƒÆ’Ã‚Â£ QR thanh toÃƒÆ’Ã‚Â¡n Ãƒâ€žÃ¢â‚¬ËœÃƒÆ’Ã‚Â£ sÃƒÂ¡Ã‚ÂºÃ‚Âµn sÃƒÆ’Ã‚Â ng
+            Payment QR code is ready
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-on-surface-variant sm:text-base">
-            Booking Ãƒâ€žÃ¢â‚¬Ëœang Ãƒâ€žÃ¢â‚¬ËœÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Â£c giÃƒÂ¡Ã‚Â»Ã‚Â¯ chÃƒÂ¡Ã‚Â»Ã¢â‚¬â€ trong 1 giÃƒÂ¡Ã‚Â»Ã‚Â. HoÃƒÆ’Ã‚Â n tÃƒÂ¡Ã‚ÂºÃ‚Â¥t chuyÃƒÂ¡Ã‚Â»Ã†â€™n khoÃƒÂ¡Ã‚ÂºÃ‚Â£n trong thÃƒÂ¡Ã‚Â»Ã‚Âi gian
-            cÃƒÆ’Ã‚Â²n lÃƒÂ¡Ã‚ÂºÃ‚Â¡i Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã†â€™ hÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡ thÃƒÂ¡Ã‚Â»Ã¢â‚¬Ëœng xÃƒÆ’Ã‚Â¡c nhÃƒÂ¡Ã‚ÂºÃ‚Â­n vÃƒÆ’Ã‚Â  phÃƒÂ¡Ã‚ÂºÃ‚Â£n hÃƒÂ¡Ã‚Â»Ã¢â‚¬Å“i sang trang thÃƒÆ’Ã‚Â nh cÃƒÆ’Ã‚Â´ng.
+            Your booking is held for 1 hour. Complete the transfer before time runs out so we can confirm payment and show the success page.
           </p>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                MÃƒÆ’Ã‚Â£ Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚ÂºÃ‚Â·t chÃƒÂ¡Ã‚Â»Ã¢â‚¬â€
+                Booking code
               </p>
               <p className="mt-2 font-mono text-xl font-black tracking-[0.18em] text-midnight-burgundy">
                 {statusData.pnrCode || '--'}
@@ -1173,7 +1172,7 @@ function PendingPaymentView({
             </div>
             <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                PhÃƒâ€ Ã‚Â°Ãƒâ€ Ã‚Â¡ng thÃƒÂ¡Ã‚Â»Ã‚Â©c
+                Payment method
               </p>
               <p className="mt-2 text-sm font-bold text-on-surface">
                 {paymentMethodLabel(statusData.method)}
@@ -1181,7 +1180,7 @@ function PendingPaymentView({
             </div>
             <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                HÃƒÂ¡Ã‚ÂºÃ‚Â¿t hÃƒÂ¡Ã‚ÂºÃ‚Â¡n lÃƒÆ’Ã‚Âºc
+                Expires at
               </p>
               <p className="mt-2 text-sm font-bold text-on-surface">
                 {formatDateTime(statusData.expireAt)}
@@ -1197,7 +1196,7 @@ function PendingPaymentView({
               disabled={refreshing}
               icon={<RefreshCcw className={`h-4 w-4${refreshing ? ' animate-spin' : ''}`} />}
             >
-              KiÃƒÂ¡Ã‚Â»Ã†â€™m tra thanh toÃƒÆ’Ã‚Â¡n
+              Check payment
             </Button>
             {statusData.paymentUrl ? (
               <a
@@ -1206,7 +1205,7 @@ function PendingPaymentView({
                 rel="noreferrer"
                 className="inline-flex items-center justify-center rounded-md border border-outline-variant/30 px-4 py-3 text-sm font-semibold text-on-surface hover:bg-surface-container-low"
               >
-                MÃƒÂ¡Ã‚Â»Ã…Â¸ trang thanh toÃƒÆ’Ã‚Â¡n
+                Open payment page
               </a>
             ) : null}
           </div>
@@ -1214,7 +1213,7 @@ function PendingPaymentView({
 
         <div className="relative overflow-hidden border-t border-luxury-gold/10 bg-[linear-gradient(180deg,rgba(125,6,51,0.96),rgba(62,16,30,0.96))] px-7 py-8 text-white lg:border-l lg:border-t-0 lg:px-8 lg:py-10">
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-luxury-gold/80">
-            TÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¢ng thanh toÃƒÆ’Ã‚Â¡n
+            Total payment
           </p>
           <p className="mt-3 font-headline text-4xl font-black tracking-tight text-luxury-gold">
             {formatCurrency(statusData.amount, statusData.currency ?? 'VND')}
@@ -1223,21 +1222,21 @@ function PendingPaymentView({
             {qrImageUrl ? (
               <img
                 src={qrImageUrl}
-                alt="QR thanh toÃƒÆ’Ã‚Â¡n"
+                alt="Payment QR code"
                 className="mx-auto aspect-square w-full max-w-[220px] rounded-2xl bg-white p-3 shadow-lg"
               />
             ) : (
               <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center rounded-2xl bg-white/10 text-sm text-white/70">
-                ChÃƒâ€ Ã‚Â°a cÃƒÆ’Ã‚Â³ mÃƒÆ’Ã‚Â£ QR
+                No QR code yet
               </div>
             )}
           </div>
           <div className="mt-6 space-y-4 border-t border-luxury-gold/15 pt-6">
             <div className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-white/70">TrÃƒÂ¡Ã‚ÂºÃ‚Â¡ng thÃƒÆ’Ã‚Â¡i</span>
+              <span className="text-white/70">Status</span>
               <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-luxury-gold">
                 <Clock3 className="h-4 w-4" />
-                {expiredLocally ? 'Ãƒâ€žÃ‚Âang hÃƒÂ¡Ã‚ÂºÃ‚Â¿t hÃƒÂ¡Ã‚ÂºÃ‚Â¡n' : 'Ãƒâ€žÃ‚Âang chÃƒÂ¡Ã‚Â»Ã‚Â'}
+                {expiredLocally ? 'Expiring' : 'Pending'}
               </span>
             </div>
             <div className="flex items-center justify-between gap-4 text-sm">
@@ -1245,14 +1244,14 @@ function PendingPaymentView({
               <span className="font-semibold text-white">#{statusData.paymentId}</span>
             </div>
             <div className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-white/70">MÃƒÆ’Ã‚Â£ giao dÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¹ch</span>
+              <span className="text-white/70">Transaction ID</span>
               <span className="max-w-[11rem] text-right font-semibold text-white">
                 {statusData.transactionId || '--'}
               </span>
             </div>
             <div className="rounded-2xl bg-white/10 px-4 py-4 text-center">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70">
-                ThÃƒÂ¡Ã‚Â»Ã‚Âi gian cÃƒÆ’Ã‚Â²n lÃƒÂ¡Ã‚ÂºÃ‚Â¡i
+                Time remaining
               </p>
               <p className="mt-2 font-mono text-3xl font-black tracking-[0.14em] text-luxury-gold">
                 {formatTimeLeft(msLeft)}
@@ -1310,11 +1309,11 @@ function PayLaterResultView({
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-cabin-burgundy" />
             <div>
               <p className="text-sm font-black text-on-surface">
-                PhiÃƒÂªn chÃ¡Â»Â thanh toÃƒÂ¡n Ã„â€˜ÃƒÂ£ hÃ¡ÂºÂ¿t hÃ¡ÂºÂ¡n
+                Payment hold has expired
               </p>
               <p className="mt-1 text-sm leading-6 text-on-surface-variant">
-                Booking khÃƒÂ´ng cÃƒÂ²n Ã„â€˜Ã†Â°Ã¡Â»Â£c giÃ¡Â»Â¯. Vui lÃƒÂ²ng quay lÃ¡ÂºÂ¡i tÃƒÂ¬m chuyÃ¡ÂºÂ¿n vÃƒÂ  Ã„â€˜Ã¡ÂºÂ·t lÃ¡ÂºÂ¡i tÃ¡Â»Â« Ã„â€˜Ã¡ÂºÂ§u nÃ¡ÂºÂ¿u bÃ¡ÂºÂ¡n
-                vÃ¡ÂºÂ«n muÃ¡Â»â€˜n tiÃ¡ÂºÂ¿p tÃ¡Â»Â¥c.
+                Your booking is no longer held. Search for a flight and book again if you still want
+                to continue.
               </p>
             </div>
           </div>
@@ -1327,23 +1326,23 @@ function PayLaterResultView({
             <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-luxury-gold/50 to-transparent" />
             <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-sm font-black uppercase tracking-[0.18em] text-amber-700">
               <Clock3 className="h-4 w-4" strokeWidth={2.2} />
-              GiÃ¡Â»Â¯ chÃ¡Â»â€” trong 1 giÃ¡Â»Â
+              Held for 1 hour
             </div>
             <p className="mt-6 font-headline text-sm font-black uppercase tracking-[0.22em] text-midnight-burgundy">
               The Sovereign
             </p>
             <h1 className="mt-3 max-w-3xl font-headline text-3xl font-black tracking-tight text-on-surface sm:text-4xl lg:text-[2.8rem]">
-              Ã„ÂÃ¡ÂºÂ·t chÃ¡Â»â€” Ã„â€˜ang chÃ¡Â»Â thanh toÃƒÂ¡n
+              Booking awaiting payment
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-on-surface-variant sm:text-base">
-              HÃ¡Â»â€¡ thÃ¡Â»â€˜ng Ã„â€˜ÃƒÂ£ tÃ¡ÂºÂ¡o mÃƒÂ£ thanh toÃƒÂ¡n vÃƒÂ  Ã„â€˜ang giÃ¡Â»Â¯ booking cÃ¡Â»Â§a bÃ¡ÂºÂ¡n. HoÃƒÂ n tÃ¡ÂºÂ¥t thanh toÃƒÂ¡n trÃ†Â°Ã¡Â»â€ºc
-              thÃ¡Â»Âi Ã„â€˜iÃ¡Â»Æ’m hÃ¡ÂºÂ¿t hÃ¡ÂºÂ¡n Ã„â€˜Ã¡Â»Æ’ vÃƒÂ© Ã„â€˜Ã†Â°Ã¡Â»Â£c xÃƒÂ¡c nhÃ¡ÂºÂ­n tÃ¡Â»Â± Ã„â€˜Ã¡Â»â„¢ng ngay trÃƒÂªn trang nÃƒÂ y.
+              A payment code has been created and your booking is on hold. Pay before the deadline
+              to confirm your ticket automatically on this page.
             </p>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                  MÃƒÂ£ Ã„â€˜Ã¡ÂºÂ·t chÃ¡Â»â€”
+                  Booking code
                 </p>
                 <p className="mt-2 font-mono text-xl font-black tracking-[0.18em] text-midnight-burgundy">
                   {statusData.pnrCode || '--'}
@@ -1351,7 +1350,7 @@ function PayLaterResultView({
               </div>
               <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                  HÃ¡ÂºÂ¿t hÃ¡ÂºÂ¡n lÃƒÂºc
+                  Expires at
                 </p>
                 <p className="mt-2 text-sm font-bold text-on-surface">
                   {formatDateTime(statusData.expireAt)}
@@ -1359,10 +1358,10 @@ function PayLaterResultView({
               </div>
               <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                  TrÃ¡ÂºÂ¡ng thÃƒÂ¡i
+                  Status
                 </p>
                 <p className="mt-2 text-sm font-bold text-on-surface">
-                  {expiredLocally ? 'Ã„ÂÃƒÂ£ hÃ¡ÂºÂ¿t hÃ¡ÂºÂ¡n chÃ¡Â»Â thanh toÃƒÂ¡n' : 'Ã„Âang giÃ¡Â»Â¯ chÃ¡Â»â€” chÃ¡Â»Â thanh toÃƒÂ¡n'}
+                  {expiredLocally ? 'Payment hold expired' : 'On hold — awaiting payment'}
                 </p>
               </div>
             </div>
@@ -1371,13 +1370,13 @@ function PayLaterResultView({
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-800/80">
-                    ThÃ¡Â»Âi gian cÃƒÂ²n lÃ¡ÂºÂ¡i
+                    Time remaining
                   </p>
                   <p className="mt-2 font-mono text-3xl font-black tracking-[0.14em] text-cabin-burgundy">
                     {formatTimeLeft(msLeft)}
                   </p>
                   <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-                    Khi thanh toÃƒÂ¡n thÃƒÂ nh cÃƒÂ´ng, trang nÃƒÂ y sÃ¡ÂºÂ½ tÃ¡Â»Â± chuyÃ¡Â»Æ’n sang trÃ¡ÂºÂ¡ng thÃƒÂ¡i hoÃƒÂ n tÃ¡ÂºÂ¥t.
+                    When payment succeeds, this page will switch to the completed state automatically.
                   </p>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
@@ -1388,7 +1387,7 @@ function PayLaterResultView({
                     disabled={refreshing}
                     icon={<RefreshCcw className={`h-4 w-4${refreshing ? ' animate-spin' : ''}`} />}
                   >
-                    KiÃ¡Â»Æ’m tra thanh toÃƒÂ¡n
+                    Check payment
                   </Button>
                   {statusData.paymentUrl ? (
                     <a
@@ -1397,7 +1396,7 @@ function PayLaterResultView({
                       rel="noreferrer"
                       className="inline-flex items-center justify-center rounded-xl border border-luxury-gold/20 bg-white px-5 py-3 text-sm font-semibold text-on-surface transition hover:border-midnight-burgundy/25 hover:bg-surface-container-low"
                     >
-                      Thanh toÃƒÂ¡n ngay
+                      Pay now
                     </a>
                   ) : null}
                 </div>
@@ -1408,7 +1407,7 @@ function PayLaterResultView({
           <div className="relative overflow-hidden border-t border-luxury-gold/10 bg-[linear-gradient(180deg,rgba(125,6,51,0.96),rgba(62,16,30,0.96))] px-7 py-8 text-white lg:border-l lg:border-t-0 lg:px-8 lg:py-10">
             <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-luxury-gold/10 blur-3xl" />
             <p className="text-[11px] font-black uppercase tracking-[0.22em] text-luxury-gold/80">
-              TÃ¡Â»â€¢ng thanh toÃƒÂ¡n
+              Total payment
             </p>
             <p className="mt-3 font-headline text-4xl font-black tracking-tight text-luxury-gold">
               {formatCurrency(statusData.amount, statusData.currency ?? 'VND')}
@@ -1416,31 +1415,31 @@ function PayLaterResultView({
 
             <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-5">
               <p className="text-center text-[11px] font-black uppercase tracking-[0.18em] text-white/70">
-                MÃƒÂ£ QR thanh toÃƒÂ¡n
+                Payment QR code
               </p>
               {qrImageUrl ? (
                 <img
                   src={qrImageUrl}
-                  alt="QR thanh toÃƒÂ¡n"
+                  alt="Payment QR code"
                   className="mx-auto mt-4 aspect-square w-full max-w-[220px] rounded-2xl bg-white p-3 shadow-lg"
                 />
               ) : (
                 <div className="mx-auto mt-4 flex aspect-square w-full max-w-[220px] items-center justify-center rounded-2xl bg-white/10 text-sm text-white/70">
-                  ChÃ†Â°a cÃƒÂ³ mÃƒÂ£ QR
+                  No QR code yet
                 </div>
               )}
             </div>
 
             <div className="mt-6 space-y-4 border-t border-luxury-gold/15 pt-6">
               <div className="flex items-center justify-between gap-4 text-sm">
-                <span className="text-white/70">TrÃ¡ÂºÂ¡ng thÃƒÂ¡i</span>
+                <span className="text-white/70">Status</span>
                 <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-luxury-gold">
                   <Clock3 className="h-4 w-4" />
-                  {expiredLocally ? 'HÃ¡ÂºÂ¿t hÃ¡ÂºÂ¡n' : 'ChÃ¡Â»Â thanh toÃƒÂ¡n'}
+                  {expiredLocally ? 'Expired' : 'Awaiting payment'}
                 </span>
               </div>
               <div className="flex items-start justify-between gap-4 text-sm">
-                <span className="text-white/70">PhÃ†Â°Ã†Â¡ng thÃ¡Â»Â©c</span>
+                <span className="text-white/70">Payment method</span>
                 <span className="max-w-[11rem] text-right font-semibold text-white">
                   {paymentMethodLabel(statusData.method)}
                 </span>
@@ -1450,7 +1449,7 @@ function PayLaterResultView({
                 <span className="font-semibold text-white">#{statusData.paymentId}</span>
               </div>
               <div className="flex items-start justify-between gap-4 text-sm">
-                <span className="text-white/70">MÃƒÂ£ giao dÃ¡Â»â€¹ch</span>
+                <span className="text-white/70">Transaction ID</span>
                 <span className="max-w-[11rem] text-right font-semibold text-white">
                   {statusData.transactionId || '--'}
                 </span>
@@ -1475,8 +1474,14 @@ function PayLaterResultView({
 }
 
 export default function CheckoutResult() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const expiredToastShownRef = useRef(false);
+  const search = searchParams.toString();
+  const successRouteHref = `/booking/checkout/success${search ? `?${search}` : ''}`;
+  const isSuccessRoute =
+    location.pathname === '/booking/checkout/success' || location.pathname === '/payment/success';
 
   const rawPaymentId = searchParams.get('paymentId');
   const paymentIdFromQuery =
@@ -1517,22 +1522,31 @@ export default function CheckoutResult() {
     }
     if (expiredToastShownRef.current) return;
     expiredToastShownRef.current = true;
-    toast.error('Phiên thanh toán đã hết hạn. Booking không còn được giữ.');
+    toast.error('Payment session expired. Your booking is no longer held.');
   }, [statusQuery.data?.expireAt, statusQuery.data?.resultPage]);
+
+  useEffect(() => {
+    if (statusQuery.data?.resultPage !== 'SUCCESS') return;
+    if (location.pathname === '/booking/checkout/success') return;
+    navigate(successRouteHref, { replace: true });
+  }, [location.pathname, navigate, statusQuery.data?.resultPage, successRouteHref]);
 
   const expiredPendingStatus =
     statusQuery.data?.resultPage === 'PENDING' &&
     isPendingPaymentExpired(statusQuery.data?.expireAt);
   const expiredFailure =
     statusQuery.data?.failure?.message === 'Booking payment window has expired';
+  const showPending = statusQuery.data?.resultPage === 'PENDING';
+  const waitingForSuccessRedirect =
+    statusQuery.data?.resultPage === 'SUCCESS' && location.pathname !== '/booking/checkout/success';
 
   if (paymentId == null) {
     return (
       <ResultShell>
         <StateCard
           icon={<XCircle className="h-12 w-12 text-cabin-burgundy" strokeWidth={2.5} />}
-          title="KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y phiÃƒÂªn thanh toÃƒÂ¡n"
-          message="LiÃƒÂªn kÃ¡ÂºÂ¿t thanh toÃƒÂ¡n khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡ hoÃ¡ÂºÂ·c thiÃ¡ÂºÂ¿u paymentId. Vui lÃƒÂ²ng quay lÃ¡ÂºÂ¡i tÃ¡Â»Â« luÃ¡Â»â€œng thanh toÃƒÂ¡n."
+          title="Payment session not found"
+          message="Invalid payment link or missing paymentId. Please return from the checkout flow."
           tone="danger"
           actions={
             <Link
@@ -1540,7 +1554,7 @@ export default function CheckoutResult() {
               className="inline-flex items-center justify-center gap-2 rounded-md border border-outline-variant/30 px-6 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low"
             >
               <Home className="h-4 w-4" />
-              VÃ¡Â»Â trang chÃ¡Â»Â§
+              Back to home
             </Link>
           }
         />
@@ -1561,12 +1575,12 @@ export default function CheckoutResult() {
       <ResultShell>
         <StateCard
           icon={<Loader2 className="h-12 w-12 animate-spin text-luxury-gold" strokeWidth={2.2} />}
-          title="Ã„Âang xÃƒÂ¡c nhÃ¡ÂºÂ­n thanh toÃƒÂ¡n"
-          message="HÃ¡Â»â€¡ thÃ¡Â»â€˜ng Ã„â€˜ang kiÃ¡Â»Æ’m tra trÃ¡ÂºÂ¡ng thÃƒÂ¡i giao dÃ¡Â»â€¹ch vÃƒÂ  chuÃ¡ÂºÂ©n bÃ¡Â»â€¹ hiÃ¡Â»Æ’n thÃ¡Â»â€¹ mÃƒÂ£ thanh toÃƒÂ¡n."
+          title="Confirming payment"
+          message="Checking transaction status and preparing your payment details."
           actions={
             <div className="inline-flex items-center gap-2 rounded-full bg-surface-container-low px-4 py-2 text-sm font-semibold text-on-surface-variant">
               <Clock3 className="h-4 w-4" />
-              Ã„Âang Ã„â€˜Ã¡Â»â€œng bÃ¡Â»â„¢ vÃ¡Â»â€ºi backend
+              Syncing with backend
             </div>
           }
         />
@@ -1574,15 +1588,21 @@ export default function CheckoutResult() {
     );
   }
 
-  const showPending = statusQuery.data?.resultPage === 'PENDING';
+  if (waitingForSuccessRedirect) {
+    return (
+      <ResultShell>
+        <PendingResultSkeleton />
+      </ResultShell>
+    );
+  }
 
   if (expiredPendingStatus) {
     return (
       <ResultShell>
         <StateCard
           icon={<XCircle className="h-12 w-12 text-cabin-burgundy" strokeWidth={2.5} />}
-          title="Phiên thanh toán đã hết hạn"
-          message="Liên kết này thuộc một phiên thanh toán trả sau đã quá hạn. Booking không còn được giữ, vui lòng quay lại tìm chuyến và đặt lại nếu bạn muốn tiếp tục."
+          title="Payment session expired"
+          message="This pay-later session has expired. Your booking is no longer held — search for a flight and book again if you want to continue."
           tone="danger"
           actions={
             <Link
@@ -1590,7 +1610,7 @@ export default function CheckoutResult() {
               className="inline-flex items-center justify-center gap-2 rounded-md border border-outline-variant/30 px-6 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low"
             >
               <Home className="h-4 w-4" />
-              Về trang chủ
+              Back to home
             </Link>
           }
         />
@@ -1598,7 +1618,7 @@ export default function CheckoutResult() {
     );
   }
 
-  if (showPending && statusQuery.data && summaryQuery.data) {
+  if (!isSuccessRoute && showPending && statusQuery.data && summaryQuery.data) {
     return (
       <ResultShell>
         <PayLaterResultView
@@ -1614,14 +1634,22 @@ export default function CheckoutResult() {
   if (showPending) {
     return (
       <ResultShell>
+        <PendingResultSkeleton />
+      </ResultShell>
+    );
+  }
+
+  if (showPending) {
+    return (
+      <ResultShell>
         <StateCard
           icon={<Loader2 className="h-12 w-12 animate-spin text-luxury-gold" strokeWidth={2.2} />}
-          title="Đang tải chi tiết booking chờ thanh toán"
-          message="Hệ thống đang dựng thông tin chuyến bay, hành khách và giá vé cho phiên thanh toán này."
+          title="Loading pending booking details"
+          message="Loading flight, passenger, and fare details for this payment session."
           actions={
             <div className="inline-flex items-center gap-2 rounded-full bg-surface-container-low px-4 py-2 text-sm font-semibold text-on-surface-variant">
               <Clock3 className="h-4 w-4" />
-              {summaryQuery.isFetching ? 'Đang lấy summary từ backend' : 'Chờ dữ liệu chi tiết'}
+              {summaryQuery.isFetching ? 'Fetching summary from backend' : 'Waiting for details'}
             </div>
           }
         />
@@ -1634,8 +1662,8 @@ export default function CheckoutResult() {
       <ResultShell>
         <StateCard
           icon={<XCircle className="h-12 w-12 text-cabin-burgundy" strokeWidth={2.5} />}
-          title="Phiên thanh toán đã hết hạn"
-          message="Liên kết này thuộc một phiên thanh toán trả sau đã quá hạn. Booking không còn được giữ, vui lòng quay lại tìm chuyến và đặt lại nếu bạn muốn tiếp tục."
+          title="Payment session expired"
+          message="This pay-later session has expired. Your booking is no longer held — search for a flight and book again if you want to continue."
           tone="danger"
           actions={
             <Link
@@ -1643,7 +1671,7 @@ export default function CheckoutResult() {
               className="inline-flex items-center justify-center gap-2 rounded-md border border-outline-variant/30 px-6 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low"
             >
               <Home className="h-4 w-4" />
-              Về trang chủ
+              Back to home
             </Link>
           }
         />
@@ -1664,7 +1692,7 @@ export default function CheckoutResult() {
       <ResultShell>
         <StateCard
           icon={<XCircle className="h-12 w-12 text-cabin-burgundy" strokeWidth={2.5} />}
-          title="KhÃƒÂ´ng thÃ¡Â»Æ’ tÃ¡ÂºÂ£i thÃƒÂ´ng tin thanh toÃƒÂ¡n"
+          title="Unable to load payment details"
           message={summaryErrorMessage(summaryQuery.error)}
           tone="danger"
           actions={
@@ -1673,7 +1701,7 @@ export default function CheckoutResult() {
               className="inline-flex items-center justify-center gap-2 rounded-md border border-outline-variant/30 px-6 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low"
             >
               <Home className="h-4 w-4" />
-              VÃ¡Â»Â trang chÃ¡Â»Â§
+              Back to home
             </Link>
           }
         />
@@ -1684,10 +1712,18 @@ export default function CheckoutResult() {
   if (!summaryQuery.data) {
     return (
       <ResultShell>
+        <PendingResultSkeleton />
+      </ResultShell>
+    );
+  }
+
+  if (!summaryQuery.data) {
+    return (
+      <ResultShell>
         <StateCard
           icon={<Loader2 className="h-12 w-12 animate-spin text-luxury-gold" strokeWidth={2.2} />}
-          title="Ã„Âang tÃ¡ÂºÂ£i thÃƒÂ´ng tin chuyÃ¡ÂºÂ¿n Ã„â€˜i"
-          message="Thanh toÃƒÂ¡n Ã„â€˜ÃƒÂ£ thÃƒÂ nh cÃƒÂ´ng. HÃ¡Â»â€¡ thÃ¡Â»â€˜ng Ã„â€˜ang dÃ¡Â»Â±ng lÃ¡ÂºÂ¡i thÃƒÂ´ng tin vÃƒÂ© vÃƒÂ  hÃƒÂ nh khÃƒÂ¡ch tÃ¡Â»Â« backend."
+          title="Loading trip details"
+          message="Payment succeeded. Loading ticket and passenger details from the backend."
         />
       </ResultShell>
     );

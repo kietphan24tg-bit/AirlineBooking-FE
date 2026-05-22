@@ -22,6 +22,7 @@ import type {
 } from '../types/booking.types';
 import type { FlightRevalidatePassengerSummary } from '../types/flight.types';
 import { passengerInfoSchema, type PassengerInfoFormValues } from '../validations/passenger.schema';
+import { getAxiosErrorCode, getAxiosErrorMessage } from '../utils/apiError';
 
 type PassengerFormEntry = PassengerInfoFormValues['passengers'][number];
 
@@ -146,7 +147,7 @@ function createPassengerFormEntry(
     passengerType: passenger.passengerType,
     identifyType: normalizeIdentifyType(passenger.identifyType),
     identifyNumber: passenger.identifyNumber,
-    expiryDate: passenger.expiryDate,
+    expiryDate: passenger.expiryDate ?? '',
     email: contact?.email ?? '',
     phone: contact?.phone ?? '',
   };
@@ -161,6 +162,7 @@ export default function PassengerInfo() {
   const setBookingResponse = useBookingStore((state) => state.setBookingResponse);
   const isPreviewMode = import.meta.env.DEV && searchParams.get('preview') === '1';
   const idempotencyKeyRef = useRef('');
+  const isSubmittingRef = useRef(false);
   const previewPassengerSummary = useMemo<FlightRevalidatePassengerSummary>(
     () => ({
       adult: 1,
@@ -190,6 +192,21 @@ export default function PassengerInfo() {
   );
   const bookingMutation = useMutation({
     mutationFn: bookingService.createBooking,
+    onError: (error) => {
+      const errorCode = getAxiosErrorCode(error);
+      if (errorCode !== 'REQUEST_IN_PROGRESS') {
+        idempotencyKeyRef.current = createIdempotencyKey();
+      }
+      const fallback = 'Unable to create the booking. Please try again.';
+      const message = getAxiosErrorMessage(error, fallback);
+      if (errorCode === 'REQUEST_IN_PROGRESS') {
+        toast.error(
+          'Your booking is still being created. Please wait a few seconds before trying again.'
+        );
+        return;
+      }
+      toast.error(message);
+    },
   });
 
   const {
@@ -255,6 +272,9 @@ export default function PassengerInfo() {
   }
 
   const onSubmit = async (data: PassengerInfoFormValues) => {
+    if (isSubmittingRef.current || bookingMutation.isPending) return;
+    isSubmittingRef.current = true;
+    bookingMutation.reset();
     setExpandedSections(passengerSections.map(() => true));
 
     const passengers = data.passengers.map(
@@ -267,7 +287,7 @@ export default function PassengerInfo() {
         passengerType: passenger.passengerType,
         identifyType: passenger.identifyType,
         identifyNumber: passenger.identifyNumber.trim(),
-        expiryDate: passenger.expiryDate,
+        expiryDate: passenger.expiryDate?.trim() ? passenger.expiryDate : undefined,
       })
     );
     const primaryPassenger = data.passengers[0];
@@ -297,9 +317,12 @@ export default function PassengerInfo() {
     }
 
     try {
+      if (!idempotencyKeyRef.current) {
+        idempotencyKeyRef.current = createIdempotencyKey();
+      }
       const booking = await bookingMutation.mutateAsync({
         revalidateId: bookingDraft.revalidateId ?? '',
-        idempotencyKey: idempotencyKeyRef.current || createIdempotencyKey(),
+        idempotencyKey: idempotencyKeyRef.current,
         passengerSummary: bookingDraft.passengerSummary ?? {
           adult: 0,
           child: 0,
@@ -312,9 +335,8 @@ export default function PassengerInfo() {
       navigate('/booking/passengers/seats');
     } catch (error) {
       console.error(error);
-      toast.error(
-        error instanceof Error ? error.message : 'Unable to create the booking. Please try again.'
-      );
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -332,14 +354,6 @@ export default function PassengerInfo() {
         </p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          {bookingMutation.isError ? (
-            <div className="rounded-xl border border-error/30 bg-error/5 p-4 text-sm text-error">
-              {bookingMutation.error instanceof Error
-                ? bookingMutation.error.message
-                : 'Unable to create the booking. Please try again.'}
-            </div>
-          ) : null}
-
           {fields.map((field, index) => {
             const section = passengerSections[index];
             const Icon = PASSENGER_TYPE_ICONS[section.passengerType];
@@ -468,9 +482,7 @@ export default function PassengerInfo() {
                           ) : null}
                         </div>
                         <div>
-                          <FieldLabel htmlFor={`passenger-${index}-dob`}>
-                            Date of birth
-                          </FieldLabel>
+                          <FieldLabel htmlFor={`passenger-${index}-dob`}>Date of birth</FieldLabel>
                           <TextInput
                             id={`passenger-${index}-dob`}
                             type="date"
@@ -561,9 +573,7 @@ export default function PassengerInfo() {
                           ) : null}
                         </div>
                         <div>
-                          <FieldLabel htmlFor={`passenger-${index}-phone`}>
-                            Phone number
-                          </FieldLabel>
+                          <FieldLabel htmlFor={`passenger-${index}-phone`}>Phone number</FieldLabel>
                           <TextInput
                             id={`passenger-${index}-phone`}
                             type="tel"
@@ -589,9 +599,7 @@ export default function PassengerInfo() {
                     <>
                       <div className="grid gap-5 sm:gap-6 md:grid-cols-2">
                         <div>
-                          <FieldLabel htmlFor={`passenger-${index}-dob`}>
-                            Date of birth
-                          </FieldLabel>
+                          <FieldLabel htmlFor={`passenger-${index}-dob`}>Date of birth</FieldLabel>
                           <TextInput
                             id={`passenger-${index}-dob`}
                             type="date"

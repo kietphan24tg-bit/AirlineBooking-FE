@@ -57,7 +57,7 @@ export interface BookingPassengerPayload {
   passengerType: PassengerType;
   identifyType: IdentifyType;
   identifyNumber: string;
-  expiryDate: string;
+  expiryDate?: string;
 }
 
 /**

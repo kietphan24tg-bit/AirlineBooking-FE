@@ -13,17 +13,29 @@ import type {
   SeatAssignmentResponse,
 } from '../types/booking.types';
 import type {
+  FlightItinerarySegmentDirection,
   FlightRevalidateFareResponse,
+  FlightRevalidateItineraryResponse,
   FlightRevalidatePassengerSummary,
   FlightRevalidatePricing,
 } from '../types/flight.types';
 
+export interface BookingDraftSegment {
+  direction: FlightItinerarySegmentDirection;
+  flightId: number;
+  fareId: number;
+  fareCode: string | null;
+  cabinClass: string | null;
+}
+
 export interface BookingPersistedDraft {
   revalidateId: string | null;
   expiresAt: number | null;
+  tripType: 'ONE_WAY' | 'ROUND_TRIP';
   flightId: number | null;
   fareId: number | null;
   fareCode: string | null;
+  segments: BookingDraftSegment[];
   passengerSummary: FlightRevalidatePassengerSummary | null;
   pricing: FlightRevalidatePricing | null;
   contacts: BookingContactPayload[];
@@ -70,7 +82,9 @@ interface BookingStore {
   setLookupCriteria: (data: BookingLookupCriteria | null) => void;
   setBookingLookup: (data: BookingLookupResponse) => void;
   setManageOptions: (data: BookingManageOptionsResponse | null) => void;
-  setRevalidationDraft: (data: FlightRevalidateFareResponse) => void;
+  setRevalidationDraft: (
+    data: FlightRevalidateFareResponse | FlightRevalidateItineraryResponse
+  ) => void;
   setBookingRequestDraft: (data: {
     contacts: BookingContactPayload[];
     passengers: BookingPassengerPayload[];
@@ -91,9 +105,11 @@ interface BookingStore {
 const initialDraftState: BookingPersistedDraft = {
   revalidateId: null,
   expiresAt: null,
+  tripType: 'ONE_WAY',
   flightId: null,
   fareId: null,
   fareCode: null,
+  segments: [],
   passengerSummary: null,
   pricing: null,
   contacts: [],
@@ -107,6 +123,34 @@ function pickNumericId(value: unknown): number | null {
 
 function pickText(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function normalizeDraftSegmentsFromRevalidate(
+  data: FlightRevalidateFareResponse | FlightRevalidateItineraryResponse
+): BookingDraftSegment[] {
+  if ('segments' in data && Array.isArray(data.segments) && data.segments.length > 0) {
+    return data.segments
+      .map((segment) => ({
+        direction: segment.direction,
+        flightId: segment.flightId,
+        fareId: segment.fareId,
+        fareCode: segment.fareCode ?? null,
+        cabinClass: segment.cabinClass ?? null,
+      }))
+      .filter((segment) => Number.isFinite(segment.flightId) && Number.isFinite(segment.fareId));
+  }
+  if ('flightId' in data && 'fareId' in data) {
+    return [
+      {
+        direction: 'OUTBOUND',
+        flightId: data.flightId,
+        fareId: data.fareId,
+        fareCode: null,
+        cabinClass: null,
+      },
+    ];
+  }
+  return [];
 }
 
 function mergeSessionPricingFromTotal(
@@ -196,19 +240,37 @@ export const useBookingStore = create<BookingStore>()(
       setManageOptions: (data) => set({ manageOptions: data }),
       setRevalidationDraft: (data) =>
         set((state) => ({
-          bookingDraft: {
-            ...state.bookingDraft,
-            revalidateId: data.revalidateId,
-            expiresAt: Date.now() + data.expiresInSeconds * 1000,
-            flightId: data.flightId,
-            fareId: data.fareId,
-            passengerSummary: data.passengerSummary,
-            pricing: data.pricing,
-          },
           bookingResponse: null,
           bookingLookup: null,
           lookupCriteria: null,
           manageOptions: null,
+          bookingDraft: {
+            ...state.bookingDraft,
+            revalidateId: data.revalidateId,
+            expiresAt: Date.now() + data.expiresInSeconds * 1000,
+            tripType: 'tripType' in data ? data.tripType : 'ONE_WAY',
+            flightId:
+              'flightId' in data
+                ? data.flightId
+                : (data.segments?.find((segment) => segment.direction === 'OUTBOUND')?.flightId ??
+                  data.segments?.[0]?.flightId ??
+                  null),
+            fareId:
+              'fareId' in data
+                ? data.fareId
+                : (data.segments?.find((segment) => segment.direction === 'OUTBOUND')?.fareId ??
+                  data.segments?.[0]?.fareId ??
+                  null),
+            fareCode:
+              'segments' in data
+                ? (data.segments?.find((segment) => segment.direction === 'OUTBOUND')?.fareCode ??
+                  data.segments?.[0]?.fareCode ??
+                  null)
+                : null,
+            segments: normalizeDraftSegmentsFromRevalidate(data),
+            passengerSummary: data.passengerSummary,
+            pricing: data.pricing,
+          },
         })),
       setBookingRequestDraft: (data) =>
         set((state) => ({
@@ -222,7 +284,7 @@ export const useBookingStore = create<BookingStore>()(
         set((state) => ({
           bookingResponse: normalizeBookingResponse(state.bookingDraft, data),
         })),
-      applySeatAssignmentResult: (data, replacedPassengerIds = []) =>
+      applySeatAssignmentResult: (data, _replacedPassengerIds = []) =>
         set((state) => {
           const { bookingResponse } = state;
           if (!bookingResponse) return state;
@@ -299,7 +361,27 @@ export const useBookingStore = create<BookingStore>()(
 
         const state = persistedState as Partial<BookingStore>;
         return {
-          bookingDraft: state.bookingDraft ?? initialDraftState,
+          bookingDraft: state.bookingDraft
+            ? {
+                ...initialDraftState,
+                ...state.bookingDraft,
+                tripType: state.bookingDraft.tripType ?? 'ONE_WAY',
+                segments:
+                  state.bookingDraft.segments && state.bookingDraft.segments.length > 0
+                    ? state.bookingDraft.segments
+                    : state.bookingDraft.flightId && state.bookingDraft.fareId
+                      ? [
+                          {
+                            direction: 'OUTBOUND',
+                            flightId: state.bookingDraft.flightId,
+                            fareId: state.bookingDraft.fareId,
+                            fareCode: state.bookingDraft.fareCode ?? null,
+                            cabinClass: null,
+                          },
+                        ]
+                      : [],
+              }
+            : initialDraftState,
           bookingResponse: state.bookingResponse
             ? {
                 ...state.bookingResponse,

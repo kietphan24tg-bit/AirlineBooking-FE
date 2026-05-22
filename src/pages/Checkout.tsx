@@ -86,6 +86,10 @@ function getPaymentRetryTooFastToastMessage(message: string | null | undefined):
   return message?.trim() || 'Bạn đang thao tác quá nhanh. Vui lòng thử lại sau 15 giây.';
 }
 
+function showCheckoutErrorToast(message: string) {
+  toast.error(message, { duration: 15000 });
+}
+
 function resolvePaymentId(payment: CreatePaymentResponse | null): string | number | null {
   const id = payment?.payment?.id ?? payment?.payment?.paymentId;
   return id == null ? null : id;
@@ -133,6 +137,14 @@ function resolveDisabledMethodReason(
   }
 
   const remainingMs = bookingExpiresAtMs != null ? bookingExpiresAtMs - Date.now() : null;
+  if (
+    method.code.trim().toUpperCase() === 'PAYOS_QR' &&
+    remainingMs != null &&
+    remainingMs > 0 &&
+    remainingMs < 5 * 60 * 1000
+  ) {
+    return 'Thanh toán VietQR không khả dụng vì thời gian giữ chỗ còn quá ít. Vui lòng chọn phương thức thanh toán khác.';
+  }
   if (
     remainingMs != null &&
     remainingMs > 0 &&
@@ -235,6 +247,7 @@ export default function Checkout() {
   const navigate = useNavigate();
   const paymentRedirectingRef = useRef(false);
   const hardBlockHandledRef = useRef(false);
+  const paymentMethodsToastMessageRef = useRef<string | null>(null);
   const acceptTermsRef = useRef<HTMLInputElement | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [resumeVersion, setResumeVersion] = useState(0);
@@ -422,12 +435,24 @@ export default function Checkout() {
     });
   }, [clearBooking, isHardBlock, navigate, paymentMethodsError, paymentMethodsQuery.isError]);
 
+  useEffect(() => {
+    if (!paymentMethodsQuery.isError || !paymentMethodsError || isHardBlock) {
+      paymentMethodsToastMessageRef.current = null;
+      return;
+    }
+    if (paymentMethodsToastMessageRef.current === paymentMethodsError) return;
+    paymentMethodsToastMessageRef.current = paymentMethodsError;
+    showCheckoutErrorToast(paymentMethodsError);
+  }, [isHardBlock, paymentMethodsError, paymentMethodsQuery.isError]);
+
   const canPay =
     paymentMethodsQuery.isSuccess &&
     supportedMethods.length > 0 &&
     !paymentMethodsQuery.isError &&
     Boolean(selectedCode) &&
     supportedMethods.some((m) => m.code === selectedCode);
+  const showInlinePaymentMethodsError = false;
+  const showInlinePaymentError = false;
   const selectedMethod = flatMethods.find((m) => m.code === selectedCode) ?? null;
   const payLaterSelected = isPayLaterMethod(selectedMethod);
 
@@ -480,7 +505,7 @@ export default function Checkout() {
           const fallbackMsg = 'Không nhận được liên kết thanh toán Stripe. Vui lòng thử lại.';
           setPaymentError(fallbackMsg);
           setActivePayment(null);
-          toast.error(fallbackMsg);
+          showCheckoutErrorToast(fallbackMsg);
           return;
         }
         if (payLaterFlow) {
@@ -499,10 +524,11 @@ export default function Checkout() {
             navigate(`/booking/checkout/result?${nextParams.toString()}`);
             return;
           }
-          const fallbackMsg = 'KhÃ´ng nháº­n Ä‘Æ°á»£c phiÃªn thanh toÃ¡n tráº£ sau. Vui lÃ²ng thá»­ láº¡i.';
+          const fallbackMsg =
+            'KhÃ´ng nháº­n Ä‘Æ°á»£c phiÃªn thanh toÃ¡n tráº£ sau. Vui lÃ²ng thá»­ láº¡i.';
           setPaymentError(fallbackMsg);
           setActivePayment(null);
-          toast.error(fallbackMsg);
+          showCheckoutErrorToast(fallbackMsg);
           return;
         }
         setActivePayment(res);
@@ -519,13 +545,13 @@ export default function Checkout() {
         if (isPaymentRetryTooFastMessage(msg)) {
           setPaymentError(null);
           setActivePayment(null);
-          toast.error(getPaymentRetryTooFastToastMessage(msg));
+          showCheckoutErrorToast(getPaymentRetryTooFastToastMessage(msg));
           setCreatingPayment(false);
           return;
         }
         setPaymentError(msg);
         setActivePayment(null);
-        toast.error(msg);
+        showCheckoutErrorToast(msg);
         setCreatingPayment(false);
         return;
       }
@@ -665,35 +691,38 @@ export default function Checkout() {
           errorMessage={paymentError}
         />
       )}
-      {paymentMethodsQuery.isError && paymentMethodsError && isHardBlock && !hardBlockHandledRef.current && (
-        <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-6"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-lg rounded-2xl border border-cabin-burgundy/30 bg-white p-6 shadow-2xl">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-cabin-burgundy/10">
-                <AlertCircle className="h-5 w-5 text-cabin-burgundy" />
+      {paymentMethodsQuery.isError &&
+        paymentMethodsError &&
+        isHardBlock &&
+        !hardBlockHandledRef.current && (
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-6"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="w-full max-w-lg rounded-2xl border border-cabin-burgundy/30 bg-white p-6 shadow-2xl">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-cabin-burgundy/10">
+                  <AlertCircle className="h-5 w-5 text-cabin-burgundy" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-base font-black text-on-surface">Không thể thanh toán</p>
+                  <p className="mt-2 text-sm text-on-surface-variant">{paymentMethodsError}</p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-base font-black text-on-surface">Không thể thanh toán</p>
-                <p className="mt-2 text-sm text-on-surface-variant">{paymentMethodsError}</p>
-              </div>
-            </div>
 
-            <div className="mt-6 flex justify-end">
-              <Button
-                type="button"
-                onClick={() => navigate('/', { replace: true })}
-                icon={<ArrowRight className="h-4 w-4" strokeWidth={2} />}
-              >
-                Quay lại trang chủ
-              </Button>
+              <div className="mt-6 flex justify-end">
+                <Button
+                  type="button"
+                  onClick={() => navigate('/', { replace: true })}
+                  icon={<ArrowRight className="h-4 w-4" strokeWidth={2} />}
+                >
+                  Quay lại trang chủ
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
       <main className="relative z-10 mx-auto max-w-6xl px-6 pb-24 pt-28">
         <BookingStepper current="pay" />
         <h1 className="mb-2 font-headline text-3xl font-black text-on-surface md:text-4xl">
@@ -716,36 +745,39 @@ export default function Checkout() {
               </div>
             )}
 
-            {paymentMethodsQuery.isError && paymentMethodsError && !isHardBlock && (
-              <div
-                className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-start sm:justify-between ${
-                  isHardBlock
-                    ? 'border-cabin-burgundy/40 bg-cabin-burgundy/5'
-                    : 'border-outline-variant/40 bg-surface-container-low'
-                }`}
-                role="alert"
-              >
-                <div className="flex gap-3">
-                  <AlertCircle
-                    className={`mt-0.5 h-5 w-5 shrink-0 ${isHardBlock ? 'text-cabin-burgundy' : 'text-on-surface-variant'}`}
-                  />
-                  <p className="text-sm font-medium text-on-surface">{paymentMethodsError}</p>
+            {showInlinePaymentMethodsError &&
+              paymentMethodsQuery.isError &&
+              paymentMethodsError &&
+              !isHardBlock && (
+                <div
+                  className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-start sm:justify-between ${
+                    isHardBlock
+                      ? 'border-cabin-burgundy/40 bg-cabin-burgundy/5'
+                      : 'border-outline-variant/40 bg-surface-container-low'
+                  }`}
+                  role="alert"
+                >
+                  <div className="flex gap-3">
+                    <AlertCircle
+                      className={`mt-0.5 h-5 w-5 shrink-0 ${isHardBlock ? 'text-cabin-burgundy' : 'text-on-surface-variant'}`}
+                    />
+                    <p className="text-sm font-medium text-on-surface">{paymentMethodsError}</p>
+                  </div>
+                  {!isHardBlock && (
+                    <button
+                      type="button"
+                      onClick={() => void paymentMethodsQuery.refetch()}
+                      disabled={paymentMethodsQuery.isFetching}
+                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-midnight-burgundy/30 px-3 py-2 text-sm font-semibold text-midnight-burgundy hover:bg-midnight-burgundy/10 disabled:opacity-60"
+                    >
+                      {paymentMethodsQuery.isFetching ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : null}
+                      Thử lại
+                    </button>
+                  )}
                 </div>
-                {!isHardBlock && (
-                  <button
-                    type="button"
-                    onClick={() => void paymentMethodsQuery.refetch()}
-                    disabled={paymentMethodsQuery.isFetching}
-                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-midnight-burgundy/30 px-3 py-2 text-sm font-semibold text-midnight-burgundy hover:bg-midnight-burgundy/10 disabled:opacity-60"
-                  >
-                    {paymentMethodsQuery.isFetching ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : null}
-                    Thử lại
-                  </button>
-                )}
-              </div>
-            )}
+              )}
 
             {paymentMethodsQuery.isSuccess &&
               supportedMethods.length === 0 &&
@@ -762,7 +794,7 @@ export default function Checkout() {
                 </div>
               )}
 
-            {paymentError && !activePayment && (
+            {showInlinePaymentError && paymentError && !activePayment && (
               <div
                 className="flex gap-3 rounded-xl border border-cabin-burgundy/40 bg-cabin-burgundy/5 p-4"
                 role="alert"
@@ -777,9 +809,7 @@ export default function Checkout() {
                 {groupsWithMethods.map((group) => (
                   <div key={group.type} className="space-y-4">
                     {showGroupLabels && (
-                      <p className="text-base font-black text-on-surface">
-                        {group.label}
-                      </p>
+                      <p className="text-base font-black text-on-surface">{group.label}</p>
                     )}
                     <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
                       {group.methods.map((method) => (

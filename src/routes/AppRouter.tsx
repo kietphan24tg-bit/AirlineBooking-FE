@@ -63,7 +63,15 @@ const AppRouter = createBrowserRouter([
     element: <CheckoutResult />,
   },
   {
+    path: '/booking/checkout/failed',
+    element: <CheckoutResult />,
+  },
+  {
     path: '/payment/cancel',
+    element: <CheckoutResult />,
+  },
+  {
+    path: '/payment/failed',
     element: <CheckoutResult />,
   },
   {

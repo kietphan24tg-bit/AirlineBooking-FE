@@ -35,8 +35,8 @@ import { useSeatAssignmentActions } from './seat-selection/useSeatAssignmentActi
 import { useSeatSelectionSummaryModel } from './seat-selection/useSeatSelectionSummaryModel';
 
 type ServiceSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
-type ServicesByPassengerId = Record<number, SelectedServiceOption[]>;
-type ServiceSaveStatusByPassengerId = Record<number, ServiceSaveStatus>;
+type ServicesBySegmentPassengerKey = Record<string, SelectedServiceOption[]>;
+type ServiceSaveStatusBySegmentPassengerKey = Record<string, ServiceSaveStatus>;
 
 function passengersFromNavigationState(
   list: PassengerBookingDetails[] | undefined
@@ -66,113 +66,12 @@ function normalizeSeatPriceText(value: string | null | undefined): string | null
   return value.trim().replace(/^\+\s*/, '');
 }
 
-function formatItineraryRouteLabel(itinerary: {
-  departureCity: string;
-  departureAirportCode: string;
-  arrivalCity: string;
-  arrivalAirportCode: string;
-}): string {
-  return `${itinerary.departureCity} (${itinerary.departureAirportCode})  ✈  ${itinerary.arrivalCity} (${itinerary.arrivalAirportCode})`;
-}
-
-function formatItineraryMetaLabel(itinerary: {
-  departureTime: string;
-  arrivalTime: string;
-  flightNumber: string;
-  cabinClass: string | null;
-}): string {
-  const departureDate = new Date(itinerary.departureTime);
-  const arrivalDate = new Date(itinerary.arrivalTime);
-  const weekdayLabels = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-  const weekday =
-    Number.isFinite(departureDate.getTime()) ? weekdayLabels[departureDate.getDay()] : '--';
-  const dateLabel = Number.isFinite(departureDate.getTime())
-    ? `${String(departureDate.getDate()).padStart(2, '0')}/${String(
-        departureDate.getMonth() + 1
-      ).padStart(2, '0')}/${departureDate.getFullYear()}`
-    : '--/--/----';
-  const departureTimeLabel = Number.isFinite(departureDate.getTime())
-    ? departureDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false })
-    : '--:--';
-  const arrivalTimeLabel = Number.isFinite(arrivalDate.getTime())
-    ? arrivalDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false })
-    : '--:--';
-  const cabinLabel =
-    itinerary.cabinClass?.trim().toUpperCase() === 'ECONOMY'
-      ? 'Eco'
-      : itinerary.cabinClass?.trim() ?? '--';
-
-  return `${weekday}, ${dateLabel} | ${departureTimeLabel} - ${arrivalTimeLabel} | ${itinerary.flightNumber} | ${cabinLabel}`;
-}
-
-function buildSummaryHeaderFromRawBooking(
-  bookingResponse: ReturnType<typeof useBookingStore.getState>['bookingResponse'],
-  seatContext: SeatContext
-): { itineraryLabel: string | null; flightMetaLabel: string | null } {
-  const rawFlight =
-    bookingResponse?.raw?.flight && typeof bookingResponse.raw.flight === 'object'
-      ? (bookingResponse.raw.flight as Record<string, unknown>)
-      : null;
-  const rawFare =
-    bookingResponse?.raw?.fare && typeof bookingResponse.raw.fare === 'object'
-      ? (bookingResponse.raw.fare as Record<string, unknown>)
-      : null;
-  const departure =
-    rawFlight?.departure && typeof rawFlight.departure === 'object'
-      ? (rawFlight.departure as Record<string, unknown>)
-      : null;
-  const arrival =
-    rawFlight?.arrival && typeof rawFlight.arrival === 'object'
-      ? (rawFlight.arrival as Record<string, unknown>)
-      : null;
-
-  const departureCity = typeof departure?.city === 'string' ? departure.city : null;
-  const departureCode =
-    typeof departure?.airportCode === 'string'
-      ? departure.airportCode
-      : typeof departure?.code === 'string'
-        ? departure.code
-        : null;
-  const arrivalCity = typeof arrival?.city === 'string' ? arrival.city : null;
-  const arrivalCode =
-    typeof arrival?.airportCode === 'string'
-      ? arrival.airportCode
-      : typeof arrival?.code === 'string'
-        ? arrival.code
-        : null;
-  const departureTime = typeof departure?.time === 'string' ? departure.time : null;
-  const arrivalTime = typeof arrival?.time === 'string' ? arrival.time : null;
-  const flightNumber = typeof rawFlight?.flightNumber === 'string' ? rawFlight.flightNumber : null;
-  const cabinClass =
-    typeof rawFare?.cabinClass === 'string'
-      ? rawFare.cabinClass
-      : typeof rawFare?.name === 'string'
-        ? rawFare.name
-        : seatContext.fareCode;
-
-  const itineraryLabel =
-    departureCity && departureCode && arrivalCity && arrivalCode
-      ? `${departureCity} (${departureCode})  ✈  ${arrivalCity} (${arrivalCode})`
-      : null;
-
-  let flightMetaLabel: string | null = null;
-  if (departureTime && arrivalTime && flightNumber) {
-    flightMetaLabel = formatItineraryMetaLabel({
-      departureTime,
-      arrivalTime,
-      flightNumber,
-      cabinClass: cabinClass ?? null,
-    });
-  } else if (flightNumber) {
-    flightMetaLabel = `${flightNumber} | ${cabinClass ?? '--'}`;
-  }
-
-  return {
-    itineraryLabel,
-    flightMetaLabel:
-      flightMetaLabel ??
-      `Flight #${seatContext.flightId ?? '--'}${seatContext.fareCode ? ` | ${seatContext.fareCode}` : ''}`,
-  };
+function buildSegmentPassengerKey(
+  flightId: number | null | undefined,
+  passengerId: number | null | undefined
+): string | null {
+  if (!flightId || !passengerId) return null;
+  return `${flightId}:${passengerId}`;
 }
 
 function findSeatCellById(
@@ -216,7 +115,8 @@ function buildConfirmedServicesLookupFromManageOptions(
     const passengerSelections = next[selection.passengerId] ?? [];
     passengerSelections.push({
       optionId: selection.optionId,
-      quantity: Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1,
+      quantity:
+        Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1,
     });
     next[selection.passengerId] = passengerSelections;
   }
@@ -248,9 +148,9 @@ function createSelectedServicesLookup(
 function hydrateServicesByPassengerId(
   services: ServiceGroup[] | undefined,
   confirmedServicesByPassengerId: Record<number, { optionId: number; quantity: number }[]>
-): ServicesByPassengerId {
+): Record<number, SelectedServiceOption[]> {
   const optionLookup = createSelectedServicesLookup(services);
-  const next: ServicesByPassengerId = {};
+  const next: Record<number, SelectedServiceOption[]> = {};
 
   for (const [passengerIdText, selections] of Object.entries(confirmedServicesByPassengerId)) {
     const passengerId = Number(passengerIdText);
@@ -273,26 +173,52 @@ function hydrateServicesByPassengerId(
   return next;
 }
 
-function createInitialServiceStatusMap(
-  confirmedServicesByPassengerId: Record<number, unknown>
-): ServiceSaveStatusByPassengerId {
-  const next: ServiceSaveStatusByPassengerId = {};
-  for (const passengerIdText of Object.keys(confirmedServicesByPassengerId)) {
-    const passengerId = Number(passengerIdText);
-    if (!Number.isFinite(passengerId)) continue;
-    next[passengerId] = 'saved';
-  }
-  return next;
+function SegmentTabs({
+  segments,
+  selectedDirection,
+  onChange,
+}: {
+  segments: SeatContext['segments'];
+  selectedDirection: 'OUTBOUND' | 'INBOUND';
+  onChange: (direction: 'OUTBOUND' | 'INBOUND') => void;
+}) {
+  if (segments.length <= 1) return null;
+
+  return (
+    <div className="mb-5 rounded-xl border border-luxury-gold/20 bg-white/75 p-3 shadow-sm backdrop-blur-md">
+      <div className="grid gap-2 sm:grid-cols-2">
+        {segments.map((segment) => {
+          const active = selectedDirection === segment.direction;
+          return (
+            <button
+              key={`${segment.direction}-${segment.flightId}-${segment.fareId}`}
+              type="button"
+              onClick={() => onChange(segment.direction)}
+              className={`rounded-lg border px-4 py-3 text-left transition-colors ${
+                active
+                  ? 'border-midnight-burgundy bg-midnight-burgundy text-white'
+                  : 'border-outline-variant/50 bg-surface text-on-surface hover:border-luxury-gold/40'
+              }`}
+            >
+              <p className="text-sm font-black uppercase tracking-[0.14em]">
+                {segment.direction === 'OUTBOUND' ? 'Outbound' : 'Return'}
+              </p>
+              <p
+                className={`mt-1 text-sm font-semibold ${
+                  active ? 'text-white/90' : 'text-on-surface-variant'
+                }`}
+              >
+                Flight #{segment.flightId}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
-function getServiceStatusLabel(status: ServiceSaveStatus): string {
-  if (status === 'saved') return 'Saved';
-  if (status === 'saving') return 'Saving';
-  if (status === 'error') return 'Loi';
-  return 'Not saved';
-}
-
-function getBookingSessionExpiredMessage(error: unknown): string | null {
+function getSeatAssignmentErrorMessage(error: unknown, fallback: string): string {
   const status =
     error &&
     typeof error === 'object' &&
@@ -303,9 +229,53 @@ function getBookingSessionExpiredMessage(error: unknown): string | null {
       ? error.response.status
       : null;
 
-  return status === 409 || status === 410
-    ? 'This booking session has expired. Please book the flight again.'
-    : null;
+  if (status === 410) {
+    return 'This booking session has expired. Please book the flight again.';
+  }
+
+  const code =
+    error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    error.response &&
+    typeof error.response === 'object' &&
+    'data' in error.response &&
+    error.response.data &&
+    typeof error.response.data === 'object' &&
+    'error' in error.response.data &&
+    error.response.data.error &&
+    typeof error.response.data.error === 'object' &&
+    'code' in error.response.data.error &&
+    typeof error.response.data.error.code === 'string'
+      ? error.response.data.error.code
+      : null;
+
+  if (code === 'BOOKING_EXPIRED') {
+    return 'This booking session has expired. Please book the flight again.';
+  }
+
+  const backendMessage =
+    error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    error.response &&
+    typeof error.response === 'object' &&
+    'data' in error.response &&
+    error.response.data &&
+    typeof error.response.data === 'object' &&
+    'error' in error.response.data &&
+    error.response.data.error &&
+    typeof error.response.data.error === 'object' &&
+    'message' in error.response.data.error &&
+    typeof error.response.data.error.message === 'string'
+      ? error.response.data.error.message
+      : null;
+
+  if (backendMessage?.trim()) {
+    return backendMessage;
+  }
+
+  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 function isExpiredTimestamp(value: string | null | undefined): boolean {
@@ -376,7 +346,7 @@ type SummaryPanelProps = {
   serviceCurrency: string;
 };
 
-function LegacySummaryPanel({
+function _LegacySummaryPanel({
   seatContext,
   totalPriceLabel,
   passengersCount,
@@ -401,7 +371,7 @@ function LegacySummaryPanel({
       ) : null}
       <p className="text-xs text-on-surface-variant">{passengersCount} passengers</p>
 
-      {(confirmedSeatNumber || activePassengerServices.length > 0) ? (
+      {confirmedSeatNumber || activePassengerServices.length > 0 ? (
         <div className="mt-5 space-y-3 border-t border-outline-variant/20 pt-4">
           {confirmedSeatNumber ? (
             <div className="flex items-start justify-between gap-3 text-sm">
@@ -479,7 +449,7 @@ type InspectorSummaryPanelProps = {
   serviceCurrency: string;
 };
 
-function InspectorSummaryPanel({
+function _InspectorSummaryPanel({
   seatContext,
   totalPriceLabel,
   passengersCount,
@@ -511,7 +481,8 @@ function InspectorSummaryPanel({
     activePassengerServices.length > 0 ? formatMoney(totalServicePrice, serviceCurrency) : '--';
   const serviceHeroTitle = highlightedService?.name ?? 'No service selected';
   const serviceHeroPrice = highlightedService?.priceLabel ?? servicePriceLabel;
-  const serviceDescription = highlightedService?.description ?? 'Chon dich vu de xem thong tin chi tiet.';
+  const serviceDescription =
+    highlightedService?.description ?? 'Chon dich vu de xem thong tin chi tiet.';
   const serviceTypeLabel = highlightedService?.serviceName ?? 'Additional service';
 
   return (
@@ -630,11 +601,11 @@ type ServiceDetailPanelProps = {
 };
 
 function ServiceDetailPanel({
-  seatContext,
-  totalPriceLabel,
-  passengersCount,
-  activePassengerName,
-  highlightedService,
+  seatContext: _seatContext,
+  totalPriceLabel: _totalPriceLabel,
+  passengersCount: _passengersCount,
+  activePassengerName: _activePassengerName,
+  highlightedService: _highlightedService,
   activePassengerServices,
   totalServicePrice,
   serviceCurrency,
@@ -743,6 +714,11 @@ function ServiceDetailPanel({
 type BookingSummaryPanelProps = {
   itineraryLabel: string | null;
   flightMetaLabel: string | null;
+  tripSegments: Array<{
+    direction: 'OUTBOUND' | 'INBOUND' | null;
+    itineraryLabel: string | null;
+    flightMetaLabel: string | null;
+  }>;
   totalPriceLabel: string | null;
   passengersCount: number;
   passengerItems: Array<{
@@ -784,6 +760,46 @@ function bookingPassengerTypeLabel(value: string | null | undefined): string {
 
 function formatSummarySeatLabel(seatNumber: string): string {
   return seatNumber.replace(/^Seat\s+/i, '').trim();
+}
+
+function SummaryTripCard({
+  segment,
+  passengersCount,
+}: {
+  segment: {
+    direction: 'OUTBOUND' | 'INBOUND' | null;
+    itineraryLabel: string | null;
+    flightMetaLabel: string | null;
+  };
+  passengersCount: number;
+}) {
+  const routeParts = segment.itineraryLabel?.split('->').map((part) => part.trim()) ?? [];
+  const routeLabel =
+    routeParts.length >= 2
+      ? `${routeParts[0]} -> ${routeParts[1]}`
+      : (segment.itineraryLabel ?? 'Flight summary');
+  const segmentLabel =
+    segment.direction === 'OUTBOUND'
+      ? 'Outbound'
+      : segment.direction === 'INBOUND'
+        ? 'Return'
+        : 'Segment';
+
+  return (
+    <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-4 py-4">
+      <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-midnight-burgundy">
+        {segmentLabel}
+      </p>
+      <p className="mt-3 text-base font-black leading-snug text-on-surface">{routeLabel}</p>
+      {segment.flightMetaLabel ? (
+        <p className="mt-2 text-sm text-on-surface-variant">{segment.flightMetaLabel}</p>
+      ) : null}
+      <p className="mt-3 text-sm text-on-surface-variant">Fare: ...</p>
+      <p className="mt-1 text-sm text-on-surface-variant">Seat: ...</p>
+      <p className="mt-1 text-sm text-on-surface-variant">Services: ...</p>
+      <p className="mt-3 text-xs text-on-surface-variant">{passengersCount} passengers</p>
+    </div>
+  );
 }
 
 function BookingSummarySection({
@@ -837,6 +853,7 @@ function BookingSummarySection({
 function BookingSummaryPanel({
   itineraryLabel,
   flightMetaLabel,
+  tripSegments,
   totalPriceLabel,
   passengersCount,
   passengerItems,
@@ -848,14 +865,11 @@ function BookingSummaryPanel({
   serviceItems,
   serviceTotalLabel,
 }: BookingSummaryPanelProps) {
-  const groupedPassengers = passengerItems.reduce(
-    (map, passenger) => {
-      const key = bookingPassengerTypeLabel(passenger.passengerType);
-      map.set(key, [...(map.get(key) ?? []), passenger]);
-      return map;
-    },
-    new Map<string, BookingSummaryPanelProps['passengerItems']>()
-  );
+  const groupedPassengers = passengerItems.reduce((map, passenger) => {
+    const key = bookingPassengerTypeLabel(passenger.passengerType);
+    map.set(key, [...(map.get(key) ?? []), passenger]);
+    return map;
+  }, new Map<string, BookingSummaryPanelProps['passengerItems']>());
   const summarySeatTotalLabel =
     seatItems.length > 0
       ? formatMoney(
@@ -874,7 +888,25 @@ function BookingSummaryPanel({
         <p className="text-[0.6875rem] font-black uppercase tracking-[0.22em] text-midnight-burgundy">
           Trip summary
         </p>
-        <div className="mt-4 space-y-2">
+        <div className="mt-4 space-y-4">
+          {(tripSegments.length > 0
+            ? tripSegments
+            : [
+                {
+                  direction: null,
+                  itineraryLabel,
+                  flightMetaLabel,
+                },
+              ]
+          ).map((segment, index) => (
+            <SummaryTripCard
+              key={`${segment.direction ?? 'segment'}-${segment.flightMetaLabel ?? index}`}
+              segment={segment}
+              passengersCount={passengersCount}
+            />
+          ))}
+        </div>
+        <div className="hidden mt-4 space-y-2">
           <h3 className="font-headline text-[1.05rem] font-black leading-snug text-on-surface sm:text-[1.15rem]">
             {itineraryFrom}
           </h3>
@@ -887,8 +919,7 @@ function BookingSummaryPanel({
             </div>
           ) : null}
         </div>
-        {flightMetaLabel ? <p className="mt-2 text-sm text-on-surface-variant">{flightMetaLabel}</p> : null}
-        <p className="mt-1 text-xs text-on-surface-variant">{passengersCount} passengers</p>
+        <p className="hidden mt-1 text-xs text-on-surface-variant">{passengersCount} passengers</p>
       </div>
 
       <div className="mt-5 space-y-4">
@@ -951,10 +982,7 @@ function BookingSummaryPanel({
         ) : null}
 
         {seatItems.length > 0 ? (
-          <BookingSummarySection
-            title="Seats"
-            value={summarySeatTotalLabel}
-          >
+          <BookingSummarySection title="Seats" value={summarySeatTotalLabel}>
             <div className="space-y-3">
               {seatItems.map((seat) => (
                 <div
@@ -966,9 +994,7 @@ function BookingSummaryPanel({
                       <span className="inline-flex rounded-full bg-outline-variant/10 px-2.5 py-1 text-[0.68rem] font-black uppercase tracking-[0.14em] text-on-surface-variant">
                         {seat.passengerName}
                       </span>
-                      <p className="mt-3 text-sm font-semibold text-on-surface">
-                        Selected seat
-                      </p>
+                      <p className="mt-3 text-sm font-semibold text-on-surface">Selected seat</p>
                       <p className="mt-1 text-lg font-bold leading-none tabular-nums text-on-surface">
                         {formatSummarySeatLabel(seat.seatNumber)}
                       </p>
@@ -1093,15 +1119,11 @@ export default function SeatSelection() {
   const [isServiceSelecting, setIsServiceSelecting] = useState(
     location.pathname.endsWith('/add-services')
   );
-  const [servicesByPassengerId, setServicesByPassengerId] = useState<ServicesByPassengerId>({});
-  const [serviceSaveStatusByPassengerId, setServiceSaveStatusByPassengerId] =
-    useState<ServiceSaveStatusByPassengerId>(() =>
-      createInitialServiceStatusMap(
-        bookingResponse?.confirmedServicesByPassengerId ??
-          buildConfirmedServicesLookupFromManageOptions(manageOptions)
-      )
-    );
-  const hydratedPassengersRef = useRef<Set<number>>(new Set());
+  const [servicesBySegmentPassengerKey, setServicesBySegmentPassengerKey] =
+    useState<ServicesBySegmentPassengerKey>({});
+  const [serviceSaveStatusBySegmentPassengerKey, setServiceSaveStatusBySegmentPassengerKey] =
+    useState<ServiceSaveStatusBySegmentPassengerKey>({});
+  const hydratedSegmentPassengerKeysRef = useRef<Set<string>>(new Set());
   const assignInFlight = useRef(false);
   const manageBookingId = resolveManageBookingId({
     manageOptions,
@@ -1162,7 +1184,7 @@ export default function SeatSelection() {
     }
   }, [manageOptionsQuery.data, setManageOptions]);
 
-  const seatContext = useMemo(
+  const baseSeatContext = useMemo(
     () =>
       resolveSeatContextFromSources({
         manageOptions,
@@ -1171,6 +1193,45 @@ export default function SeatSelection() {
       }),
     [bookingDraft, bookingResponse, manageOptions]
   );
+  const [selectedSegmentDirection, setSelectedSegmentDirection] = useState<'OUTBOUND' | 'INBOUND'>(
+    'OUTBOUND'
+  );
+  const availableSegments = useMemo(
+    () =>
+      baseSeatContext.segments.length > 0
+        ? baseSeatContext.segments
+        : baseSeatContext.flightId && baseSeatContext.fareId
+          ? [
+              {
+                direction: 'OUTBOUND' as const,
+                flightId: baseSeatContext.flightId,
+                fareId: baseSeatContext.fareId,
+                fareCode: baseSeatContext.fareCode,
+              },
+            ]
+          : [],
+    [baseSeatContext]
+  );
+  useEffect(() => {
+    if (isManageBookingFlow) return;
+    if (availableSegments.length === 0) return;
+    if (availableSegments.some((segment) => segment.direction === selectedSegmentDirection)) return;
+    setSelectedSegmentDirection(availableSegments[0].direction);
+  }, [availableSegments, isManageBookingFlow, selectedSegmentDirection]);
+  const seatContext = useMemo(() => {
+    if (isManageBookingFlow) return baseSeatContext;
+    const selected =
+      availableSegments.find((segment) => segment.direction === selectedSegmentDirection) ??
+      availableSegments[0];
+    if (!selected) return baseSeatContext;
+    return {
+      ...baseSeatContext,
+      flightId: selected.flightId,
+      fareId: selected.fareId,
+      fareCode: selected.fareCode,
+      segments: availableSegments,
+    };
+  }, [availableSegments, baseSeatContext, isManageBookingFlow, selectedSegmentDirection]);
   const canLoadSeatMap = isSeatSelecting && !!seatContext.flightId && !!seatContext.fareId;
   const canLoadServices = isServiceSelecting && !!seatContext.flightId && !!seatContext.fareId;
 
@@ -1179,6 +1240,13 @@ export default function SeatSelection() {
     () => resolveStorePassengerId(activePassenger),
     [activePassenger]
   );
+  const activeServiceSelectionKey = useMemo(
+    () => buildSegmentPassengerKey(seatContext.flightId, activePassengerId),
+    [activePassengerId, seatContext.flightId]
+  );
+  useEffect(() => {
+    setSelectedSeat(null);
+  }, [seatContext.fareId, seatContext.flightId]);
 
   const servicesMutation = useMutation({
     mutationFn: (vars: {
@@ -1229,19 +1297,14 @@ export default function SeatSelection() {
     staleTime: 60_000,
   });
 
-  const {
-    assignSeat,
-    changeSeat,
-    cancelSeat,
-    isSeatMutationPending,
-  } = useSeatAssignmentActions({
+  const { assignSeat, changeSeat, cancelSeat, isSeatMutationPending } = useSeatAssignmentActions({
     bookingResponse,
     isManageBookingFlow,
     applySeatAssignmentResult,
     refetchSeatMap: seatMapQuery.refetch,
     refetchManageOptions: manageOptionsQuery.refetch,
     onCancelSuccess: () => setSelectedSeat(null),
-    getBookingSessionExpiredMessage,
+    getSeatAssignmentErrorMessage,
   });
 
   useEffect(() => {
@@ -1259,50 +1322,63 @@ export default function SeatSelection() {
       servicesQuery.data.services,
       confirmedServicesByPassengerId
     );
+    const currentFlightId = seatContext.flightId;
 
-    if (!Object.keys(hydratedServices).length) {
+    if (!currentFlightId || !Object.keys(hydratedServices).length) {
       return;
     }
 
-    setServicesByPassengerId((current) => {
+    setServicesBySegmentPassengerKey((current) => {
       let changed = false;
       const next = { ...current };
 
       for (const [passengerIdText, services] of Object.entries(hydratedServices)) {
         const passengerId = Number(passengerIdText);
-        if (!Number.isFinite(passengerId) || hydratedPassengersRef.current.has(passengerId)) {
+        const key = buildSegmentPassengerKey(currentFlightId, passengerId);
+        if (
+          !Number.isFinite(passengerId) ||
+          !key ||
+          hydratedSegmentPassengerKeysRef.current.has(key)
+        ) {
           continue;
         }
-        next[passengerId] = services;
-        hydratedPassengersRef.current.add(passengerId);
+        next[key] = services;
+        hydratedSegmentPassengerKeysRef.current.add(key);
         changed = true;
       }
 
       return changed ? next : current;
     });
 
-    setServiceSaveStatusByPassengerId((current) => {
+    setServiceSaveStatusBySegmentPassengerKey((current) => {
       const next = { ...current };
       let changed = false;
 
       for (const passengerIdText of Object.keys(confirmedServicesByPassengerId)) {
         const passengerId = Number(passengerIdText);
-        if (!Number.isFinite(passengerId) || next[passengerId] === 'saved') continue;
-        next[passengerId] = 'saved';
+        const key = buildSegmentPassengerKey(currentFlightId, passengerId);
+        if (!Number.isFinite(passengerId) || !key || next[key] === 'saved') continue;
+        next[key] = 'saved';
         changed = true;
       }
 
       return changed ? next : current;
     });
-  }, [bookingResponse?.confirmedServicesByPassengerId, manageOptions, servicesQuery.data?.services]);
+  }, [
+    bookingResponse?.confirmedServicesByPassengerId,
+    manageOptions,
+    seatContext.flightId,
+    servicesQuery.data?.services,
+  ]);
 
-  const activePassengerServices = activePassengerId
-    ? (servicesByPassengerId[activePassengerId] ?? [])
+  const activePassengerServices = activeServiceSelectionKey
+    ? (servicesBySegmentPassengerKey[activeServiceSelectionKey] ?? [])
     : [];
   const confirmedActivePassengerServices = useMemo(() => {
     if (activePassengerId == null) return [];
 
-    const confirmedSelections = bookingResponse?.confirmedServicesByPassengerId?.[activePassengerId];
+    const confirmedSelections =
+      bookingResponse?.confirmedServicesByPassengerId?.[activePassengerId];
     if (confirmedSelections?.length) {
       return confirmedSelections
         .filter((selection) => selection.optionId > 0)
@@ -1334,8 +1410,8 @@ export default function SeatSelection() {
     manageOptions?.serviceSelections,
   ]);
   const activePassengerServiceStatus =
-    activePassengerId != null
-      ? (serviceSaveStatusByPassengerId[activePassengerId] ?? 'idle')
+    activeServiceSelectionKey != null
+      ? (serviceSaveStatusBySegmentPassengerKey[activeServiceSelectionKey] ?? 'idle')
       : 'idle';
   const highlightedService = activePassengerServices[activePassengerServices.length - 1] ?? null;
   const pricing = bookingResponse?.pricing ?? bookingDraft.pricing;
@@ -1363,19 +1439,30 @@ export default function SeatSelection() {
         )
       : null;
   const confirmedSeatAssignment = useMemo(() => {
-    if (activePassengerId == null) return null;
+    if (activePassengerId == null || seatContext.flightId == null) return null;
     const latestAssignment = bookingResponse?.lastSeatAssignment?.assignments?.find(
-      (assignment) => assignment.passengerId === activePassengerId
+      (assignment) =>
+        assignment.passengerId === activePassengerId &&
+        findSeatCellById(seatMapQuery.data?.rows, assignment.seatId) != null
     );
     if (latestAssignment) return latestAssignment;
     return (
       manageOptions?.seatAssignments?.find(
-        (assignment) => assignment.passengerId === activePassengerId
+        (assignment) =>
+          assignment.passengerId === activePassengerId &&
+          assignment.flightId === seatContext.flightId
       ) ?? null
     );
-  }, [activePassengerId, bookingResponse?.lastSeatAssignment?.assignments, manageOptions?.seatAssignments]);
+  }, [
+    activePassengerId,
+    bookingResponse?.lastSeatAssignment?.assignments,
+    manageOptions?.seatAssignments,
+    seatContext.flightId,
+    seatMapQuery.data?.rows,
+  ]);
   const confirmedSeat =
-    confirmedSeatAssignment?.seatId != null && selectedSeat?.seatId === confirmedSeatAssignment.seatId
+    confirmedSeatAssignment?.seatId != null &&
+    selectedSeat?.seatId === confirmedSeatAssignment.seatId
       ? selectedSeat
       : null;
   const seatDetails = findSeatCellById(
@@ -1408,7 +1495,8 @@ export default function SeatSelection() {
 
     for (const passenger of bookingLookup?.passengers ?? []) {
       const passengerId = pickNumericId(passenger.passengerId);
-      const seatNumber = (passenger.selections?.seats ?? passenger.seatAssignments ?? [])[0]?.seatNumber;
+      const seatNumber = (passenger.selections?.seats ?? passenger.seatAssignments ?? [])[0]
+        ?.seatNumber;
       if (passengerId == null || !seatNumber || next.has(passengerId)) continue;
       next.set(passengerId, seatNumber);
     }
@@ -1426,172 +1514,10 @@ export default function SeatSelection() {
   const seatPriceLabel = normalizeSeatPriceText(
     confirmedSeat?.displayPrice?.text ?? seatDetails?.displayPrice?.text
   );
-  const summaryPassengerItems = useMemo(
-    () =>
-      passengers.map((passenger, index) => ({
-        passengerId: resolveStorePassengerId(passengerSource[index]),
-        fullName: passenger.fullName,
-        passengerType:
-          passengerSource[index] &&
-          typeof passengerSource[index] === 'object' &&
-          'passengerType' in passengerSource[index]
-            ? String(passengerSource[index].passengerType ?? '')
-            : null,
-      })),
-    [passengerSource, passengers]
-  );
-  const summaryTaxFeeItems = pricing
-    ? [
-        { label: 'Taxes', value: formatMoney(pricing.taxes, pricing.currency || 'VND') },
-        { label: 'Fees', value: formatMoney(pricing.fees, pricing.currency || 'VND') },
-      ]
-    : [];
-  const summaryTaxFeeTotalLabel =
-    pricing != null
-      ? formatMoney((pricing.taxes ?? 0) + (pricing.fees ?? 0), pricing.currency || 'VND')
-      : null;
-  const summarySeatItems = useMemo(() => {
-    const assignments =
-      bookingResponse?.lastSeatAssignment?.assignments ?? manageOptions?.seatAssignments ?? [];
-
-    return assignments
-      .map((assignment) => {
-        const passengerId = pickNumericId(assignment.passengerId);
-        const seatId = pickNumericId(assignment.seatId);
-        if (passengerId == null || seatId == null) return null;
-        const seatCell = findSeatCellById(seatMapQuery.data?.rows, seatId);
-        const passengerName =
-          summaryPassengerItems.find((item) => item.passengerId === passengerId)?.fullName ??
-          `Passenger ${passengerId}`;
-        const seatNumber =
-          seatCell?.seatNumber ??
-          ('seatNumber' in assignment && typeof assignment.seatNumber === 'string'
-            ? assignment.seatNumber
-            : `Seat ${seatId}`);
-        const surchargeAmount =
-          'surchargeAmount' in assignment && typeof assignment.surchargeAmount === 'number'
-            ? assignment.surchargeAmount
-            : 0;
-        const currency =
-          'currency' in assignment && typeof assignment.currency === 'string'
-            ? assignment.currency
-            : pricing?.currency ?? manageOptions?.currency ?? 'VND';
-
-        return {
-          passengerId,
-          passengerName,
-          seatNumber,
-          seatTypeLabel: seatCell?.seatTypeDisplay?.label ?? null,
-          seatCategoryLabel: seatCell?.seatCategoryDisplay?.label ?? null,
-          surchargeAmount,
-          currency,
-          surchargeLabel: formatMoney(surchargeAmount, currency),
-        };
-      })
-      .filter((item): item is NonNullable<typeof item> => item != null);
-  }, [
-    bookingResponse?.lastSeatAssignment?.assignments,
-    manageOptions?.currency,
-    manageOptions?.seatAssignments,
-    pricing?.currency,
-    seatMapQuery.data?.rows,
-    summaryPassengerItems,
-  ]);
-  const summarySeatTotalAmount = summarySeatItems.reduce(
-    (total, seat) => total + seat.surchargeAmount,
-    0
-  );
-  const summarySeatTotalLabel =
-    summarySeatItems.length > 0
-      ? formatMoney(
-          summarySeatTotalAmount,
-          summarySeatItems[0]?.currency ?? pricing?.currency ?? manageOptions?.currency ?? 'VND'
-        )
-      : null;
-  const summaryServiceItems = useMemo(() => {
-    const next: Array<{
-      passengerId: number;
-      passengerName: string;
-      serviceName: string;
-      optionName: string;
-      quantity: number;
-      totalPriceLabel: string;
-    }> = [];
-
-    const confirmedServiceEntries = Object.entries(
-      bookingResponse?.confirmedServicesByPassengerId ?? {}
-    );
-
-    if (confirmedServiceEntries.length > 0) {
-      for (const [passengerIdText, selections] of confirmedServiceEntries) {
-        const passengerId = Number(passengerIdText);
-        if (!Number.isFinite(passengerId)) continue;
-        const passengerName =
-          summaryPassengerItems.find((item) => item.passengerId === passengerId)?.fullName ??
-          `Passenger ${passengerId}`;
-
-        for (const selection of selections) {
-          next.push({
-            passengerId,
-            passengerName,
-            serviceName: selection.serviceName,
-            optionName: selection.optionName,
-            quantity:
-              Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1,
-            totalPriceLabel: formatMoney(
-              selection.price * (Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1),
-              serviceCurrency
-            ),
-          });
-        }
-      }
-
-      return next;
-    }
-
-    for (const selection of manageOptions?.serviceSelections ?? []) {
-      const passengerId = pickNumericId(selection.passengerId);
-      if (passengerId == null || (selection.optionId ?? 0) <= 0) continue;
-      const quantity =
-        Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1;
-      const passengerName =
-        summaryPassengerItems.find((item) => item.passengerId === passengerId)?.fullName ??
-        `Passenger ${passengerId}`;
-      next.push({
-        passengerId,
-        passengerName,
-        serviceName: selection.serviceName ?? 'Additional service',
-        optionName: selection.optionName ?? `Option ${selection.optionId}`,
-        quantity,
-        totalPriceLabel: formatMoney(
-          selection.price * quantity,
-          manageOptions?.currency ?? serviceCurrency
-        ),
-      });
-    }
-
-    return next;
-  }, [
-    bookingResponse?.confirmedServicesByPassengerId,
-    manageOptions?.currency,
-    manageOptions?.serviceSelections,
-    serviceCurrency,
-    summaryPassengerItems,
-  ]);
-  const summaryServiceTotalAmount = useMemo(
-    () =>
-      summaryServiceItems.reduce((total, item) => {
-        const match = item.totalPriceLabel.replace(/[^\d]/g, '');
-        const numeric = Number(match);
-        return total + (Number.isFinite(numeric) ? numeric : 0);
-      }, 0),
-    [summaryServiceItems]
-  );
-  const summaryServiceTotalLabel =
-    summaryServiceItems.length > 0 ? formatMoney(summaryServiceTotalAmount, serviceCurrency) : null;
   const {
     totalPriceLabel: resolvedTotalPriceLabel,
     summaryHeader: resolvedSummaryHeader,
+    summaryTripSegments: resolvedSummaryTripSegments,
     summaryPassengerItems: resolvedSummaryPassengerItems,
     summaryFareAmountLabel: resolvedSummaryFareAmountLabel,
     summaryDiscountAmountLabel: resolvedSummaryDiscountAmountLabel,
@@ -1617,21 +1543,21 @@ export default function SeatSelection() {
       ? 'Flight ID or fare ID was not found in the store for loading the seat map.'
       : manageOptionsQuery.error instanceof Error
         ? manageOptionsQuery.error.message
-      : seatMapQuery.error instanceof Error
-        ? seatMapQuery.error.message
-        : seatMapQuery.isError
-          ? 'Unable to load the seat map right now.'
-          : null;
+        : seatMapQuery.error instanceof Error
+          ? seatMapQuery.error.message
+          : seatMapQuery.isError
+            ? 'Unable to load the seat map right now.'
+            : null;
   const servicesError =
     !seatContext.flightId || !seatContext.fareId
       ? 'Flight ID or fare ID was not found in the store for loading the services list.'
       : manageOptionsQuery.error instanceof Error
         ? manageOptionsQuery.error.message
-      : servicesQuery.error instanceof Error
-        ? servicesQuery.error.message
-        : servicesQuery.isError
-          ? 'Unable to load the services list right now.'
-          : null;
+        : servicesQuery.error instanceof Error
+          ? servicesQuery.error.message
+          : servicesQuery.isError
+            ? 'Unable to load the services list right now.'
+            : null;
   const selectionMode = isSeatSelecting ? 'seat' : isServiceSelecting ? 'service' : 'overview';
   const openSeatSelection = () => {
     setIsSeatSelecting(true);
@@ -1658,7 +1584,8 @@ export default function SeatSelection() {
     if (bookingIdNumeric == null) return;
     const passengerId = activePassengerId;
     if (passengerId == null) return;
-    const passengerName = activePassengerProfile?.fullName?.trim() || `Passenger ${activePassengerIndex + 1}`;
+    const passengerName =
+      activePassengerProfile?.fullName?.trim() || `Passenger ${activePassengerIndex + 1}`;
     if (assignInFlight.current) return;
     assignInFlight.current = true;
     const currentSeatId = confirmedSeatAssignment?.seatId;
@@ -1696,7 +1623,8 @@ export default function SeatSelection() {
     if (bookingIdNumeric == null) return;
     const passengerId = activePassengerId;
     if (passengerId == null) return;
-    const passengerName = activePassengerProfile?.fullName?.trim() || `Passenger ${activePassengerIndex + 1}`;
+    const passengerName =
+      activePassengerProfile?.fullName?.trim() || `Passenger ${activePassengerIndex + 1}`;
     if (assignInFlight.current) return;
     assignInFlight.current = true;
     cancelSeat(
@@ -1710,29 +1638,30 @@ export default function SeatSelection() {
   };
 
   const handleActivePassengerServicesChange = (services: SelectedServiceOption[]) => {
-    if (activePassengerId == null) return;
-    hydratedPassengersRef.current.add(activePassengerId);
-    setServicesByPassengerId((current) => ({
+    if (!activeServiceSelectionKey) return;
+    hydratedSegmentPassengerKeysRef.current.add(activeServiceSelectionKey);
+    setServicesBySegmentPassengerKey((current) => ({
       ...current,
-      [activePassengerId]: services,
+      [activeServiceSelectionKey]: services,
     }));
-    setServiceSaveStatusByPassengerId((current) => ({
+    setServiceSaveStatusBySegmentPassengerKey((current) => ({
       ...current,
-      [activePassengerId]: 'idle',
+      [activeServiceSelectionKey]: 'idle',
     }));
   };
 
   const handleServicesConfirm = () => {
     const bookingIdNumeric = manageBookingId;
-    if (bookingIdNumeric == null || activePassengerId == null) return;
-    const passengerName = activePassengerProfile?.fullName?.trim() || `Passenger ${activePassengerIndex + 1}`;
-    const services = servicesByPassengerId[activePassengerId] ?? [];
+    if (bookingIdNumeric == null || activePassengerId == null || !activeServiceSelectionKey) return;
+    const passengerName =
+      activePassengerProfile?.fullName?.trim() || `Passenger ${activePassengerIndex + 1}`;
+    const services = servicesBySegmentPassengerKey[activeServiceSelectionKey] ?? [];
     const selections = buildSelectionsFromSelectedServices(services);
 
-    hydratedPassengersRef.current.add(activePassengerId);
-    setServiceSaveStatusByPassengerId((current) => ({
+    hydratedSegmentPassengerKeysRef.current.add(activeServiceSelectionKey);
+    setServiceSaveStatusBySegmentPassengerKey((current) => ({
       ...current,
-      [activePassengerId]: 'saving',
+      [activeServiceSelectionKey]: 'saving',
     }));
 
     servicesMutation.mutate(
@@ -1750,22 +1679,19 @@ export default function SeatSelection() {
           if (isManageBookingFlow) {
             void manageOptionsQuery.refetch();
           }
-          setServiceSaveStatusByPassengerId((current) => ({
+          setServiceSaveStatusBySegmentPassengerKey((current) => ({
             ...current,
-            [variables.passengerId]: 'saved',
+            [activeServiceSelectionKey]: 'saved',
           }));
           toast.success(`Services added for ${variables.passengerName}.`);
         },
-        onError: (error, variables) => {
-          setServiceSaveStatusByPassengerId((current) => ({
+        onError: (error, _variables) => {
+          setServiceSaveStatusBySegmentPassengerKey((current) => ({
             ...current,
-            [variables.passengerId]: 'error',
+            [activeServiceSelectionKey]: 'error',
           }));
           toast.error(
-            getBookingSessionExpiredMessage(error) ??
-              (error instanceof Error
-                ? error.message
-                : 'Unable to update services. Please try again.')
+            getSeatAssignmentErrorMessage(error, 'Unable to update services. Please try again.')
           );
         },
       }
@@ -1792,10 +1718,6 @@ export default function SeatSelection() {
                       passengerId != null
                         ? (passengerSeatLabelByPassengerId.get(passengerId) ?? p.seat)
                         : p.seat;
-                    const serviceStatus =
-                      passengerId != null
-                        ? (serviceSaveStatusByPassengerId[passengerId] ?? 'idle')
-                        : 'idle';
 
                     return (
                       <button
@@ -1882,6 +1804,7 @@ export default function SeatSelection() {
               <BookingSummaryPanel
                 itineraryLabel={resolvedSummaryHeader.itineraryLabel}
                 flightMetaLabel={resolvedSummaryHeader.flightMetaLabel}
+                tripSegments={resolvedSummaryTripSegments}
                 totalPriceLabel={resolvedTotalPriceLabel}
                 passengersCount={passengers.length}
                 passengerItems={resolvedSummaryPassengerItems}
@@ -1894,66 +1817,61 @@ export default function SeatSelection() {
                 serviceTotalLabel={resolvedSummaryServiceTotalLabel}
               />
               <div className="hidden w-full rounded-xl border border-luxury-gold/20 bg-surface-container-lowest p-5 shadow-lg xl:sticky xl:top-28 xl:w-[23rem]">
-              <h3 className="mb-4 font-headline text-lg font-black text-on-surface">Summary</h3>
-              <p className="text-sm text-on-surface-variant">
-                Flight #{seatContext.flightId ?? '--'}
-                {seatContext.fareCode ? ` | ${seatContext.fareCode}` : ''}
-              </p>
-              {totalPriceLabel ? (
-                <p className="mt-6 text-2xl font-black text-secondary">{totalPriceLabel}</p>
-              ) : null}
-              <p className="text-xs text-on-surface-variant">{passengers.length} passengers</p>
+                <h3 className="mb-4 font-headline text-lg font-black text-on-surface">Summary</h3>
+                <p className="text-sm text-on-surface-variant">
+                  Flight #{seatContext.flightId ?? '--'}
+                  {seatContext.fareCode ? ` | ${seatContext.fareCode}` : ''}
+                </p>
+                {totalPriceLabel ? (
+                  <p className="mt-6 text-2xl font-black text-secondary">{totalPriceLabel}</p>
+                ) : null}
+                <p className="text-xs text-on-surface-variant">{passengers.length} passengers</p>
 
-              {confirmedSeatNumber ? (
-                <div className="mt-4 rounded-lg bg-midnight-burgundy/10 p-3">
-                  <p className="text-xs font-bold uppercase tracking-wider text-midnight-burgundy">
-                    Ghe da chon
-                  </p>
-                  <p className="mt-1 text-lg font-black text-secondary">
-                    {confirmedSeatNumber}
-                  </p>
-                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
-                    {seatDetails?.seatTypeDisplay?.label ??
-                      confirmedSeat?.seatTypeDisplay?.label ??
-                      'Seat'}{' '}
-                    |{' '}
-                    {seatDetails?.seatCategoryDisplay?.label ??
-                      confirmedSeat?.seatCategoryDisplay?.label ??
-                      confirmedSeat?.seatCategory}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-on-surface">
-                    {seatPriceLabel ?? 'Selected'}
-                  </p>
-                </div>
-              ) : null}
+                {confirmedSeatNumber ? (
+                  <div className="mt-4 rounded-lg bg-midnight-burgundy/10 p-3">
+                    <p className="text-xs font-bold uppercase tracking-wider text-midnight-burgundy">
+                      Ghe da chon
+                    </p>
+                    <p className="mt-1 text-lg font-black text-secondary">{confirmedSeatNumber}</p>
+                    <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                      {seatDetails?.seatTypeDisplay?.label ??
+                        confirmedSeat?.seatTypeDisplay?.label ??
+                        'Seat'}{' '}
+                      |{' '}
+                      {seatDetails?.seatCategoryDisplay?.label ??
+                        confirmedSeat?.seatCategoryDisplay?.label ??
+                        confirmedSeat?.seatCategory}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-on-surface">
+                      {seatPriceLabel ?? 'Selected'}
+                    </p>
+                  </div>
+                ) : null}
 
-              {confirmedActivePassengerServices.length > 0 && (
-                <div className="mt-6 space-y-2 border-t border-outline-variant/20 pt-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                    Additional services
-                  </p>
-                  {confirmedActivePassengerServices.map((service) => (
-                    <div
-                      key={service.optionId}
-                      className="flex justify-between gap-3 text-sm"
-                    >
-                      <span className="text-on-surface-variant">
-                        {service.name}
-                        {service.quantity > 1 ? ` x${service.quantity}` : ''}
-                      </span>
-                      <span className="text-right font-bold text-secondary">
-                        {formatMoney(service.price * service.quantity, serviceCurrency)}
-                      </span>
-                    </div>
-                  ))}
-                  <div className="border-t border-outline-variant/20 pt-2">
-                    <div className="flex justify-between font-bold text-midnight-burgundy">
-                      <span>Services:</span>
-                      <span>{formatMoney(confirmedTotalServicePrice, serviceCurrency)}</span>
+                {confirmedActivePassengerServices.length > 0 && (
+                  <div className="mt-6 space-y-2 border-t border-outline-variant/20 pt-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                      Additional services
+                    </p>
+                    {confirmedActivePassengerServices.map((service) => (
+                      <div key={service.optionId} className="flex justify-between gap-3 text-sm">
+                        <span className="text-on-surface-variant">
+                          {service.name}
+                          {service.quantity > 1 ? ` x${service.quantity}` : ''}
+                        </span>
+                        <span className="text-right font-bold text-secondary">
+                          {formatMoney(service.price * service.quantity, serviceCurrency)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="border-t border-outline-variant/20 pt-2">
+                      <div className="flex justify-between font-bold text-midnight-burgundy">
+                        <span>Services:</span>
+                        <span>{formatMoney(confirmedTotalServicePrice, serviceCurrency)}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
                 <div className="mt-8 flex h-12 flex-row gap-3">
                   <Link
@@ -1976,6 +1894,13 @@ export default function SeatSelection() {
 
         {selectionMode === 'seat' && (
           <section className="mb-6">
+            {!isManageBookingFlow ? (
+              <SegmentTabs
+                segments={availableSegments}
+                selectedDirection={selectedSegmentDirection}
+                onChange={setSelectedSegmentDirection}
+              />
+            ) : null}
             <AircraftSeatsMap
               seatMap={seatMapQuery.data ?? null}
               loading={canLoadSeatMap && seatMapQuery.isPending}
@@ -1996,6 +1921,13 @@ export default function SeatSelection() {
         {selectionMode === 'service' && (
           <section className="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
             <div className="min-w-0">
+              {!isManageBookingFlow ? (
+                <SegmentTabs
+                  segments={availableSegments}
+                  selectedDirection={selectedSegmentDirection}
+                  onChange={setSelectedSegmentDirection}
+                />
+              ) : null}
               {isServiceSelecting && (
                 <AdditionalService
                   services={servicesQuery.data?.services ?? []}

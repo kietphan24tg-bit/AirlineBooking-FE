@@ -133,6 +133,44 @@ export interface FlightRevalidateFareResponse {
   pricing: FlightRevalidatePricing;
 }
 
+export type FlightItineraryTripType = 'ONE_WAY' | 'ROUND_TRIP';
+export type FlightItinerarySegmentDirection = 'OUTBOUND' | 'INBOUND';
+
+export interface FlightRevalidateItinerarySegmentRequest {
+  direction: FlightItinerarySegmentDirection;
+  flightId: number;
+  fareId: number;
+}
+
+export interface FlightRevalidateItineraryRequest {
+  tripType: FlightItineraryTripType;
+  promoCode: string;
+  passengerSummary: FlightRevalidatePassengerSummary;
+  segments: FlightRevalidateItinerarySegmentRequest[];
+}
+
+export interface FlightRevalidateItinerarySegment {
+  direction: FlightItinerarySegmentDirection;
+  flightId: number;
+  fareId: number;
+  fareClassId: number;
+  fareCode: string;
+  fareName: string;
+  cabinClass: string;
+  currency: string;
+  pricing: FlightRevalidatePricing;
+}
+
+export interface FlightRevalidateItineraryResponse {
+  revalidateId: string;
+  expiresInSeconds: number;
+  tripType: FlightItineraryTripType;
+  promoCode: string;
+  passengerSummary: FlightRevalidatePassengerSummary;
+  pricing: FlightRevalidatePricing;
+  segments: FlightRevalidateItinerarySegment[];
+}
+
 export type SeatMapSeatStatus = 'AVAILABLE' | 'RESERVED' | 'BOOKED' | 'UNAVAILABLE';
 
 export type SeatMapSeatType = 'WINDOW' | 'MIDDLE' | 'AISLE';

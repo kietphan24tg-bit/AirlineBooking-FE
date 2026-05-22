@@ -11,6 +11,12 @@ export type SeatContext = {
   flightId: number | null;
   fareId: number | null;
   fareCode: string | null;
+  segments: Array<{
+    direction: 'OUTBOUND' | 'INBOUND';
+    flightId: number;
+    fareId: number;
+    fareCode: string | null;
+  }>;
 };
 
 export type PassengerLike =
@@ -48,6 +54,7 @@ export function resolveSeatContext(source: unknown): SeatContext {
       flightId: null,
       fareId: null,
       fareCode: null,
+      segments: [],
     };
   }
 
@@ -71,10 +78,56 @@ export function resolveSeatContext(source: unknown): SeatContext {
         ? (rawResponse.fare as Record<string, unknown>)
         : null;
 
+  const rawSegments = Array.isArray(raw.segments)
+    ? raw.segments
+    : Array.isArray(selectedFareContext?.segments)
+      ? selectedFareContext.segments
+      : [];
+  const segments = rawSegments
+    .map((segment) => {
+      if (!segment || typeof segment !== 'object') return null;
+      const record = segment as Record<string, unknown>;
+      const directionRaw = String(record.direction ?? '')
+        .trim()
+        .toUpperCase();
+      if (directionRaw !== 'OUTBOUND' && directionRaw !== 'INBOUND') return null;
+      const flightId = pickNumericId(record.flightId);
+      const fareId = pickNumericId(record.fareId);
+      if (!flightId || !fareId) return null;
+      return {
+        direction: directionRaw,
+        flightId,
+        fareId,
+        fareCode: pickText(record.fareCode),
+      } as SeatContext['segments'][number];
+    })
+    .filter((segment): segment is SeatContext['segments'][number] => segment != null);
+
+  const fallbackFlightId = pickNumericId(
+    raw.flightId ?? selectedFareContext?.flightId ?? flight?.flightId
+  );
+  const fallbackFareId = pickNumericId(raw.fareId ?? selectedFareContext?.fareId ?? fare?.fareId);
+  const fallbackFareCode = pickText(
+    raw.fareCode ?? selectedFareContext?.fareCode ?? fare?.code ?? fare?.fareCode
+  );
+  const primarySegment = segments[0];
   return {
-    flightId: pickNumericId(raw.flightId ?? selectedFareContext?.flightId ?? flight?.flightId),
-    fareId: pickNumericId(raw.fareId ?? selectedFareContext?.fareId ?? fare?.fareId),
-    fareCode: pickText(raw.fareCode ?? selectedFareContext?.fareCode ?? fare?.code ?? fare?.fareCode),
+    flightId: primarySegment?.flightId ?? fallbackFlightId,
+    fareId: primarySegment?.fareId ?? fallbackFareId,
+    fareCode: primarySegment?.fareCode ?? fallbackFareCode,
+    segments:
+      segments.length > 0
+        ? segments
+        : fallbackFlightId && fallbackFareId
+          ? [
+              {
+                direction: 'OUTBOUND',
+                flightId: fallbackFlightId,
+                fareId: fallbackFareId,
+                fareCode: fallbackFareCode,
+              },
+            ]
+          : [],
   };
 }
 
@@ -85,16 +138,56 @@ export function resolveSeatContextFromSources(params: {
 }): SeatContext {
   const { manageOptions, bookingResponse, bookingDraft } = params;
   if (manageOptions?.itineraries?.length) {
-    const itinerary = manageOptions.itineraries[0];
+    const itinerarySegments = manageOptions.itineraries
+      .map((itinerary, index) => {
+        const directionRaw = String(itinerary.journeyType ?? '')
+          .trim()
+          .toUpperCase();
+        const direction =
+          directionRaw === 'INBOUND'
+            ? 'INBOUND'
+            : directionRaw === 'OUTBOUND'
+              ? 'OUTBOUND'
+              : index === 0
+                ? 'OUTBOUND'
+                : 'INBOUND';
+        return {
+          direction,
+          flightId: itinerary.flightId,
+          fareId: itinerary.fareId,
+          fareCode: itinerary.fareName ?? null,
+        } as SeatContext['segments'][number];
+      })
+      .filter((segment) => segment.flightId && segment.fareId);
+    const primarySegment = itinerarySegments[0];
     return {
-      flightId: itinerary.flightId,
-      fareId: itinerary.fareId,
-      fareCode: null,
+      flightId: primarySegment?.flightId ?? null,
+      fareId: primarySegment?.fareId ?? null,
+      fareCode: primarySegment?.fareCode ?? null,
+      segments: itinerarySegments,
     };
   }
   const responseContext = resolveSeatContext(bookingResponse);
+  const draftContext = resolveSeatContext(bookingDraft);
+  const responseHasSegments = responseContext.segments.length > 1;
+  const draftHasSegments = draftContext.segments.length > 1;
+
+  if (responseHasSegments) return responseContext;
+
+  if (draftHasSegments) {
+    const selectedResponseSegment =
+      draftContext.segments.find((segment) => segment.flightId === responseContext.flightId) ??
+      draftContext.segments[0];
+    return {
+      flightId: selectedResponseSegment?.flightId ?? responseContext.flightId,
+      fareId: selectedResponseSegment?.fareId ?? responseContext.fareId,
+      fareCode: selectedResponseSegment?.fareCode ?? responseContext.fareCode,
+      segments: draftContext.segments,
+    };
+  }
+
   if (responseContext.flightId && responseContext.fareId) return responseContext;
-  return resolveSeatContext(bookingDraft);
+  return draftContext;
 }
 
 export function resolveStorePassengerId(
@@ -148,8 +241,13 @@ export function resolvePassengerDisplayData(params: {
   passengers: PassengerProfileView[];
   passengerSource: PassengerLike[];
 } {
-  const { isManageBookingFlow, bookingResponse, bookingLookup, manageOptions, navigationPassengers } =
-    params;
+  const {
+    isManageBookingFlow,
+    bookingResponse,
+    bookingLookup,
+    manageOptions,
+    navigationPassengers,
+  } = params;
   const storePassengers = bookingResponse?.passengers?.length
     ? bookingResponse.passengers.map((passenger, index) => toPassengerProfile(passenger, index))
     : null;
@@ -176,11 +274,11 @@ export function resolvePassengerDisplayData(params: {
 
   return {
     passengers: isManageBookingFlow
-      ? managePassengers ?? lookupPassengers ?? []
-      : storePassengers ?? navigationPassengers ?? [],
+      ? (managePassengers ?? lookupPassengers ?? [])
+      : (storePassengers ?? navigationPassengers ?? []),
     passengerSource: isManageBookingFlow
-      ? manageOptions?.passengers ?? bookingLookup?.passengers ?? []
-      : bookingResponse?.passengers ?? [],
+      ? (manageOptions?.passengers ?? bookingLookup?.passengers ?? [])
+      : (bookingResponse?.passengers ?? []),
   };
 }
 
@@ -227,7 +325,8 @@ export function buildConfirmedServicesLookupFromManageOptions(
     const passengerSelections = next[selection.passengerId] ?? [];
     passengerSelections.push({
       optionId: selection.optionId,
-      quantity: Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1,
+      quantity:
+        Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1,
     });
     next[selection.passengerId] = passengerSelections;
   }

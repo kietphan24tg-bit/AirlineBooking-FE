@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import BookingStepper from '../components/booking/BookingStepper';
 import FlightResultCard from '../components/booking/FlightResultCard';
@@ -13,6 +14,7 @@ import { useBookingStore } from '../stores/useBookingStore';
 import type {
   FlightLeg,
   FlightRevalidateFareRequest,
+  FlightRevalidateItineraryRequest,
   FlightSearchCriteria,
   FlightSearchFilters,
 } from '../types/flight.types';
@@ -102,6 +104,8 @@ const PRICE_SLIDER_DEBOUNCE_MS = 400;
 const FALLBACK_SLIDER_MIN = 0;
 const FALLBACK_SLIDER_MAX = 20_000_000;
 const FALLBACK_CURRENCY = 'VND';
+const OUTBOUND_SELECTED_TOAST_ID = 'outbound-fare-selected';
+type ResultDirection = 'OUTBOUND' | 'INBOUND';
 
 function formatMoneySafe(amount: number, currency: string): string {
   try {
@@ -304,7 +308,11 @@ export default function FlightResults() {
   );
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [pendingFareKey, setPendingFareKey] = useState<string | null>(null);
-  const [fareSelectionError, setFareSelectionError] = useState<string | null>(null);
+  const selectedOutboundRef = useRef<{
+    leg: FlightLeg;
+    fareId: number;
+    fareKey: string;
+  } | null>(null);
   /** UI value while dragging; `null` = no cap (slider at max). Committed to `filters.maxBudget` after debounce. */
   const [draftMaxBudget, setDraftMaxBudget] = useState<number | null>(
     () => parseFlightResultsFilters(initialSearchParams).maxBudget
@@ -338,6 +346,7 @@ export default function FlightResults() {
     setDraftMaxBudget(parsedUrlFilters.maxBudget);
     setSort(parsedUrlSort);
     setMobileFiltersOpen(false);
+    selectedOutboundRef.current = null;
   }, [criteria, criteriaKey, parsedUrlFilters, parsedUrlSort]);
 
   useEffect(() => {
@@ -450,31 +459,70 @@ export default function FlightResults() {
       ? 'No filters applied'
       : `${activeFiltersCount} filter${activeFiltersCount === 1 ? '' : 's'} active`;
 
-  const handleSelectFare = async (payload: { leg: FlightLeg; fareId: number; fareKey: string }) => {
+  const handleSelectFare = async (
+    direction: ResultDirection,
+    payload: { leg: FlightLeg; fareId: number; fareKey: string }
+  ) => {
     if (!criteria || pendingFareKey) return;
     const flightId = Number(payload.leg.id);
     if (!Number.isFinite(flightId) || flightId <= 0) {
-      setFareSelectionError('Unable to select this fare. Please try another option.');
+      toast.error('Unable to select this fare. Please try another option.');
       return;
     }
-    setFareSelectionError(null);
+    if (criteria.tripType === 'ROUND_TRIP' && direction === 'OUTBOUND') {
+      selectedOutboundRef.current = payload;
+      toast.info(
+        `Outbound selected: Flight ${payload.leg.flightNumber} (${payload.leg.departureCode} -> ${payload.leg.arrivalCode}). Select a return fare to continue.`,
+        { id: OUTBOUND_SELECTED_TOAST_ID }
+      );
+      return;
+    }
+    if (
+      criteria.tripType === 'ROUND_TRIP' &&
+      direction === 'INBOUND' &&
+      !selectedOutboundRef.current
+    ) {
+      toast.error('Please select an outbound fare before selecting the return fare.');
+      return;
+    }
+
     setPendingFareKey(payload.fareKey);
     try {
-      const revalidated = await revalidateFareMutation.mutateAsync({
-        flightId,
-        fareId: payload.fareId,
-        promoCode: criteria.promoCode?.trim() ?? '',
-        passengerSummary: {
-          adult: criteria.adult,
-          child: criteria.child,
-          infant: criteria.infant,
-        },
-      });
+      const passengerSummary = {
+        adult: criteria.adult,
+        child: criteria.child,
+        infant: criteria.infant,
+      };
+      const revalidated =
+        criteria.tripType === 'ROUND_TRIP'
+          ? await flightService.revalidateItinerary({
+              tripType: 'ROUND_TRIP',
+              promoCode: criteria.promoCode?.trim() ?? '',
+              passengerSummary,
+              segments: [
+                {
+                  direction: 'OUTBOUND',
+                  flightId: Number(selectedOutboundRef.current?.leg.id),
+                  fareId: selectedOutboundRef.current?.fareId as number,
+                },
+                {
+                  direction: 'INBOUND',
+                  flightId,
+                  fareId: payload.fareId,
+                },
+              ],
+            } satisfies FlightRevalidateItineraryRequest)
+          : await revalidateFareMutation.mutateAsync({
+              flightId,
+              fareId: payload.fareId,
+              promoCode: criteria.promoCode?.trim() ?? '',
+              passengerSummary,
+            } satisfies FlightRevalidateFareRequest);
       clearBooking();
       setRevalidationDraft(revalidated);
       navigate('/booking/passengers');
     } catch (error) {
-      setFareSelectionError(
+      toast.error(
         error instanceof Error ? error.message : 'Could not verify latest fare. Please try again.'
       );
     } finally {
@@ -668,11 +716,6 @@ export default function FlightResults() {
           </aside>
 
           <div className="space-y-8 lg:col-span-9 lg:space-y-10">
-            {fareSelectionError ? (
-              <div className="rounded-xl border border-error/30 bg-error/5 p-4 text-sm text-error">
-                {fareSelectionError}
-              </div>
-            ) : null}
             {loading ? (
               <section aria-label="Loading flight results" className="space-y-6 lg:space-y-8">
                 {Array.from({ length: LOADING_SKELETON_COUNT }).map((_, index) => (
@@ -707,7 +750,7 @@ export default function FlightResults() {
                           key={leg.id}
                           leg={leg}
                           pendingFareKey={pendingFareKey}
-                          onSelectFare={handleSelectFare}
+                          onSelectFare={(payload) => void handleSelectFare('OUTBOUND', payload)}
                         />
                       ))}
                     </div>
@@ -730,7 +773,7 @@ export default function FlightResults() {
                             key={`in-${leg.id}`}
                             leg={leg}
                             pendingFareKey={pendingFareKey}
-                            onSelectFare={handleSelectFare}
+                            onSelectFare={(payload) => void handleSelectFare('INBOUND', payload)}
                           />
                         ))}
                       </div>

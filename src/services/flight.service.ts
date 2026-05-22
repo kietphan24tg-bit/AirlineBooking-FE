@@ -12,6 +12,8 @@ import type {
   FlightPriceRange,
   FlightRevalidateFareRequest,
   FlightRevalidateFareResponse,
+  FlightRevalidateItineraryRequest,
+  FlightRevalidateItineraryResponse,
   FlightSearchCriteria,
   FlightSearchFilters,
   FlightSearchPageInfo,
@@ -112,18 +114,20 @@ function resolveMockManageVariantForFlights(): ManageBookingMockVariant | null {
     urlFlag = params.get('mockManageBooking') === '1';
     urlVariant = params.get('mockManageVariant');
   }
-  const { mockManageBookingMode, manageOptions, bookingLookup, lookupCriteria } = useBookingStore.getState();
+  const { mockManageBookingMode, manageOptions, bookingLookup, lookupCriteria } =
+    useBookingStore.getState();
   const looksLikePersistedMock =
     isDevLocal &&
-    (
-      bookingLookup?.booking?.pnrCode?.trim().toUpperCase() === 'ABC123' ||
+    (bookingLookup?.booking?.pnrCode?.trim().toUpperCase() === 'ABC123' ||
       lookupCriteria?.pnrCode?.trim().toUpperCase() === 'ABC123' ||
-      manageOptions?.bookingId === 90210
-    );
+      manageOptions?.bookingId === 90210);
   if (urlFlag || envFlag) {
     if (urlVariant && isManageBookingMockVariant(urlVariant)) return urlVariant;
     if (mockManageBookingMode || looksLikePersistedMock) {
-      if ((manageOptions?.passengers?.length ?? 0) === 1 && (manageOptions?.itineraries?.length ?? 0) === 1) {
+      if (
+        (manageOptions?.passengers?.length ?? 0) === 1 &&
+        (manageOptions?.itineraries?.length ?? 0) === 1
+      ) {
         return 'CHECKIN_SINGLE';
       }
       return 'CONFIRMED';
@@ -132,7 +136,10 @@ function resolveMockManageVariantForFlights(): ManageBookingMockVariant | null {
   }
 
   if (mockManageBookingMode || looksLikePersistedMock) {
-    if ((manageOptions?.passengers?.length ?? 0) === 1 && (manageOptions?.itineraries?.length ?? 0) === 1) {
+    if (
+      (manageOptions?.passengers?.length ?? 0) === 1 &&
+      (manageOptions?.itineraries?.length ?? 0) === 1
+    ) {
       return 'CHECKIN_SINGLE';
     }
     return 'CONFIRMED';
@@ -436,6 +443,19 @@ export async function revalidateFareMapped(
   return raw;
 }
 
+export async function revalidateItineraryMapped(
+  payload: FlightRevalidateItineraryRequest
+): Promise<FlightRevalidateItineraryResponse> {
+  const res = await api.post<
+    FlightRevalidateItineraryResponse | { data?: FlightRevalidateItineraryResponse }
+  >('/api/flights/revalidate-itinerary', payload);
+  const raw = unwrapData(res.data) as FlightRevalidateItineraryResponse;
+  if (!raw?.revalidateId || !Array.isArray(raw.segments) || raw.segments.length === 0) {
+    throw new Error('Itinerary revalidation failed');
+  }
+  return raw;
+}
+
 export async function getSeatMapMapped(flightId: number, fareId: number): Promise<SeatMapResponse> {
   const mockVariant = resolveMockManageVariantForFlights();
   if (mockVariant) {
@@ -592,6 +612,7 @@ function normalizeServiceOption(
 export const flightService = {
   searchFlights: searchFlightsMapped,
   revalidateFare: revalidateFareMapped,
+  revalidateItinerary: revalidateItineraryMapped,
   getSeatMap: getSeatMapMapped,
   getServices: getServicesMapped,
 };

@@ -3,12 +3,7 @@ import type {
   PaymentResultSummaryResponse,
 } from '../types/payment-create.types';
 
-export type PaymentResultMockVariant =
-  | 'SUCCESS'
-  | 'PENDING'
-  | 'FAILED'
-  | 'CANCELLED'
-  | 'EXPIRED';
+export type PaymentResultMockVariant = 'SUCCESS' | 'PENDING' | 'FAILED' | 'CANCELLED' | 'EXPIRED';
 
 export const PAYMENT_RESULT_MOCK_VARIANTS: readonly PaymentResultMockVariant[] = [
   'SUCCESS',
@@ -69,7 +64,7 @@ const successSummary: PaymentResultSummaryResponse = {
     {
       segmentKey: 'FLIGHT-600',
       flightId: 600,
-      journeyType: 'Chuyến đi',
+      journeyType: 'Outbound',
       flightNumber: 'VN123',
       airlineName: 'The Sovereign Airways',
       departure: {
@@ -126,9 +121,9 @@ const successSummary: PaymentResultSummaryResponse = {
         {
           serviceId: 5002,
           serviceType: 'BAGGAGE',
-          serviceName: 'Hành lý ký gửi',
+          serviceName: 'Checked baggage',
           optionId: 5201,
-          optionName: 'Gói 20kg',
+          optionName: '20kg package',
           quantity: 1,
           amount: 160000,
           currency: 'VND',
@@ -137,9 +132,9 @@ const successSummary: PaymentResultSummaryResponse = {
         {
           serviceId: 5003,
           serviceType: 'INSURANCE',
-          serviceName: 'Bảo hiểm du lịch',
+          serviceName: 'Travel insurance',
           optionId: 5301,
-          optionName: 'Gói tiêu chuẩn',
+          optionName: 'Standard package',
           quantity: 1,
           amount: 100000,
           currency: 'VND',
@@ -178,7 +173,7 @@ const successSummary: PaymentResultSummaryResponse = {
     byPassenger: [
       {
         passengerId: 9001,
-        passengerLabel: 'Người lớn: Mr PHAN KIET',
+        passengerLabel: 'Adult: Mr PHAN KIET',
         bySegment: [
           {
             segmentKey: 'FLIGHT-600',
@@ -189,12 +184,10 @@ const successSummary: PaymentResultSummaryResponse = {
               vatOnFare: 0,
               fareTotal: 1738800,
             },
-            taxesAndFees: [
-              { label: 'Thuế, phí sân bay', amount: 583400 },
-            ],
+            taxesAndFees: [{ label: 'Taxes and airport fees', amount: 583400 }],
             services: [
-              { label: 'Hành lý ký gửi 20kg', amount: 160000 },
-              { label: 'Bảo hiểm du lịch', amount: 100000 },
+              { label: 'Checked baggage 20kg', amount: 160000 },
+              { label: 'Travel insurance', amount: 100000 },
             ],
             segmentTotal: 2582200,
           },
@@ -216,7 +209,8 @@ const pendingStatus: PaymentResultStatusResponse = {
   currency: 'VND',
   method: 'PAY_LATER',
   transactionId: 'TXN-VQR-20260501-1236',
-  qrData: '00020101021138580010A00000072701280006970415011312345678901234580208QRIBFTTA5303704540725822005802VN62090805AB1236304A1B2',
+  qrData:
+    '00020101021138580010A00000072701280006970415011312345678901234580208QRIBFTTA5303704540725822005802VN62090805AB1236304A1B2',
   qrImageUrl: null,
   paymentUrl: 'https://pay.payos.vn/web/1001',
   pnrCode: 'ABC123',
@@ -227,7 +221,10 @@ const pendingStatus: PaymentResultStatusResponse = {
   failure: null,
 };
 
-const failureByVariant: Record<Exclude<PaymentResultMockVariant, 'SUCCESS' | 'PENDING'>, PaymentResultStatusResponse> = {
+const failureByVariant: Record<
+  Exclude<PaymentResultMockVariant, 'SUCCESS' | 'PENDING'>,
+  PaymentResultStatusResponse
+> = {
   FAILED: {
     paymentId: 1001,
     bookingId: 90210,
@@ -246,7 +243,7 @@ const failureByVariant: Record<Exclude<PaymentResultMockVariant, 'SUCCESS' | 'PE
     polling: { pending: false, nextPollAfterSeconds: null },
     failure: {
       code: 'PAYMENT_RESULT_ERROR',
-      message: 'Giao dịch không thành công. Vui lòng kiểm tra lại thông tin thanh toán và thử lại.',
+      message: 'Payment failed. Please verify your payment details and try again.',
     },
   },
   CANCELLED: {
@@ -267,7 +264,7 @@ const failureByVariant: Record<Exclude<PaymentResultMockVariant, 'SUCCESS' | 'PE
     polling: { pending: false, nextPollAfterSeconds: null },
     failure: {
       code: 'PAYMENT_RESULT_ERROR',
-      message: 'Giao dịch đã bị hủy trước khi hoàn tất thanh toán.',
+      message: 'Payment was cancelled before it could be completed.',
     },
   },
   EXPIRED: {
@@ -288,7 +285,7 @@ const failureByVariant: Record<Exclude<PaymentResultMockVariant, 'SUCCESS' | 'PE
     polling: { pending: false, nextPollAfterSeconds: null },
     failure: {
       code: 'PAYMENT_RESULT_ERROR',
-      message: 'Phiên thanh toán đã hết hạn. Vui lòng tạo lại giao dịch mới.',
+      message: 'Payment session has expired. Please start a new payment.',
     },
   },
 };

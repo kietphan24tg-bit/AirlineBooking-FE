@@ -520,4 +520,3 @@ export default function BookingResultCard() {
     </div>
   );
 }
-

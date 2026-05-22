@@ -33,12 +33,12 @@ export function useSeatAssignmentActions(params: {
   refetchSeatMap: () => Promise<unknown>;
   refetchManageOptions: () => Promise<unknown>;
   onCancelSuccess?: () => void;
-  getBookingSessionExpiredMessage: (error: unknown) => string | null;
+  getSeatAssignmentErrorMessage: (error: unknown, fallback: string) => string;
 }) {
   const {
     applySeatAssignmentResult,
     bookingResponse,
-    getBookingSessionExpiredMessage,
+    getSeatAssignmentErrorMessage,
     isManageBookingFlow,
     onCancelSuccess,
     refetchManageOptions,
@@ -66,10 +66,10 @@ export function useSeatAssignmentActions(params: {
     },
     onError: (error, variables) => {
       toast.error(
-        getBookingSessionExpiredMessage(error) ??
-          (error instanceof Error
-            ? error.message
-            : `Unable to assign a seat for ${variables.passengerName}. Please try again.`)
+        getSeatAssignmentErrorMessage(
+          error,
+          `Unable to assign a seat for ${variables.passengerName}. Please try again.`
+        )
       );
     },
   });
@@ -87,10 +87,10 @@ export function useSeatAssignmentActions(params: {
     },
     onError: (error, variables) => {
       toast.error(
-        getBookingSessionExpiredMessage(error) ??
-          (error instanceof Error
-            ? error.message
-            : `Unable to change the seat for ${variables.passengerName}. Please try again.`)
+        getSeatAssignmentErrorMessage(
+          error,
+          `Unable to change the seat for ${variables.passengerName}. Please try again.`
+        )
       );
     },
   });
@@ -107,10 +107,10 @@ export function useSeatAssignmentActions(params: {
     },
     onError: (error, variables) => {
       toast.error(
-        getBookingSessionExpiredMessage(error) ??
-          (error instanceof Error
-            ? error.message
-            : `Unable to cancel the seat for ${variables.passengerName}. Please try again.`)
+        getSeatAssignmentErrorMessage(
+          error,
+          `Unable to cancel the seat for ${variables.passengerName}. Please try again.`
+        )
       );
     },
   });

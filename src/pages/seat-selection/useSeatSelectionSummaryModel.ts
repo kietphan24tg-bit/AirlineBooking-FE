@@ -5,11 +5,7 @@ import type {
 } from '../../types/booking.types';
 import type { SeatMapCell } from '../../types/flight.types';
 import type { BookingPersistedDraft, BookingSession } from '../../stores/useBookingStore';
-import type {
-  PassengerLike,
-  ResolvedSeatAssignment,
-  SeatContext,
-} from './seatSelectionResolvers';
+import type { PassengerLike, ResolvedSeatAssignment, SeatContext } from './seatSelectionResolvers';
 import { pickNumericId, resolveStorePassengerId } from './seatSelectionResolvers';
 
 function formatMoney(amount: number, currency: string): string {
@@ -42,8 +38,9 @@ function formatItineraryMetaLabel(itinerary: {
   const departureDate = new Date(itinerary.departureTime);
   const arrivalDate = new Date(itinerary.arrivalTime);
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const weekday =
-    Number.isFinite(departureDate.getTime()) ? weekdayLabels[departureDate.getDay()] : '--';
+  const weekday = Number.isFinite(departureDate.getTime())
+    ? weekdayLabels[departureDate.getDay()]
+    : '--';
   const dateLabel = Number.isFinite(departureDate.getTime())
     ? `${String(departureDate.getDate()).padStart(2, '0')}/${String(
         departureDate.getMonth() + 1
@@ -66,7 +63,7 @@ function formatItineraryMetaLabel(itinerary: {
   const cabinLabel =
     itinerary.cabinClass?.trim().toUpperCase() === 'ECONOMY'
       ? 'Eco'
-      : itinerary.cabinClass?.trim() ?? '--';
+      : (itinerary.cabinClass?.trim() ?? '--');
 
   return `${weekday}, ${dateLabel} | ${departureTimeLabel} - ${arrivalTimeLabel} | ${itinerary.flightNumber} | ${cabinLabel}`;
 }
@@ -179,6 +176,59 @@ type SummaryServiceItem = {
   totalPriceLabel: string;
 };
 
+type SummaryTripSegment = {
+  direction: 'OUTBOUND' | 'INBOUND' | null;
+  itineraryLabel: string | null;
+  flightMetaLabel: string | null;
+};
+
+function buildFallbackTripSegments(
+  bookingDraft: BookingPersistedDraft,
+  bookingResponse: BookingSession | null
+): SummaryTripSegment[] {
+  const raw = bookingResponse?.raw as Record<string, unknown> | undefined;
+  const rawSegments = Array.isArray(raw?.segments)
+    ? (raw.segments as Record<string, unknown>[])
+    : [];
+
+  if (rawSegments.length > 0) {
+    const mapped = rawSegments
+      .map((segment) => {
+        const directionRaw = String(segment.direction ?? '')
+          .trim()
+          .toUpperCase();
+        const direction =
+          directionRaw === 'OUTBOUND' || directionRaw === 'INBOUND' ? directionRaw : null;
+        const itineraryLabel =
+          typeof segment.departureCity === 'string' &&
+          typeof segment.departureAirportCode === 'string' &&
+          typeof segment.arrivalCity === 'string' &&
+          typeof segment.arrivalAirportCode === 'string'
+            ? `${segment.departureCity} (${segment.departureAirportCode})  ->  ${segment.arrivalCity} (${segment.arrivalAirportCode})`
+            : null;
+        const flightMetaLabel =
+          typeof segment.flightNumber === 'string'
+            ? `${segment.flightNumber}${typeof segment.fareCode === 'string' ? ` | ${segment.fareCode}` : ''}`
+            : typeof segment.flightId === 'number'
+              ? `Flight #${segment.flightId}${typeof segment.fareCode === 'string' ? ` | ${segment.fareCode}` : ''}`
+              : null;
+        return {
+          direction: direction as SummaryTripSegment['direction'],
+          itineraryLabel,
+          flightMetaLabel,
+        };
+      })
+      .filter((segment) => segment.itineraryLabel || segment.flightMetaLabel);
+    if (mapped.length > 0) return mapped;
+  }
+
+  return bookingDraft.segments.map((segment) => ({
+    direction: segment.direction,
+    itineraryLabel: segment.direction === 'OUTBOUND' ? 'Outbound flight' : 'Return flight',
+    flightMetaLabel: `Flight #${segment.flightId}${segment.fareCode ? ` | ${segment.fareCode}` : ''}`,
+  }));
+}
+
 export function useSeatSelectionSummaryModel(params: {
   bookingDraft: BookingPersistedDraft;
   bookingResponse: BookingSession | null;
@@ -227,6 +277,40 @@ export function useSeatSelectionSummaryModel(params: {
         }
       : buildSummaryHeaderFromRawBooking(bookingResponse, seatContext);
   }, [bookingResponse, manageOptions, seatContext]);
+
+  const summaryTripSegments = useMemo<SummaryTripSegment[]>(() => {
+    if (manageOptions?.itineraries?.length) {
+      return manageOptions.itineraries.map((itinerary, index) => {
+        const journeyType = String(itinerary.journeyType ?? '')
+          .trim()
+          .toUpperCase();
+        const direction =
+          journeyType === 'OUTBOUND'
+            ? 'OUTBOUND'
+            : journeyType === 'INBOUND'
+              ? 'INBOUND'
+              : index === 0
+                ? 'OUTBOUND'
+                : 'INBOUND';
+        return {
+          direction,
+          itineraryLabel: formatItineraryRouteLabel(itinerary),
+          flightMetaLabel: formatItineraryMetaLabel(itinerary),
+        };
+      });
+    }
+
+    const fallbackSegments = buildFallbackTripSegments(bookingDraft, bookingResponse);
+    if (fallbackSegments.length > 0) return fallbackSegments;
+
+    return [
+      {
+        direction: null,
+        itineraryLabel: summaryHeader.itineraryLabel,
+        flightMetaLabel: summaryHeader.flightMetaLabel,
+      },
+    ].filter((segment) => segment.itineraryLabel || segment.flightMetaLabel);
+  }, [bookingDraft, bookingResponse, manageOptions?.itineraries, summaryHeader]);
 
   const summaryPassengerItems = useMemo<SummaryPassengerItem[]>(
     () =>
@@ -277,7 +361,8 @@ export function useSeatSelectionSummaryModel(params: {
             summaryPassengerItems.find((item) => item.passengerId === passengerId)?.fullName ??
             `Passenger ${passengerId}`;
           const seatNumber = seatCell?.seatNumber ?? assignment.seatNumber ?? `Seat ${seatId}`;
-          const currency = assignment.currency || pricing?.currency || manageOptions?.currency || 'VND';
+          const currency =
+            assignment.currency || pricing?.currency || manageOptions?.currency || 'VND';
 
           return {
             passengerId,
@@ -291,7 +376,13 @@ export function useSeatSelectionSummaryModel(params: {
           };
         })
         .filter((item): item is SummarySeatItem => item != null),
-    [confirmedSeatAssignments, manageOptions?.currency, pricing?.currency, seatMapRows, summaryPassengerItems]
+    [
+      confirmedSeatAssignments,
+      manageOptions?.currency,
+      pricing?.currency,
+      seatMapRows,
+      summaryPassengerItems,
+    ]
   );
 
   const summarySeatTotalLabel =
@@ -323,7 +414,9 @@ export function useSeatSelectionSummaryModel(params: {
             serviceName: selection.serviceName,
             optionName: selection.optionName,
             quantity:
-              Number.isFinite(selection.quantity) && selection.quantity > 0 ? selection.quantity : 1,
+              Number.isFinite(selection.quantity) && selection.quantity > 0
+                ? selection.quantity
+                : 1,
             totalPriceLabel: formatMoney(
               selection.price *
                 (Number.isFinite(selection.quantity) && selection.quantity > 0
@@ -385,6 +478,7 @@ export function useSeatSelectionSummaryModel(params: {
     pricing,
     totalPriceLabel,
     summaryHeader,
+    summaryTripSegments,
     summaryPassengerItems,
     summaryFareAmountLabel,
     summaryDiscountAmountLabel,

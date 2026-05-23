@@ -1,5 +1,5 @@
 import { ArrowRight, AlertCircle, Loader2, CreditCard } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
@@ -175,6 +175,21 @@ function formatPaymentMethodName(method: PaymentMethod): string {
   }
 }
 
+function formatPaymentGroupLabel(group: PaymentMethodGroup): string {
+  const type = group.type.trim().toUpperCase();
+
+  switch (type) {
+    case 'CARD':
+      return 'Cards & banking';
+    case 'EWALLET':
+      return 'E-wallets';
+    case 'PAY_LATER':
+      return 'Pay later';
+    default:
+      return group.label;
+  }
+}
+
 function MethodIconButton({
   method,
   selected,
@@ -237,6 +252,8 @@ function MethodIconButton({
 
 export default function Checkout() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const allowMethodChange = searchParams.get('allowMethodChange') === '1';
   const paymentRedirectingRef = useRef(false);
   const paymentMethodsToastMessageRef = useRef<string | null>(null);
   const acceptTermsRef = useRef<HTMLInputElement | null>(null);
@@ -309,6 +326,37 @@ export default function Checkout() {
     [groups]
   );
   const showGroupLabels = groupsWithMethods.length > 1;
+
+  useEffect(() => {
+    if (
+      !paymentMethodsQuery.isSuccess ||
+      allowMethodChange ||
+      paymentRedirectingRef.current ||
+      activePayment
+    ) {
+      return;
+    }
+    const activePayLater = paymentMethodsQuery.data?.activePayLater;
+    if (!activePayLater?.paymentId) return;
+
+    const currentParams = new URLSearchParams(window.location.search);
+    const mockPaymentResult = currentParams.get('mockPaymentResult');
+    const mockPaymentVariant = currentParams.get('mockPaymentVariant');
+    const nextParams = new URLSearchParams({ paymentId: String(activePayLater.paymentId) });
+    if (mockPaymentResult === '1') {
+      nextParams.set('mockPaymentResult', '1');
+    }
+    if (mockPaymentVariant) {
+      nextParams.set('mockPaymentVariant', mockPaymentVariant);
+    }
+    navigate(`/booking/checkout/result?${nextParams.toString()}`, { replace: true });
+  }, [
+    activePayment,
+    allowMethodChange,
+    navigate,
+    paymentMethodsQuery.data?.activePayLater,
+    paymentMethodsQuery.isSuccess,
+  ]);
 
   useEffect(() => {
     const candidates = supportedMethods.length > 0 ? supportedMethods : flatMethods;
@@ -428,14 +476,14 @@ export default function Checkout() {
       paymentMethodsToastMessageRef.current = null;
       return;
     }
-    if (errorStatus === 410) {
+    if (isHardBlock) {
       redirectHomeForExpiredPayment(paymentMethodsError);
       return;
     }
     if (paymentMethodsToastMessageRef.current === paymentMethodsError) return;
     paymentMethodsToastMessageRef.current = paymentMethodsError;
     showCheckoutErrorToast(paymentMethodsError);
-  }, [errorStatus, navigate, paymentMethodsError, paymentMethodsQuery.isError]);
+  }, [isHardBlock, navigate, paymentMethodsError, paymentMethodsQuery.isError]);
 
   const canPay =
     paymentMethodsQuery.isSuccess &&
@@ -547,23 +595,21 @@ export default function Checkout() {
           setPaymentError(null);
           setActivePayment(null);
           showCheckoutErrorToast(getPaymentRetryTooFastToastMessage(msg));
-          setCreatingPayment(false);
           return;
         }
         if (status === 410) {
           setPaymentError(null);
           setActivePayment(null);
-          setCreatingPayment(false);
           redirectHomeForExpiredPayment(msg);
           return;
         }
         setPaymentError(msg);
         setActivePayment(null);
         showCheckoutErrorToast(msg);
-        setCreatingPayment(false);
         return;
+      } finally {
+        setCreatingPayment(false);
       }
-      setCreatingPayment(false);
     })();
   };
 
@@ -619,7 +665,7 @@ export default function Checkout() {
           ? 'Please sign in again to check payment status.'
           : status === 410
             ? paymentMethodsErrorMessage(status, data)
-          : 'Could not check payment status. Please try again.');
+            : 'Could not check payment status. Please try again.');
       if (status === 410) {
         setPaymentError(null);
         redirectHomeForExpiredPayment(msg);
@@ -680,7 +726,7 @@ export default function Checkout() {
           ? 'Please sign in again to check payment status.'
           : status === 410
             ? paymentMethodsErrorMessage(status, data)
-          : 'Could not check payment status. Please try again.');
+            : 'Could not check payment status. Please try again.');
       if (status === 410) {
         setPaymentError(null);
         redirectHomeForExpiredPayment(msg);
@@ -714,35 +760,6 @@ export default function Checkout() {
           errorMessage={paymentError}
         />
       )}
-      {false && (
-          <div
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-6"
-            role="dialog"
-            aria-modal="true"
-          >
-            <div className="w-full max-w-lg rounded-2xl border border-cabin-burgundy/30 bg-white p-6 shadow-2xl">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-cabin-burgundy/10">
-                  <AlertCircle className="h-5 w-5 text-cabin-burgundy" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-base font-black text-on-surface">Unable to pay</p>
-                  <p className="mt-2 text-sm text-on-surface-variant">{paymentMethodsError}</p>
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end">
-                <Button
-                  type="button"
-                  onClick={() => navigate('/', { replace: true })}
-                  icon={<ArrowRight className="h-4 w-4" strokeWidth={2} />}
-                >
-                  Back to home
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
       <main className="relative z-10 mx-auto max-w-6xl px-6 pb-24 pt-28">
         <BookingStepper current="pay" />
         <h1 className="mb-2 font-headline text-3xl font-black text-on-surface md:text-4xl">
@@ -829,7 +846,9 @@ export default function Checkout() {
                 {groupsWithMethods.map((group) => (
                   <div key={group.type} className="space-y-4">
                     {showGroupLabels && (
-                      <p className="text-base font-black text-on-surface">{group.label}</p>
+                      <p className="text-base font-black text-on-surface">
+                        {formatPaymentGroupLabel(group)}
+                      </p>
                     )}
                     <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
                       {group.methods.map((method) => (

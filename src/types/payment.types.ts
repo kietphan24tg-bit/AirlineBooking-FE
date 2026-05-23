@@ -18,6 +18,12 @@ export interface PaymentMethodGroup {
   methods: PaymentMethod[];
 }
 
+export interface ActivePayLaterSession {
+  paymentId: number;
+  expireAt: string;
+}
+
 export interface PaymentMethodsResponse {
   groups: PaymentMethodGroup[];
+  activePayLater?: ActivePayLaterSession | null;
 }

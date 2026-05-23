@@ -53,6 +53,7 @@ const MOCK_PAYMENT_METHODS: PaymentMethodsResponse = {
       ],
     },
   ],
+  activePayLater: null,
 };
 
 export type PaymentCardPayload = {

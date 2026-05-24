@@ -185,6 +185,8 @@ export interface SeatAssignmentRequest {
 export interface SeatAssignmentItem {
   passengerId: number;
   seatId: number;
+  flightId?: number;
+  seatNumber?: string;
   status: string;
   surchargeAmount: number;
   currency: string;
@@ -225,6 +227,7 @@ export interface PutBookingServicesRequest {
 }
 
 export interface BookingServiceSelectionItem {
+  flightId?: number;
   serviceId: number;
   serviceType: string;
   serviceName: string;
@@ -628,8 +631,98 @@ export interface BookingCancellationPreviewResponse {
   };
 }
 
+export interface BookingRefundMethod {
+  type: string;
+  label: string;
+  maskedAccount?: string | null;
+  estimatedDays: string;
+}
+
 export interface BookingCancellationConfirmResponse extends BookingCancellationPreviewResponse {
   cancellationStatus: string;
   cancelledAt: string;
   message: string;
+  cancellationCode?: string;
+  refundMethod?: BookingRefundMethod;
+  refundStatus?: string;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+}
+
+export type SeatChangeSettlementType = 'NONE' | 'REFUND' | 'COLLECT_PAYMENT';
+
+export interface SeatChangePreviewRequest {
+  changes: Array<{
+    passengerId: number;
+    flightId: number;
+    fromSeatId: number | null;
+    toSeatId: number | null;
+  }>;
+}
+
+export interface SeatChangePreviewItem {
+  passengerId: number;
+  passengerName: string | null;
+  flightId: number;
+  flightNumber: string | null;
+  departureAirportCode: string | null;
+  arrivalAirportCode: string | null;
+  departureTime: string | null;
+  fromSeatId: number | null;
+  fromSeatNumber: string | null;
+  toSeatId: number | null;
+  toSeatNumber: string | null;
+  oldAmount: number;
+  newAmount: number;
+  delta: number;
+  status: string;
+  message: string | null;
+}
+
+export interface SeatChangePreviewResponse {
+  bookingId: number;
+  currency: string;
+  previewToken: string;
+  settlementType: SeatChangeSettlementType;
+  items: SeatChangePreviewItem[];
+  summary: {
+    additionalAmount: number;
+    refundAmount: number;
+    netAmount: number;
+  };
+}
+
+export interface SeatChangeConfirmRequest {
+  changes: SeatChangePreviewRequest['changes'];
+  previewToken?: string | null;
+  idempotencyKey: string;
+  expectedAdditionalAmount: number;
+  expectedRefundAmount: number;
+  expectedNetAmount: number;
+}
+
+export interface SeatChangeConfirmResponse {
+  settlementId?: number | null;
+  bookingId: number;
+  currency: string;
+  settlementType: SeatChangeSettlementType;
+  status: 'COMPLETED' | 'REFUND_PENDING' | 'REFUND_FAILED' | 'PAYMENT_REQUIRED';
+  refundStatus?: string | null;
+  provider?: string | null;
+  providerRefundId?: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  refundMethod?: BookingRefundMethod | null;
+  paymentMethods?: Array<{
+    code: string;
+    label: string;
+    provider: string;
+    icon: string | null;
+    supported: boolean;
+  }> | null;
+  summary: {
+    additionalAmount: number;
+    refundAmount: number;
+    netAmount: number;
+  };
 }

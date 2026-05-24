@@ -7,6 +7,10 @@
   BookingLookupSeatAssignment,
   BookingLookupServiceSelection,
   BookingManageOptionsResponse,
+  SeatChangeConfirmRequest,
+  SeatChangeConfirmResponse,
+  SeatChangePreviewRequest,
+  SeatChangePreviewResponse,
   BookingTicketResponse,
 } from '../types/booking.types';
 import type { SeatMapResponse } from '../types/flight.types';
@@ -805,6 +809,107 @@ export function getMockSeatMapResponse(
       seatCategories: ['STANDARD', 'PREFERRED'],
     },
     rows,
+  };
+}
+
+function findMockSeatDetails(
+  variant: ManageBookingMockVariant,
+  flightId: number,
+  seatId: number | null
+): { seatNumber: string | null; amount: number } {
+  if (seatId == null) return { seatNumber: null, amount: 0 };
+  const itinerary = getMockManageOptionsResponse(variant).itineraries.find(
+    (item) => item.flightId === flightId
+  );
+  if (!itinerary) return { seatNumber: null, amount: 0 };
+  const seatMap = getMockSeatMapResponse(variant, flightId, itinerary.fareId);
+  const seat =
+    seatMap?.rows.flatMap((row) => row.cells).find((cell) => cell.seatId === seatId) ?? null;
+  if (!seat) return { seatNumber: null, amount: 0 };
+  return { seatNumber: seat.seatNumber, amount: seat.extraPrice ?? 0 };
+}
+
+export function getMockSeatChangePreviewResponse(
+  variant: ManageBookingMockVariant,
+  body: SeatChangePreviewRequest
+): SeatChangePreviewResponse {
+  const lookup = getMockBookingLookupResponse(variant);
+  const items = body.changes.map((change) => {
+    const from = findMockSeatDetails(variant, change.flightId, change.fromSeatId);
+    const to = findMockSeatDetails(variant, change.flightId, change.toSeatId);
+    const passenger = lookup.passengers.find((item) => item.passengerId === change.passengerId);
+    const itinerary = lookup.itineraries.find((item) => item.flightId === change.flightId);
+    const delta = to.amount - from.amount;
+    return {
+      passengerId: change.passengerId,
+      passengerName: passenger ? `${passenger.lastName} ${passenger.firstName}`.trim() : null,
+      flightId: change.flightId,
+      flightNumber: itinerary?.flightNumber ?? null,
+      departureAirportCode: itinerary?.departureAirportCode ?? null,
+      arrivalAirportCode: itinerary?.arrivalAirportCode ?? null,
+      departureTime: itinerary?.departureTime ?? null,
+      fromSeatId: change.fromSeatId,
+      fromSeatNumber: from.seatNumber,
+      toSeatId: change.toSeatId,
+      toSeatNumber: to.seatNumber,
+      oldAmount: from.amount,
+      newAmount: to.amount,
+      delta,
+      status: 'VALID',
+      message: null,
+    };
+  });
+
+  const additionalAmount = items.reduce((sum, item) => sum + Math.max(0, item.delta), 0);
+  const refundAmount = items.reduce((sum, item) => sum + Math.max(0, -item.delta), 0);
+  const netAmount = additionalAmount - refundAmount;
+  const settlementType: SeatChangePreviewResponse['settlementType'] =
+    netAmount > 0 ? 'COLLECT_PAYMENT' : netAmount < 0 ? 'REFUND' : 'NONE';
+
+  return {
+    bookingId: lookup.booking.bookingId,
+    currency: lookup.booking.currency,
+    previewToken: `seatchg_prev_${Date.now()}`,
+    settlementType,
+    items,
+    summary: {
+      additionalAmount,
+      refundAmount,
+      netAmount,
+    },
+  };
+}
+
+export function getMockSeatChangeConfirmResponse(
+  variant: ManageBookingMockVariant,
+  body: SeatChangeConfirmRequest
+): SeatChangeConfirmResponse {
+  const preview = getMockSeatChangePreviewResponse(variant, { changes: body.changes });
+  return {
+    bookingId: preview.bookingId,
+    currency: preview.currency,
+    settlementType: preview.settlementType,
+    status:
+      preview.settlementType === 'COLLECT_PAYMENT'
+        ? 'PAYMENT_REQUIRED'
+        : preview.settlementType === 'REFUND'
+          ? 'REFUND_PENDING'
+          : 'COMPLETED',
+    refundStatus: preview.settlementType === 'REFUND' ? 'SUCCEEDED' : null,
+    provider: preview.settlementType === 'REFUND' ? 'STRIPE' : null,
+    providerRefundId: preview.settlementType === 'REFUND' ? `mock_refund_${Date.now()}` : null,
+    errorCode: null,
+    errorMessage: null,
+    refundMethod:
+      preview.settlementType === 'REFUND'
+        ? {
+            type: 'CARD',
+            label: 'Visa',
+            maskedAccount: '**** 4242',
+            estimatedDays: '3-7 business days',
+          }
+        : null,
+    summary: preview.summary,
   };
 }
 

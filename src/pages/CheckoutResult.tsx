@@ -131,6 +131,10 @@ function paymentMethodLabel(method: string | null | undefined): string {
   return method;
 }
 
+function isPayLaterMethod(method: string | null | undefined): boolean {
+  return (method ?? '').trim().toUpperCase().includes('PAY_LATER');
+}
+
 function formatTimeLeft(msLeft: number): string {
   const totalSeconds = Math.max(0, Math.floor(msLeft / 1000));
   const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
@@ -1246,7 +1250,7 @@ function PayLaterResultView({
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-on-surface-variant sm:text-base">
               A payment code has been created and your booking is on hold. Pay before the deadline
-              to confirm your ticket automatically on this page.
+              to confirm your ticket automatically.
             </p>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
@@ -1290,7 +1294,7 @@ function PayLaterResultView({
                     automatically.
                   </p>
                 </div>
-                <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <Button
                     type="button"
                     className="sm:w-auto"
@@ -1300,16 +1304,6 @@ function PayLaterResultView({
                   >
                     Check payment
                   </Button>
-                  {statusData.paymentUrl ? (
-                    <a
-                      href={statusData.paymentUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center justify-center rounded-xl border border-luxury-gold/20 bg-white px-5 py-3 text-sm font-semibold text-on-surface transition hover:border-midnight-burgundy/25 hover:bg-surface-container-low"
-                    >
-                      Pay now
-                    </a>
-                  ) : null}
                 </div>
               </div>
             </div>
@@ -1388,6 +1382,7 @@ export default function CheckoutResult() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const expiredToastShownRef = useRef(false);
+  const payLaterBackGuardRef = useRef(false);
   const search = searchParams.toString();
   const successRouteHref = `/booking/checkout/success${search ? `?${search}` : ''}`;
   const failureRouteHref = `/booking/checkout/failed${search ? `?${search}` : ''}`;
@@ -1458,8 +1453,32 @@ export default function CheckoutResult() {
   const expiredFailure =
     statusQuery.data?.failure?.message === 'Booking payment window has expired';
   const showPending = statusQuery.data?.resultPage === 'PENDING';
+  const isPayLaterPendingResult =
+    location.pathname === '/booking/checkout/result' &&
+    statusQuery.data?.resultPage === 'PENDING' &&
+    isPayLaterMethod(statusQuery.data?.method);
   const waitingForSuccessRedirect = statusQuery.data?.resultPage === 'SUCCESS' && !isSuccessRoute;
   const waitingForFailureRedirect = statusQuery.data?.resultPage === 'ERROR' && !isFailureRoute;
+
+  useEffect(() => {
+    if (!isPayLaterPendingResult || payLaterBackGuardRef.current) return;
+    payLaterBackGuardRef.current = true;
+
+    const handlePopState = () => {
+      navigate('/booking/checkout', {
+        replace: true,
+        state: { skipActivePayLaterRedirect: true },
+      });
+    };
+
+    window.history.pushState({ checkoutPayLaterBackGuard: true }, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      payLaterBackGuardRef.current = false;
+    };
+  }, [isPayLaterPendingResult, navigate]);
 
   if (paymentId == null) {
     return (

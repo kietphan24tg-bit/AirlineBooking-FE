@@ -716,8 +716,12 @@ type BookingSummaryPanelProps = {
   flightMetaLabel: string | null;
   tripSegments: Array<{
     direction: 'OUTBOUND' | 'INBOUND' | null;
+    flightId: number | null;
     itineraryLabel: string | null;
     flightMetaLabel: string | null;
+    fareAmountLabel: string | null;
+    taxFeeItems: Array<{ label: string; value: string }>;
+    taxFeeTotalLabel: string | null;
   }>;
   totalPriceLabel: string | null;
   passengersCount: number;
@@ -731,6 +735,7 @@ type BookingSummaryPanelProps = {
   taxFeeTotalLabel: string | null;
   taxFeeItems: Array<{ label: string; value: string }>;
   seatItems: Array<{
+    flightId: number | null;
     passengerId: number;
     passengerName: string;
     seatNumber: string;
@@ -741,6 +746,7 @@ type BookingSummaryPanelProps = {
     surchargeLabel: string;
   }>;
   serviceItems: Array<{
+    flightId: number | null;
     passengerId: number;
     passengerName: string;
     serviceName: string;
@@ -762,22 +768,69 @@ function formatSummarySeatLabel(seatNumber: string): string {
   return seatNumber.replace(/^Seat\s+/i, '').trim();
 }
 
+function isGenericSegmentItineraryLabel(
+  label: string | null | undefined,
+  direction: 'OUTBOUND' | 'INBOUND' | null
+): boolean {
+  if (!label) return true;
+  const normalized = label.trim().toLowerCase();
+  if (normalized === 'outbound flight' && direction === 'OUTBOUND') return true;
+  if (normalized === 'return flight' && direction === 'INBOUND') return true;
+  return false;
+}
+
 function SummaryTripCard({
   segment,
   passengersCount,
+  fareAmountLabel,
+  taxFeeTotalLabel,
+  seatTotalLabel,
+  serviceTotalLabel,
+  passengerItems = [],
+  taxFeeItems = [],
+  seatItems = [],
+  serviceItems = [],
 }: {
   segment: {
     direction: 'OUTBOUND' | 'INBOUND' | null;
+    flightId: number | null;
     itineraryLabel: string | null;
     flightMetaLabel: string | null;
+    fareAmountLabel: string | null;
+    taxFeeItems: Array<{ label: string; value: string }>;
+    taxFeeTotalLabel: string | null;
   };
   passengersCount: number;
+  fareAmountLabel?: string | null;
+  taxFeeTotalLabel?: string | null;
+  seatTotalLabel?: string | null;
+  serviceTotalLabel?: string | null;
+  passengerItems?: Array<{
+    passengerId: number | null;
+    fullName: string;
+    passengerType: string | null;
+  }>;
+  taxFeeItems?: Array<{ label: string; value: string }>;
+  seatItems?: Array<{
+    passengerId: number;
+    passengerName: string;
+    seatNumber: string;
+    surchargeLabel: string;
+  }>;
+  serviceItems?: Array<{
+    passengerId: number;
+    passengerName: string;
+    serviceName: string;
+    optionName: string;
+    quantity: number;
+    totalPriceLabel: string;
+  }>;
 }) {
   const routeParts = segment.itineraryLabel?.split('->').map((part) => part.trim()) ?? [];
   const routeLabel =
-    routeParts.length >= 2
-      ? `${routeParts[0]} -> ${routeParts[1]}`
-      : (segment.itineraryLabel ?? 'Flight summary');
+    routeParts.length >= 2 ? `${routeParts[0]} -> ${routeParts[1]}` : segment.itineraryLabel;
+  const showRouteLabel =
+    routeLabel != null && !isGenericSegmentItineraryLabel(routeLabel, segment.direction);
   const segmentLabel =
     segment.direction === 'OUTBOUND'
       ? 'Outbound'
@@ -790,14 +843,123 @@ function SummaryTripCard({
       <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-midnight-burgundy">
         {segmentLabel}
       </p>
-      <p className="mt-3 text-base font-black leading-snug text-on-surface">{routeLabel}</p>
-      {segment.flightMetaLabel ? (
-        <p className="mt-2 text-sm text-on-surface-variant">{segment.flightMetaLabel}</p>
+      {showRouteLabel ? (
+        <p className="mt-3 text-base font-black leading-snug text-on-surface">{routeLabel}</p>
       ) : null}
-      <p className="mt-3 text-sm text-on-surface-variant">Fare: ...</p>
-      <p className="mt-1 text-sm text-on-surface-variant">Seat: ...</p>
-      <p className="mt-1 text-sm text-on-surface-variant">Services: ...</p>
+      {segment.flightMetaLabel ? (
+        <p className={`${showRouteLabel ? 'mt-2' : 'mt-3'} text-sm text-on-surface-variant`}>
+          {segment.flightMetaLabel}
+        </p>
+      ) : null}
       <p className="mt-3 text-xs text-on-surface-variant">{passengersCount} passengers</p>
+
+      <div className="mt-4 border-t border-outline-variant/15 pt-4">
+        <BookingSummarySection title="Passenger details">
+          <div className="space-y-3">
+            {passengerItems.length > 0 ? (
+              passengerItems.map((passenger) => (
+                <div
+                  key={`${passenger.passengerId ?? passenger.fullName}-segment`}
+                  className="rounded-2xl border border-outline-variant/15 bg-white px-4 py-3"
+                >
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-on-surface-variant">
+                    {bookingPassengerTypeLabel(passenger.passengerType)}
+                  </p>
+                  <p className="mt-2 font-semibold text-on-surface">{passenger.fullName}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-on-surface-variant">No passenger details.</p>
+            )}
+          </div>
+        </BookingSummarySection>
+        <BookingSummarySection title="Fare" value={fareAmountLabel}>
+          <div className="rounded-2xl border border-outline-variant/15 bg-white px-4 py-3">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <p className="font-semibold text-on-surface">Flight fare</p>
+              <span className="font-black text-secondary">
+                {segment.fareAmountLabel ?? fareAmountLabel ?? '--'}
+              </span>
+            </div>
+          </div>
+        </BookingSummarySection>
+        <BookingSummarySection
+          title="Taxes & fees"
+          value={segment.taxFeeTotalLabel ?? taxFeeTotalLabel}
+        >
+          <div className="space-y-2">
+            {(segment.taxFeeItems.length > 0 ? segment.taxFeeItems : taxFeeItems).length > 0 ? (
+              (segment.taxFeeItems.length > 0 ? segment.taxFeeItems : taxFeeItems).map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-outline-variant/15 bg-white px-4 py-3 text-sm"
+                >
+                  <span className="text-on-surface">{item.label}</span>
+                  <span className="font-black text-secondary">{item.value}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-on-surface-variant">No taxes or fees.</p>
+            )}
+          </div>
+        </BookingSummarySection>
+        <BookingSummarySection title="Seats" value={seatTotalLabel ?? '0 đ'}>
+          <div className="space-y-2">
+            {seatItems.length > 0 ? (
+              seatItems.map((seat) => (
+                <div
+                  key={`${seat.passengerId}-${seat.seatNumber}-segment`}
+                  className="rounded-2xl border border-outline-variant/15 bg-white px-4 py-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.14em] text-on-surface-variant">
+                        {seat.passengerName}
+                      </p>
+                      <p className="mt-2 font-semibold text-on-surface">
+                        Seat {formatSummarySeatLabel(seat.seatNumber)}
+                      </p>
+                    </div>
+                    <span className="text-sm font-black text-secondary">{seat.surchargeLabel}</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-on-surface-variant">No seats selected.</p>
+            )}
+          </div>
+        </BookingSummarySection>
+        <BookingSummarySection title="Services" value={serviceTotalLabel ?? '0 đ'}>
+          <div className="space-y-2">
+            {serviceItems.length > 0 ? (
+              serviceItems.map((service) => (
+                <div
+                  key={`${service.passengerId}-${service.serviceName}-${service.optionName}-segment`}
+                  className="rounded-2xl border border-outline-variant/15 bg-white px-4 py-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.14em] text-on-surface-variant">
+                        {service.passengerName}
+                      </p>
+                      <p className="mt-2 font-semibold text-on-surface">{service.serviceName}</p>
+                      <p className="mt-1 text-sm text-on-surface-variant">
+                        {service.optionName}
+                        {service.quantity > 1 ? ` x${service.quantity}` : ''}
+                      </p>
+                    </div>
+                    <span className="text-sm font-black text-secondary">
+                      {service.totalPriceLabel}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-on-surface-variant">No services selected.</p>
+            )}
+          </div>
+        </BookingSummarySection>
+      </div>
     </div>
   );
 }
@@ -850,7 +1012,7 @@ function BookingSummarySection({
   );
 }
 
-function BookingSummaryPanel({
+function _BookingSummaryPanel({
   itineraryLabel,
   flightMetaLabel,
   tripSegments,
@@ -894,8 +1056,12 @@ function BookingSummaryPanel({
             : [
                 {
                   direction: null,
+                  flightId: null,
                   itineraryLabel,
                   flightMetaLabel,
+                  fareAmountLabel: fareAmountLabel ?? null,
+                  taxFeeItems: taxFeeItems ?? [],
+                  taxFeeTotalLabel: taxFeeTotalLabel ?? null,
                 },
               ]
           ).map((segment, index) => (
@@ -1080,6 +1246,122 @@ function BookingSummaryPanel({
   );
 }
 
+function BookingSummaryPanelV2({
+  itineraryLabel,
+  flightMetaLabel,
+  tripSegments,
+  totalPriceLabel,
+  passengersCount,
+  passengerItems: _passengerItems,
+  fareAmountLabel,
+  discountAmountLabel: _discountAmountLabel,
+  taxFeeTotalLabel,
+  taxFeeItems: _taxFeeItems,
+  seatItems,
+  serviceItems: _serviceItems,
+  serviceTotalLabel,
+}: BookingSummaryPanelProps) {
+  const resolvedTripSegments =
+    tripSegments.length > 0
+      ? tripSegments
+      : [
+          {
+            direction: null,
+            flightId: null,
+            itineraryLabel,
+            flightMetaLabel,
+            fareAmountLabel: fareAmountLabel ?? null,
+            taxFeeItems: _taxFeeItems ?? [],
+            taxFeeTotalLabel: taxFeeTotalLabel ?? null,
+          },
+        ];
+
+  return (
+    <div className="w-full rounded-[1.75rem] border border-luxury-gold/20 bg-white/92 p-5 shadow-[0_22px_70px_rgba(81,35,20,0.12)] backdrop-blur-md xl:sticky xl:top-28 xl:w-[23rem]">
+      <div className="pb-5">
+        <p className="text-[0.6875rem] font-black uppercase tracking-[0.22em] text-midnight-burgundy">
+          Trip summary
+        </p>
+        <div className="mt-4 space-y-4">
+          {resolvedTripSegments.map((segment, index) => {
+            const segmentSeatItems =
+              segment.flightId != null
+                ? seatItems.filter((seat) => seat.flightId === segment.flightId)
+                : seatItems;
+            const segmentSeatTotalLabel =
+              segmentSeatItems.length > 0
+                ? formatMoney(
+                    segmentSeatItems.reduce((total, seat) => total + seat.surchargeAmount, 0),
+                    segmentSeatItems[0]?.currency ?? 'VND'
+                  )
+                : null;
+            const segmentServiceItems =
+              segment.flightId != null
+                ? _serviceItems.filter(
+                    (service) => service.flightId == null || service.flightId === segment.flightId
+                  )
+                : _serviceItems;
+            const segmentServiceTotalLabel =
+              segmentServiceItems.length > 0
+                ? formatMoney(
+                    segmentServiceItems.reduce((total, service) => {
+                      const numeric = Number(service.totalPriceLabel.replace(/[^\d]/g, ''));
+                      return total + (Number.isFinite(numeric) ? numeric : 0);
+                    }, 0),
+                    'VND'
+                  )
+                : null;
+
+            return (
+              <SummaryTripCard
+                key={`${segment.direction ?? 'segment'}-${segment.flightMetaLabel ?? index}`}
+                segment={segment}
+                passengersCount={passengersCount}
+                fareAmountLabel={segment.fareAmountLabel ?? fareAmountLabel}
+                taxFeeTotalLabel={segment.taxFeeTotalLabel ?? taxFeeTotalLabel}
+                seatTotalLabel={segmentSeatTotalLabel}
+                serviceTotalLabel={segmentServiceTotalLabel ?? serviceTotalLabel}
+                passengerItems={_passengerItems}
+                taxFeeItems={segment.taxFeeItems.length > 0 ? segment.taxFeeItems : _taxFeeItems}
+                seatItems={segmentSeatItems}
+                serviceItems={segmentServiceItems}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      {totalPriceLabel ? (
+        <div className="mt-2 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest px-4 py-4">
+          <div className="grid grid-cols-1 gap-y-3">
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-midnight-burgundy">
+              Total payment
+            </p>
+            <p className="text-[1.95rem] font-black leading-none tabular-nums text-secondary">
+              {totalPriceLabel}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-8 flex h-12 flex-row gap-3">
+        <Link
+          to="/"
+          className="inline-flex w-24 items-center justify-center gap-2 rounded-md bg-cabin-silver px-4"
+        >
+          Cancel
+        </Link>
+        <Link
+          to="/booking/checkout"
+          className="auth-primary-btn inline-flex w-full items-center justify-center gap-2 rounded-md px-4 text-white transition-all hover:bg-midnight-burgundy/90"
+        >
+          Payment
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function SeatSelection() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -1129,6 +1411,7 @@ export default function SeatSelection() {
     manageOptions,
     bookingLookup,
     bookingResponse,
+    preferManageBooking: isManageBookingFlow,
   });
   const bookingResponseStatus =
     typeof bookingResponse?.raw?.booking === 'object' &&
@@ -1301,6 +1584,7 @@ export default function SeatSelection() {
     bookingResponse,
     isManageBookingFlow,
     applySeatAssignmentResult,
+    currentFlightId: seatContext.flightId,
     refetchSeatMap: seatMapQuery.refetch,
     refetchManageOptions: manageOptionsQuery.refetch,
     onCancelSuccess: () => setSelectedSeat(null),
@@ -1469,46 +1753,6 @@ export default function SeatSelection() {
     seatMapQuery.data?.rows,
     confirmedSeatAssignment?.seatId ?? null
   );
-  const passengerSeatLabelByPassengerId = useMemo(() => {
-    const next = new Map<number, string>();
-
-    for (const assignment of bookingResponse?.lastSeatAssignment?.assignments ?? []) {
-      const passengerId = pickNumericId(assignment.passengerId);
-      if (passengerId == null) continue;
-
-      const mappedSeatNumber =
-        assignment.seatId === selectedSeat?.seatId
-          ? selectedSeat.seatNumber
-          : findSeatCellById(seatMapQuery.data?.rows, assignment.seatId)?.seatNumber;
-
-      if (mappedSeatNumber) {
-        next.set(passengerId, mappedSeatNumber);
-      }
-    }
-
-    for (const assignment of manageOptions?.seatAssignments ?? []) {
-      const passengerId = pickNumericId(assignment.passengerId);
-      const seatNumber = assignment.seatNumber?.trim();
-      if (passengerId == null || !seatNumber || next.has(passengerId)) continue;
-      next.set(passengerId, seatNumber);
-    }
-
-    for (const passenger of bookingLookup?.passengers ?? []) {
-      const passengerId = pickNumericId(passenger.passengerId);
-      const seatNumber = (passenger.selections?.seats ?? passenger.seatAssignments ?? [])[0]
-        ?.seatNumber;
-      if (passengerId == null || !seatNumber || next.has(passengerId)) continue;
-      next.set(passengerId, seatNumber);
-    }
-
-    return next;
-  }, [
-    bookingLookup?.passengers,
-    bookingResponse?.lastSeatAssignment?.assignments,
-    manageOptions?.seatAssignments,
-    seatMapQuery.data?.rows,
-    selectedSeat,
-  ]);
   const confirmedSeatNumber =
     seatDetails?.seatNumber ?? confirmedSeat?.seatNumber ?? activePassengerProfile?.seat ?? null;
   const seatPriceLabel = normalizeSeatPriceText(
@@ -1674,7 +1918,7 @@ export default function SeatSelection() {
       {
         onSuccess: (data, variables) => {
           if (bookingResponse) {
-            applyServicesAssignmentResult(data, [variables.passengerId]);
+            applyServicesAssignmentResult(data, [variables.passengerId], seatContext.flightId);
           }
           if (isManageBookingFlow) {
             void manageOptionsQuery.refetch();
@@ -1712,40 +1956,25 @@ export default function SeatSelection() {
                   Select Passenger
                 </p>
                 <div className="flex flex-wrap gap-3">
-                  {passengers.map((p, idx) => {
-                    const passengerId = resolveStorePassengerId(passengerSource[idx]);
-                    const seatLabel =
-                      passengerId != null
-                        ? (passengerSeatLabelByPassengerId.get(passengerId) ?? p.seat)
-                        : p.seat;
-
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setActivePassengerIndex(idx)}
-                        className={`flex min-w-0 items-center space-x-3 rounded-lg border-2 px-4 py-3 ${
-                          idx === activePassengerIndex
-                            ? 'border-midnight-burgundy bg-midnight-burgundy/5'
-                            : 'border-transparent bg-surface-container-low hover:border-luxury-gold/30'
-                        }`}
-                      >
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-midnight-burgundy text-xs font-bold text-white">
-                          {idx + 1}
-                        </span>
-                        <div className="text-left">
-                          <p className="text-sm font-bold leading-tight text-midnight-burgundy">
-                            {p.fullName}
-                          </p>
-                          {seatLabel ? (
-                            <p className="mt-1 text-[0.625rem] font-bold uppercase tracking-tighter text-luxury-gold">
-                              Seat: {seatLabel}
-                            </p>
-                          ) : null}
-                        </div>
-                      </button>
-                    );
-                  })}
+                  {passengers.map((p, idx) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setActivePassengerIndex(idx)}
+                      className={`flex min-w-0 items-center space-x-3 rounded-lg border-2 px-4 py-3 ${
+                        idx === activePassengerIndex
+                          ? 'border-midnight-burgundy bg-midnight-burgundy/5'
+                          : 'border-transparent bg-surface-container-low hover:border-luxury-gold/30'
+                      }`}
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-midnight-burgundy text-xs font-bold text-white">
+                        {idx + 1}
+                      </span>
+                      <p className="text-sm font-bold leading-tight text-midnight-burgundy">
+                        {p.fullName}
+                      </p>
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -1801,7 +2030,7 @@ export default function SeatSelection() {
             </div>
 
             <div className="w-full xl:w-[23rem] xl:shrink-0">
-              <BookingSummaryPanel
+              <BookingSummaryPanelV2
                 itineraryLabel={resolvedSummaryHeader.itineraryLabel}
                 flightMetaLabel={resolvedSummaryHeader.flightMetaLabel}
                 tripSegments={resolvedSummaryTripSegments}

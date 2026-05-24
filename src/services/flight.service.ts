@@ -4,6 +4,7 @@ import {
   isManageBookingMockVariant,
   type ManageBookingMockVariant,
 } from '../mocks/manageBooking';
+import { getMockReservedSeatsForFlight } from './booking.service';
 import { useBookingStore } from '../stores/useBookingStore';
 import type {
   CabinClassKey,
@@ -106,6 +107,9 @@ function resolveMockManageVariantForFlights(): ManageBookingMockVariant | null {
     import.meta.env.DEV &&
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const isManageRoute =
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/manage-booking');
+  if (!isManageRoute) return null;
   const envFlag = import.meta.env?.VITE_MOCK_MANAGE_BOOKING === 'true';
   let urlFlag = false;
   let urlVariant: string | null = null;
@@ -459,7 +463,8 @@ export async function revalidateItineraryMapped(
 export async function getSeatMapMapped(flightId: number, fareId: number): Promise<SeatMapResponse> {
   const mockVariant = resolveMockManageVariantForFlights();
   if (mockVariant) {
-    const mockSeatMap = getMockSeatMapResponse(mockVariant, flightId, fareId);
+    const reservedOverrides = getMockReservedSeatsForFlight(mockVariant, flightId);
+    const mockSeatMap = getMockSeatMapResponse(mockVariant, flightId, fareId, reservedOverrides);
     if (mockSeatMap) return normalizeSeatMap(mockSeatMap);
   }
   const res = await api.get<SeatMapResponse | { data?: SeatMapResponse }>(

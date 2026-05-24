@@ -1,5 +1,5 @@
 import { ArrowRight, AlertCircle, Loader2, CreditCard } from 'lucide-react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
@@ -251,9 +251,16 @@ function MethodIconButton({
 }
 
 export default function Checkout() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const allowMethodChange = searchParams.get('allowMethodChange') === '1';
+  const skipActivePayLaterRedirect =
+    Boolean(location.state) &&
+    typeof location.state === 'object' &&
+    'skipActivePayLaterRedirect' in location.state &&
+    (location.state as { skipActivePayLaterRedirect?: boolean }).skipActivePayLaterRedirect ===
+      true;
   const paymentRedirectingRef = useRef(false);
   const paymentMethodsToastMessageRef = useRef<string | null>(null);
   const acceptTermsRef = useRef<HTMLInputElement | null>(null);
@@ -331,6 +338,7 @@ export default function Checkout() {
     if (
       !paymentMethodsQuery.isSuccess ||
       allowMethodChange ||
+      skipActivePayLaterRedirect ||
       paymentRedirectingRef.current ||
       activePayment
     ) {
@@ -339,6 +347,10 @@ export default function Checkout() {
     const activePayLater = paymentMethodsQuery.data?.activePayLater;
     if (!activePayLater?.paymentId) return;
 
+    navigate('/booking/checkout', {
+      replace: true,
+      state: { skipActivePayLaterRedirect: true },
+    });
     const currentParams = new URLSearchParams(window.location.search);
     const mockPaymentResult = currentParams.get('mockPaymentResult');
     const mockPaymentVariant = currentParams.get('mockPaymentVariant');
@@ -349,13 +361,14 @@ export default function Checkout() {
     if (mockPaymentVariant) {
       nextParams.set('mockPaymentVariant', mockPaymentVariant);
     }
-    navigate(`/booking/checkout/result?${nextParams.toString()}`, { replace: true });
+    navigate(`/booking/checkout/result?${nextParams.toString()}`);
   }, [
     activePayment,
     allowMethodChange,
     navigate,
     paymentMethodsQuery.data?.activePayLater,
     paymentMethodsQuery.isSuccess,
+    skipActivePayLaterRedirect,
   ]);
 
   useEffect(() => {
@@ -561,6 +574,10 @@ export default function Checkout() {
         if (payLaterFlow) {
           const paymentId = resolvePaymentId(res);
           if (paymentId != null) {
+            navigate('/booking/checkout', {
+              replace: true,
+              state: { skipActivePayLaterRedirect: true },
+            });
             const currentParams = new URLSearchParams(window.location.search);
             const mockPaymentResult = currentParams.get('mockPaymentResult');
             const mockPaymentVariant = currentParams.get('mockPaymentVariant');

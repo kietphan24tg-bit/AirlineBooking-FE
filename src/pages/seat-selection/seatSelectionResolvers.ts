@@ -33,6 +33,7 @@ export type PassengerProfileView = {
 export type ResolvedSeatAssignment = {
   passengerId: number;
   seatId: number;
+  flightId?: number;
   status: string;
   surchargeAmount: number;
   currency: string;
@@ -208,7 +209,11 @@ export function resolveManageBookingId(params: {
   manageOptions: BookingManageOptionsResponse | null;
   bookingLookup: BookingLookupResponse | null;
   bookingResponse: BookingSession | null;
+  preferManageBooking?: boolean;
 }): number | null {
+  if (params.preferManageBooking === false) {
+    return pickNumericId(params.bookingResponse?.bookingId);
+  }
   return pickNumericId(
     params.manageOptions?.bookingId ??
       params.bookingLookup?.booking?.bookingId ??
@@ -291,15 +296,18 @@ export function resolveConfirmedSeatAssignments(params: {
     return bookingResponse.lastSeatAssignment.assignments.map((assignment) => ({
       passengerId: assignment.passengerId,
       seatId: assignment.seatId,
+      flightId: assignment.flightId,
       status: assignment.status,
       surchargeAmount: assignment.surchargeAmount,
       currency: assignment.currency,
+      seatNumber: assignment.seatNumber,
     }));
   }
 
   return (manageOptions?.seatAssignments ?? []).map((assignment) => ({
     passengerId: assignment.passengerId,
     seatId: assignment.seatId,
+    flightId: assignment.flightId,
     status: assignment.status,
     surchargeAmount: assignment.surchargeAmount,
     currency: assignment.currency,

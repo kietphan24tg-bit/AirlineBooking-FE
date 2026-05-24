@@ -353,6 +353,10 @@ const TAX = 400000;
 const DISCOUNT = 0;
 const SEAT_MAP_COLUMNS = ['A', 'B', 'C', 'D', 'E', 'F'];
 const SEAT_MAP_ROWS = [10, 11, 12, 13, 14, 15];
+const MOCK_FAILED_CANCELLATION_ROUTE = {
+  from: 'HAN',
+  to: 'SGN',
+};
 
 export function getMockBookingLookupResponse(
   variant: ManageBookingMockVariant
@@ -650,10 +654,13 @@ export function getMockManageOptionsResponse(
   };
 }
 
+export type MockReservedSeatInfo = { surchargeAmount: number | null };
+
 export function getMockSeatMapResponse(
   variant: ManageBookingMockVariant,
   flightId: number,
-  fareId: number
+  fareId: number,
+  reservedSeatOverrides?: ReadonlyMap<number, MockReservedSeatInfo> | null
 ): SeatMapResponse | null {
   const overrides = getVariantOverrides(variant);
   const validFlightIds = overrides.includeReturnFlight
@@ -667,13 +674,19 @@ export function getMockSeatMapResponse(
     number,
     { status: 'BOOKED' | 'UNAVAILABLE'; price: number | null }
   >();
-  if (flightId === FLIGHT_OUTBOUND_ID) {
-    reservedSeats.set(SEAT_ROW_PRIMARY.seatId, { status: 'BOOKED', price: 100000 });
-    reservedSeats.set(SEAT_ROW_SECONDARY.seatId, { status: 'BOOKED', price: 100000 });
-  }
-  if (flightId === FLIGHT_RETURN_ID) {
-    reservedSeats.set(SEAT_ROW_PRIMARY_RETURN.seatId, { status: 'BOOKED', price: 100000 });
-    reservedSeats.set(SEAT_ROW_SECONDARY_RETURN.seatId, { status: 'BOOKED', price: 100000 });
+  if (reservedSeatOverrides && reservedSeatOverrides.size > 0) {
+    for (const [seatId, info] of reservedSeatOverrides) {
+      reservedSeats.set(seatId, { status: 'BOOKED', price: info.surchargeAmount });
+    }
+  } else {
+    if (flightId === FLIGHT_OUTBOUND_ID) {
+      reservedSeats.set(SEAT_ROW_PRIMARY.seatId, { status: 'BOOKED', price: 100000 });
+      reservedSeats.set(SEAT_ROW_SECONDARY.seatId, { status: 'BOOKED', price: 100000 });
+    }
+    if (flightId === FLIGHT_RETURN_ID) {
+      reservedSeats.set(SEAT_ROW_PRIMARY_RETURN.seatId, { status: 'BOOKED', price: 100000 });
+      reservedSeats.set(SEAT_ROW_SECONDARY_RETURN.seatId, { status: 'BOOKED', price: 100000 });
+    }
   }
 
   let seatIdCounter = flightId * 1000;
@@ -1028,10 +1041,51 @@ export function getMockCancellationConfirmResponse(
   }
 
   const preview = getMockCancellationSelectionPreviewResponse(variant, body);
+  const lookup = getMockBookingLookupResponse(variant);
+  const cancellationCode = `CAN${preview.bookingId}${Date.now().toString().slice(-6)}`;
+  const hasFailedRouteSelection = body.passengers.some(({ flightIds }) =>
+    flightIds.some((flightId) => {
+      const itinerary = lookup.itineraries.find((item) => item.flightId === flightId);
+      return (
+        itinerary?.departureAirportCode === MOCK_FAILED_CANCELLATION_ROUTE.from &&
+        itinerary?.arrivalAirportCode === MOCK_FAILED_CANCELLATION_ROUTE.to
+      );
+    })
+  );
+
+  const failOutcome =
+    hasFailedRouteSelection ||
+    (typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('mockCancellationOutcome') === 'fail');
+
+  if (failOutcome) {
+    return {
+      ...preview,
+      bookingStatus: 'CONFIRMED',
+      cancellationStatus: 'FAILED',
+      cancelledAt: new Date().toISOString(),
+      message: 'Flight cancellation could not be processed.',
+      cancellationCode,
+      refundStatus: 'FAILED',
+      errorCode: 'CANCELLATION_WINDOW_CLOSED',
+      errorMessage: hasFailedRouteSelection
+        ? 'Mock data: chặng HAN - SGN được cấu hình hủy không thành công.'
+        : 'Chuyến bay không đủ điều kiện để hủy do đã quá thời gian quy định.',
+    };
+  }
+
   return {
     ...preview,
     cancellationStatus: 'SUCCESS',
     cancelledAt: '2026-05-20T10:15:00+07:00',
     message: 'Flight cancellation completed successfully.',
+    cancellationCode,
+    refundStatus: 'SUCCEEDED',
+    refundMethod: {
+      type: 'CREDIT_CARD',
+      label: 'Credit card',
+      maskedAccount: 'Visa **** 4242',
+      estimatedDays: '3-7 business days',
+    },
   };
 }

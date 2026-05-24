@@ -1,4 +1,16 @@
-import { AlertTriangle, ArrowRight, CheckCircle2, Home, LoaderCircle, Plane, XCircle } from 'lucide-react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  Copy,
+  Headphones,
+  Home,
+  LoaderCircle,
+  Plane,
+  RefreshCw,
+  XCircle,
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SiteFooter from '../components/layout/SiteFooter';
@@ -12,6 +24,7 @@ import { useBookingStore } from '../stores/useBookingStore';
 import type {
   BookingCancellationConfirmResponse,
   BookingCancellationPreviewResponse,
+  BookingLookupResponse,
 } from '../types/booking.types';
 
 type CancelStep = 1 | 2 | 3;
@@ -47,6 +60,15 @@ function formatDateLabel(value: string): string {
   return date.toLocaleDateString('vi-VN');
 }
 
+function formatDateTimeLabel(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.toLocaleDateString('vi-VN')} ${date.toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`;
+}
+
 function formatTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -70,18 +92,18 @@ function foldAsciiUpper(value: string): string {
 
 function passengerTypeVi(type: string): string {
   const map: Record<string, string> = {
-    ADULT: 'Người lớn',
-    CHILD: 'Trẻ em',
-    INFANT: 'Em bé',
+    ADULT: 'Adult',
+    CHILD: 'Child',
+    INFANT: 'Infant',
   };
   return map[type] ?? type;
 }
 
 function StepIndicator({ step }: { step: CancelStep }) {
   const steps = [
-    { num: 1, label: 'Chọn chuyến bay' },
-    { num: 2, label: 'Xác nhận thông tin' },
-    { num: 3, label: 'Kết quả' },
+    { num: 1, label: 'Select flights' },
+    { num: 2, label: 'Confirm details' },
+    { num: 3, label: 'Result' },
   ];
   return (
     <div className="mb-6 flex items-center gap-0">
@@ -100,15 +122,11 @@ function StepIndicator({ step }: { step: CancelStep }) {
                       : 'bg-surface-container-high text-on-surface-variant'
                 }`}
               >
-                {done ? '✓' : item.num}
+                {done ? 'OK' : item.num}
               </div>
               <span
                 className={`whitespace-nowrap text-xs font-semibold ${
-                  active
-                    ? 'text-primary'
-                    : done
-                      ? 'text-green-600'
-                      : 'text-on-surface-variant'
+                  active ? 'text-primary' : done ? 'text-green-600' : 'text-on-surface-variant'
                 }`}
               >
                 {item.label}
@@ -142,9 +160,7 @@ function FlightRow({
   const content = (
     <div
       className={`mt-3 flex items-stretch gap-0 overflow-hidden rounded-xl border transition-all ${
-        selected
-          ? 'border-primary/40 bg-primary/5'
-          : 'border-surface-container-high bg-white'
+        selected ? 'border-primary/40 bg-primary/5' : 'border-surface-container-high bg-white'
       }`}
     >
       <div className="flex min-w-[90px] flex-col items-center justify-center bg-primary/10 px-3 py-3 text-center">
@@ -184,7 +200,9 @@ function FlightRow({
             <Plane className="h-4 w-4 text-primary" />
             <div className="h-px flex-1 border-t-2 border-dashed border-gray-300" />
           </div>
-          <p className="text-[10px] font-semibold uppercase text-on-surface-variant">{flight.cabin}</p>
+          <p className="text-[10px] font-semibold uppercase text-on-surface-variant">
+            {flight.cabin}
+          </p>
         </div>
         <div className="text-right">
           <p className="text-sm font-black text-on-surface">{flight.arrivalTime}</p>
@@ -232,18 +250,18 @@ function PreviewSummaryCard({
 }) {
   return (
     <div className="glass-panel self-start rounded-2xl border border-surface-container-high p-5 shadow-sm">
-      <p className="mb-4 text-base font-bold text-on-surface">Tóm tắt hủy chuyến</p>
+      <p className="mb-4 text-base font-bold text-on-surface">Cancellation summary</p>
 
       {selectedCount === 0 ? (
         <div className="rounded-xl border border-dashed border-surface-container-high px-4 py-5 text-sm text-on-surface-variant">
-          Chọn ít nhất một chuyến bay của hành khách để xem preview hoàn tiền.
+          Select at least one passenger flight to preview the refund.
         </div>
       ) : null}
 
       {selectedCount > 0 && previewLoading ? (
         <div className="flex items-center gap-2 rounded-xl border border-surface-container-high bg-surface-low px-4 py-5 text-sm text-on-surface-variant">
           <LoaderCircle className="h-4 w-4 animate-spin text-primary" />
-          Đang cập nhật preview...
+          Updating preview...
         </div>
       ) : null}
 
@@ -263,7 +281,7 @@ function PreviewSummaryCard({
         <>
           <div className="mb-3">
             <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">
-              Hành khách hủy ({preview.items.length})
+              Cancelled passengers ({preview.items.length})
             </p>
             {preview.items.map((item, index) => (
               <p key={`${item.passengerId}-${index}`} className="text-sm text-on-surface">
@@ -276,7 +294,7 @@ function PreviewSummaryCard({
 
           <div className="mb-3">
             <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">
-              Chuyến bay hủy
+              Cancelled flights
             </p>
             {preview.items.map((item) => (
               <div key={`${item.passengerId}-${item.flightIds.join('-')}`} className="mb-2">
@@ -285,7 +303,10 @@ function PreviewSummaryCard({
                   const flight = flightsById.get(flightId);
                   if (!flight) return null;
                   return (
-                    <p key={`${item.passengerId}-${flightId}`} className="text-[12px] text-on-surface-variant">
+                    <p
+                      key={`${item.passengerId}-${flightId}`}
+                      className="text-[12px] text-on-surface-variant"
+                    >
                       {flight.label}: {flight.fromCode} - {flight.toCode} ({flight.flightNo})
                     </p>
                   );
@@ -298,29 +319,29 @@ function PreviewSummaryCard({
 
           <div className="mb-3">
             <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">
-              Hoàn tiền dự kiến
+              Estimated refund
             </p>
             <div className="space-y-1.5">
               <div className="flex justify-between text-sm">
-                <span className="text-on-surface-variant">Tổng tiền vé</span>
+                <span className="text-on-surface-variant">Fare total</span>
                 <span className="text-on-surface">
                   {formatMoney(preview.summary.fareGross, preview.currency)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-on-surface-variant">Hoàn ghế</span>
+                <span className="text-on-surface-variant">Seat refund</span>
                 <span className="text-on-surface">
                   {formatMoney(preview.summary.seatRefund, preview.currency)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-on-surface-variant">Hoàn dịch vụ</span>
+                <span className="text-on-surface-variant">Service refund</span>
                 <span className="text-on-surface">
                   {formatMoney(preview.summary.serviceRefund, preview.currency)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-on-surface-variant">Phí hủy</span>
+                <span className="text-on-surface-variant">Cancellation fee</span>
                 <span className="text-red-500">
                   -{formatMoney(preview.summary.refundFee, preview.currency)}
                 </span>
@@ -331,7 +352,7 @@ function PreviewSummaryCard({
           <div className="my-3 border-t-2 border-surface-container-high" />
 
           <div className="mb-3 flex items-center justify-between">
-            <span className="text-sm font-bold text-on-surface">Tổng tiền hoàn</span>
+            <span className="text-sm font-bold text-on-surface">Total refund</span>
             <span className="text-lg font-black text-primary">
               {formatMoney(preview.summary.netRefund, preview.currency)}
             </span>
@@ -342,7 +363,7 @@ function PreviewSummaryCard({
               <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
                 <p className="text-[10px] text-amber-800">
-                  Preview đã được lấy thành công. Bấm xác nhận để gửi yêu cầu hủy thật.
+                  Preview is ready. Click confirm to submit the cancellation request.
                 </p>
               </div>
 
@@ -353,7 +374,7 @@ function PreviewSummaryCard({
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-black text-white shadow-lg transition-all hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {confirmLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-                Xác nhận hủy
+                Confirm cancellation
               </button>
             </>
           ) : null}
@@ -391,7 +412,10 @@ function Step1({
   onBack: () => void;
   onNext: () => void;
 }) {
-  const flightsById = useMemo(() => new Map(flights.map((flight) => [flight.flightId, flight])), [flights]);
+  const flightsById = useMemo(
+    () => new Map(flights.map((flight) => [flight.flightId, flight])),
+    [flights]
+  );
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
@@ -400,25 +424,25 @@ function Step1({
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Mã đặt chỗ (PNR)
+                Booking reference (PNR)
               </p>
               <p className="mt-1 text-lg font-black text-on-surface">{booking.pnr}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Trạng thái
+                Status
               </p>
               <p className="mt-1 text-sm font-bold text-green-600">{booking.status}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Ngày đặt
+                Booking date
               </p>
               <p className="mt-1 text-sm font-bold text-on-surface">{booking.bookingDate}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Tổng tiền
+                Total amount
               </p>
               <p className="mt-1 text-sm font-black text-primary">{booking.totalPrice}</p>
             </div>
@@ -427,15 +451,8 @@ function Step1({
 
         <div className="glass-panel rounded-2xl border border-surface-container-high p-5 shadow-sm">
           <p className="mb-1 text-base font-bold text-on-surface">
-            Chọn chuyến bay muốn hủy theo từng hành khách
+            Select the flights to cancel per passenger
           </p>
-          <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-            <p className="text-[12px] text-amber-800">
-              Mọi thay đổi sẽ gọi preview để cập nhật ngay tổng tiền hoàn bên phải.
-            </p>
-          </div>
-
           <div className="flex flex-col gap-4">
             {passengers.map((passenger, idx) => (
               <div
@@ -449,7 +466,8 @@ function Step1({
                   <div className="flex-1">
                     <p className="text-sm font-bold text-on-surface">{passenger.name}</p>
                     <p className="text-[11px] text-on-surface-variant">
-                      {passengerTypeVi(passenger.type)} | {passenger.dob} | Hành lý: {passenger.baggage}
+                      {passengerTypeVi(passenger.type)} | {passenger.dob} | Baggage:{' '}
+                      {passenger.baggage}
                     </p>
                   </div>
                 </div>
@@ -480,7 +498,7 @@ function Step1({
               onClick={onBack}
               className="rounded-xl border border-surface-container-high bg-white px-6 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-surface-low active:scale-95"
             >
-              Quay lại
+              Back
             </button>
             <button
               type="button"
@@ -489,7 +507,7 @@ function Step1({
               className="flex items-center gap-2 rounded-xl bg-primary px-8 py-2.5 text-sm font-bold text-white shadow-lg transition-all hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {previewLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-              Tiếp tục
+              Continue
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
@@ -527,12 +545,15 @@ function Step2({
   onBack: () => void;
   onConfirm: () => void;
 }) {
-  const flightsById = useMemo(() => new Map(flights.map((flight) => [flight.flightId, flight])), [flights]);
+  const flightsById = useMemo(
+    () => new Map(flights.map((flight) => [flight.flightId, flight])),
+    [flights]
+  );
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
       <div className="glass-panel rounded-2xl border border-surface-container-high p-5 shadow-sm">
-        <p className="mb-4 text-base font-bold text-on-surface">Thông tin hủy chuyến</p>
+        <p className="mb-4 text-base font-bold text-on-surface">Cancellation details</p>
 
         <div className="mb-5 space-y-2">
           <div className="flex justify-between">
@@ -540,8 +561,8 @@ function Step2({
             <span className="text-sm font-black text-primary">{booking.pnr}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-sm text-on-surface-variant">Hành khách hủy</span>
-            <span className="text-sm font-bold text-on-surface">{preview.items.length} người</span>
+            <span className="text-sm text-on-surface-variant">Cancelled passengers</span>
+            <span className="text-sm font-bold text-on-surface">{preview.items.length}</span>
           </div>
           <div className="pl-0 text-sm text-on-surface-variant">
             {preview.items.map((item, index) => (
@@ -553,21 +574,16 @@ function Step2({
         </div>
 
         <div className="border-t border-surface-container-high pt-4">
-          <p className="mb-3 text-sm font-bold text-on-surface">Chuyến bay hủy</p>
+          <p className="mb-3 text-sm font-bold text-on-surface">Cancelled flights</p>
           {preview.items.map((item, index) => (
             <div key={`${item.passengerId}-${item.flightIds.join('-')}`} className="mb-4">
               <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">
-                {index + 1}. {item.passengerName} - {item.flightIds.length} chặng
+                {index + 1}. {item.passengerName} - {item.flightIds.length} segment(s)
               </p>
               {item.flightIds.map((flightId) => {
                 const flight = flightsById.get(flightId);
                 if (!flight) return null;
-                return (
-                  <FlightRow
-                    key={`${item.passengerId}-${flightId}`}
-                    flight={flight}
-                  />
-                );
+                return <FlightRow key={`${item.passengerId}-${flightId}`} flight={flight} />;
               })}
             </div>
           ))}
@@ -579,7 +595,7 @@ function Step2({
             onClick={onBack}
             className="rounded-xl border border-surface-container-high bg-white px-6 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-surface-low active:scale-95"
           >
-            Quay lại
+            Back
           </button>
         </div>
       </div>
@@ -602,66 +618,289 @@ function Step2({
 function Step3({
   booking,
   preview,
+  flights,
+  bookingLookup,
 }: {
-  booking: { pnr: string };
-  preview: BookingCancellationPreviewResponse;
+  booking: { pnr: string; bookingDate: string };
+  preview: BookingCancellationConfirmResponse;
+  flights: CancelFlightLeg[];
+  bookingLookup: BookingLookupResponse;
 }) {
   const navigate = useNavigate();
+  const flightsById = useMemo(
+    () => new Map(flights.map((flight) => [flight.flightId, flight])),
+    [flights]
+  );
+  const cancelledFlightIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const item of preview.items) for (const id of item.flightIds) ids.add(id);
+    return Array.from(ids);
+  }, [preview.items]);
+  const baggage = bookingLookup.itineraries[0]?.fareBenefits;
+  const passengersByFlightId = useMemo(() => {
+    const map = new Map<number, string[]>();
+    for (const item of preview.items) {
+      for (const flightId of item.flightIds) {
+        const list = map.get(flightId) ?? [];
+        list.push(item.passengerName);
+        map.set(flightId, list);
+      }
+    }
+    return map;
+  }, [preview.items]);
+  const [copied, setCopied] = useState(false);
+
+  function handleCopyCode() {
+    if (!preview.cancellationCode) return;
+    void navigator.clipboard.writeText(preview.cancellationCode).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
+  const isFailed = preview.refundStatus === 'FAILED' || preview.cancellationStatus === 'FAILED';
+  const canChangeFlight = bookingLookup.actions?.canChangeFlight ?? false;
 
   return (
-    <div className="glass-panel rounded-2xl border border-surface-container-high p-8 text-center shadow-sm">
-      <div className="mb-4 flex justify-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-          <CheckCircle2 className="h-10 w-10 text-green-500" />
-        </div>
-      </div>
-
-      <h2 className="mb-1 text-xl font-black text-on-surface">Hủy chuyến bay thành công!</h2>
-      <p className="mb-8 text-sm text-on-surface-variant">
-        Đây vẫn là kết quả mock UI. Preview đã nối, nhưng submit hủy thật chưa được nối.
-      </p>
-
-      <div className="mx-auto mb-8 grid max-w-lg grid-cols-2 gap-5 text-left">
-        <div>
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-            PNR
-          </p>
-          <p className="text-lg font-black text-on-surface">{booking.pnr}</p>
-        </div>
-        <div>
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-            Tổng tiền hoàn
-          </p>
-          <p className="text-lg font-black text-primary">
-            {formatMoney(preview.summary.netRefund, preview.currency)}
-          </p>
-        </div>
-        <div>
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-            Hành khách hủy
-          </p>
-          {preview.items.map((item, index) => (
-            <p key={`${item.passengerId}-${index}`} className="text-sm text-on-surface">
-              {index + 1}. {item.passengerName}
-            </p>
-          ))}
-        </div>
-        <div>
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-            Thời gian hoàn tiền
-          </p>
-          <p className="text-sm text-on-surface">Trong vòng 7 - 30 ngày làm việc</p>
-        </div>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => navigate('/')}
-        className="inline-flex items-center gap-2 rounded-xl bg-primary px-10 py-3 text-sm font-black text-white shadow-lg transition-all hover:brightness-110 active:scale-95"
+    <div className="mx-auto max-w-3xl space-y-4">
+      <div
+        className={`glass-panel rounded-2xl border p-8 text-center shadow-sm ${
+          isFailed ? 'border-red-200 bg-red-50/50' : 'border-green-200 bg-green-50/50'
+        }`}
       >
-        <Home className="h-4 w-4" />
-        Về trang chủ
-      </button>
+        <div className="mb-3 flex justify-center">
+          <div
+            className={`flex h-16 w-16 items-center justify-center rounded-full ${
+              isFailed ? 'bg-red-100' : 'bg-green-100'
+            }`}
+          >
+            {isFailed ? (
+              <XCircle className="h-10 w-10 text-red-500" />
+            ) : (
+              <CheckCircle2 className="h-10 w-10 text-green-500" />
+            )}
+          </div>
+        </div>
+        <h2 className={`mb-2 text-xl font-black ${isFailed ? 'text-red-700' : 'text-green-700'}`}>
+          {isFailed ? 'Cancellation failed!' : 'Cancellation successful!'}
+        </h2>
+        <p className="mb-4 text-sm text-on-surface-variant">
+          {isFailed
+            ? 'Your cancellation request could not be processed.'
+            : 'Your flight cancellation request has been processed.'}
+        </p>
+        {preview.cancellationCode ? (
+          <button
+            type="button"
+            onClick={handleCopyCode}
+            className={`inline-flex items-center gap-2 rounded-full border bg-white px-4 py-1.5 text-xs font-semibold text-on-surface transition-all active:scale-95 ${
+              isFailed ? 'border-red-200 hover:bg-red-50' : 'border-green-200 hover:bg-green-50'
+            }`}
+          >
+            <span className="text-on-surface-variant">Cancellation code:</span>
+            <span className={`font-black ${isFailed ? 'text-red-700' : 'text-green-700'}`}>
+              {preview.cancellationCode}
+            </span>
+            <Copy className="h-3.5 w-3.5 text-on-surface-variant" />
+            {copied ? <span className="text-[10px] text-green-600">copied</span> : null}
+          </button>
+        ) : null}
+      </div>
+
+      {isFailed && preview.errorMessage ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+          <div>
+            <p className="text-sm font-bold text-red-700">Failure reason</p>
+            <p className="mt-0.5 text-sm text-red-800">{preview.errorMessage}</p>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="glass-panel rounded-2xl border border-surface-container-high p-5 shadow-sm">
+        <p className="mb-3 text-base font-bold text-on-surface">Booking information</p>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+              PNR
+            </p>
+            <p className="mt-1 text-sm font-black text-green-600">{booking.pnr}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+              Booking date
+            </p>
+            <p className="mt-1 text-sm font-bold text-on-surface">{booking.bookingDate}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+              Status
+            </p>
+            <p
+              className={`mt-1 inline-block rounded px-2 py-0.5 text-[11px] font-black uppercase ${
+                isFailed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+              }`}
+            >
+              {isFailed ? 'Confirmed' : 'Cancelled'}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+              {isFailed ? 'Requested at' : 'Cancelled at'}
+            </p>
+            <p className="mt-1 text-sm font-bold text-on-surface">
+              {formatDateTimeLabel(preview.cancelledAt)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="glass-panel rounded-2xl border border-surface-container-high p-5 shadow-sm">
+        <p className="mb-2 text-base font-bold text-on-surface">
+          {isFailed ? 'Itinerary' : 'Cancelled itinerary'}
+        </p>
+        {cancelledFlightIds.map((flightId) => {
+          const flight = flightsById.get(flightId);
+          if (!flight) return null;
+          const passengerNames = passengersByFlightId.get(flightId) ?? [];
+          return (
+            <div key={flightId}>
+              <FlightRow flight={flight} />
+              <div className="mt-2 flex flex-wrap items-start justify-between gap-2 rounded-xl bg-surface-low px-4 py-2 text-[11px]">
+                <p className="text-on-surface-variant">
+                  Passenger:{' '}
+                  <span className="font-bold uppercase text-on-surface">
+                    {passengerNames.join(', ')}
+                  </span>
+                </p>
+                {baggage ? (
+                  <p className="text-on-surface-variant">
+                    Baggage:{' '}
+                    <span className="font-bold text-on-surface">
+                      {baggage.baggageCheckinKg}kg checked, {baggage.baggageHandKg}kg cabin
+                    </span>
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {!isFailed ? (
+        <div className="glass-panel rounded-2xl border border-surface-container-high p-5 shadow-sm">
+          <p className="mb-3 text-base font-bold text-on-surface">Refund information</p>
+          <div className="rounded-xl bg-green-50 px-4 py-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-[11px] font-semibold text-on-surface-variant">Total refund</p>
+                <p className="mt-1 text-2xl font-black text-green-600">
+                  {formatMoney(preview.summary.netRefund, preview.currency)}
+                </p>
+              </div>
+              {preview.refundMethod ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-on-surface-variant">Refund method</span>
+                    <span className="text-right font-bold text-on-surface">
+                      {preview.refundMethod.maskedAccount
+                        ? `${preview.refundMethod.label} (${preview.refundMethod.maskedAccount})`
+                        : preview.refundMethod.label}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-on-surface-variant">Estimated time</span>
+                    <span className="text-right font-bold text-on-surface">
+                      {preview.refundMethod.estimatedDays}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {preview.refundMethod ? (
+            <div className="mt-3 flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-800">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+              <p>
+                The refund will be processed to your account/card within{' '}
+                {preview.refundMethod.estimatedDays} depending on your card issuer.
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {isFailed ? (
+        <div className="glass-panel rounded-2xl border border-surface-container-high p-5 shadow-sm">
+          <p className="mb-3 text-base font-bold text-on-surface">Suggestions for you</p>
+          {canChangeFlight ? (
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-container-high px-4 py-3">
+              <div className="flex items-center gap-3">
+                <RefreshCw className="h-4 w-4 text-on-surface-variant" />
+                <p className="text-[12px] text-on-surface-variant">
+                  You may change to another flight if seats are available and your fare allows.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/manage-booking/cancel')}
+                className="rounded-lg border border-primary px-3 py-1.5 text-[12px] font-bold text-primary transition-all hover:bg-primary/5 active:scale-95"
+              >
+                Change flight
+              </button>
+            </div>
+          ) : null}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-container-high px-4 py-3">
+            <div className="flex items-center gap-3">
+              <Headphones className="h-4 w-4 text-on-surface-variant" />
+              <p className="text-[12px] text-on-surface-variant">
+                Contact our hotline <span className="font-bold text-primary">1900 1886</span> for
+                detailed support.
+              </p>
+            </div>
+            <a
+              href="tel:19001886"
+              className="rounded-lg border border-primary px-3 py-1.5 text-[12px] font-bold text-primary transition-all hover:bg-primary/5 active:scale-95"
+            >
+              Call now
+            </a>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-surface-container-high bg-white px-4 py-3 text-sm font-bold text-on-surface transition-all hover:bg-surface-low active:scale-95"
+        >
+          <Home className="h-4 w-4" />
+          Back to home
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/manage-booking')}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-all active:scale-95 ${
+            isFailed
+              ? 'bg-primary text-white shadow-lg hover:brightness-110'
+              : 'border border-surface-container-high bg-white text-on-surface hover:bg-surface-low'
+          }`}
+        >
+          Manage booking
+        </button>
+      </div>
+
+      <div className="glass-panel flex items-center gap-3 rounded-2xl border border-surface-container-high p-4 shadow-sm">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+          <Headphones className="h-4 w-4 text-primary" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-bold text-on-surface">Need support?</p>
+          <p className="text-[11px] text-on-surface-variant">
+            Call hotline <span className="font-bold text-primary">1900 1886</span> for assistance.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -694,8 +933,7 @@ export default function CancelFlight() {
 
     if (normalizedPnr !== 'ABC123' || normalizedLastName !== 'NGUYEN') return;
 
-    let variant: 'CONFIRMED' | 'PENDING_PAYMENT' | 'CHECKED_IN_LOCKED' | 'CANCELLED' =
-      'CONFIRMED';
+    let variant: 'CONFIRMED' | 'PENDING_PAYMENT' | 'CHECKED_IN_LOCKED' | 'CANCELLED' = 'CONFIRMED';
 
     switch ((bookingLookup.booking.status ?? '').toUpperCase()) {
       case 'PENDING_PAYMENT':
@@ -734,7 +972,9 @@ export default function CancelFlight() {
         const options = await bookingService.getManageOptions(lookup.booking.bookingId);
         setManageOptions(options);
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : 'Không thể tải mock booking.');
+        setErrorMessage(
+          error instanceof Error ? error.message : 'Unable to load the sample booking.'
+        );
       } finally {
         setBootstrapping(false);
       }
@@ -744,7 +984,7 @@ export default function CancelFlight() {
   const booking = useMemo(
     () => ({
       pnr: bookingLookup?.booking?.pnrCode ?? 'ABC123',
-      status: bookingLookup?.booking?.statusLabel ?? 'Đã xác nhận',
+      status: bookingLookup?.booking?.statusLabel ?? 'Confirmed',
       bookingDate: bookingLookup?.booking?.createdAt
         ? formatDateLabel(bookingLookup.booking.createdAt)
         : '20/05/2026',
@@ -772,7 +1012,7 @@ export default function CancelFlight() {
     () =>
       bookingLookup?.itineraries?.map((itinerary, index) => ({
         flightId: itinerary.flightId,
-        label: index === 0 ? 'Chuyến đi' : `Chặng ${index + 1}`,
+        label: index === 0 ? 'Outbound' : `Segment ${index + 1}`,
         date: formatDateLabel(itinerary.departureTime),
         time: formatTime(itinerary.departureTime),
         fromCode: itinerary.departureAirportCode,
@@ -834,7 +1074,9 @@ export default function CancelFlight() {
       } catch (error) {
         if (requestSeq !== previewRequestSeqRef.current) return;
         setPreview(null);
-        setPreviewError(error instanceof Error ? error.message : 'Không thể preview hủy chuyến.');
+        setPreviewError(
+          error instanceof Error ? error.message : 'Unable to preview the cancellation.'
+        );
       } finally {
         if (requestSeq === previewRequestSeqRef.current) {
           setPreviewLoading(false);
@@ -868,7 +1110,9 @@ export default function CancelFlight() {
       setConfirmedCancellation(response);
       setStep(3);
     } catch (error) {
-      setConfirmError(error instanceof Error ? error.message : 'Không thể xác nhận hủy chuyến.');
+      setConfirmError(
+        error instanceof Error ? error.message : 'Unable to confirm the cancellation.'
+      );
     } finally {
       setConfirmLoading(false);
     }
@@ -881,7 +1125,7 @@ export default function CancelFlight() {
         <main className="mx-auto flex min-h-svh max-w-4xl items-center justify-center px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
           <div className="glass-panel w-full rounded-2xl border border-surface-container-high p-8 text-center shadow-sm">
             <LoaderCircle className="mx-auto h-8 w-8 animate-spin text-primary" />
-            <p className="mt-4 text-sm text-on-surface-variant">Đang tải mock booking...</p>
+            <p className="mt-4 text-sm text-on-surface-variant">Loading sample booking...</p>
           </div>
         </main>
         <SiteFooter />
@@ -895,18 +1139,16 @@ export default function CancelFlight() {
         <SiteHeader />
         <main className="mx-auto flex min-h-svh max-w-4xl items-center justify-center px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
           <div className="glass-panel w-full rounded-2xl border border-surface-container-high p-8 text-center shadow-sm">
-            <h1 className="font-headline text-2xl font-black text-on-surface">
-              Chưa có dữ liệu booking
-            </h1>
+            <h1 className="font-headline text-2xl font-black text-on-surface">No booking data</h1>
             <p className="mt-3 text-sm text-on-surface-variant">
-              {errorMessage ?? 'Quay lại trang quản lý đặt chỗ và tìm booking trước khi hủy.'}
+              {errorMessage ?? 'Return to Manage Booking and find a booking before canceling.'}
             </p>
             <button
               type="button"
               onClick={() => navigate('/manage-booking?mockManageBooking=1')}
               className="mt-6 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white"
             >
-              Về quản lý đặt chỗ
+              Back to Manage Booking
             </button>
           </div>
         </main>
@@ -918,13 +1160,13 @@ export default function CancelFlight() {
   return (
     <div className="relative min-h-screen bg-surface text-on-surface antialiased">
       <SiteHeader />
-      <main className="mx-auto min-h-svh max-w-5xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
+      <main className="mx-auto min-h-svh w-full max-w-400 px-6 pb-16 pt-24 sm:pt-28 md:px-8">
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
             <XCircle className="h-5 w-5 text-primary" />
           </div>
           <h1 className="font-headline text-2xl font-black text-on-surface md:text-3xl">
-            Hủy chuyến bay
+            Cancel flight
           </h1>
         </div>
 
@@ -956,7 +1198,12 @@ export default function CancelFlight() {
           />
         ) : null}
         {step === 3 && confirmedCancellation ? (
-          <Step3 booking={booking} preview={confirmedCancellation} />
+          <Step3
+            booking={booking}
+            preview={confirmedCancellation}
+            flights={flights}
+            bookingLookup={bookingLookup}
+          />
         ) : null}
       </main>
 

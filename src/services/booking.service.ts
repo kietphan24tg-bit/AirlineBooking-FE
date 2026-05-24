@@ -76,9 +76,7 @@ function createMockManageBookingSession(
   };
 }
 
-function getMockManageBookingSession(
-  variant: ManageBookingMockVariant
-): ManageBookingMockSession {
+function getMockManageBookingSession(variant: ManageBookingMockVariant): ManageBookingMockSession {
   const existing = mockManageBookingSessions.get(variant);
   if (existing) return existing;
   const created = createMockManageBookingSession(variant);
@@ -86,10 +84,28 @@ function getMockManageBookingSession(
   return created;
 }
 
+export function getMockReservedSeatsForFlight(
+  variant: ManageBookingMockVariant,
+  flightId: number
+): ReadonlyMap<number, { surchargeAmount: number | null }> {
+  const session = getMockManageBookingSession(variant);
+  const map = new Map<number, { surchargeAmount: number | null }>();
+  for (const assignment of session.manageOptions.seatAssignments) {
+    if (assignment.flightId !== flightId) continue;
+    map.set(assignment.seatId, { surchargeAmount: assignment.surchargeAmount });
+  }
+  return map;
+}
+
 function isDevLocalhostManageBooking(): boolean {
   if (!import.meta.env.DEV || typeof window === 'undefined') return false;
   const hostname = window.location.hostname;
   return hostname === 'localhost' || hostname === '127.0.0.1';
+}
+
+function isManageBookingRoute(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname.startsWith('/manage-booking');
 }
 
 function normalizeLookupToken(value: string): string {
@@ -195,7 +211,9 @@ function syncMockManageOptionsPassengerSegments(session: ManageBookingMockSessio
   }));
 }
 
-function buildMockSeatAssignmentResponse(session: ManageBookingMockSession): SeatAssignmentResponse {
+function buildMockSeatAssignmentResponse(
+  session: ManageBookingMockSession
+): SeatAssignmentResponse {
   const seatSurchargeTotal = session.manageOptions.seatAssignments.reduce(
     (sum, assignment) => sum + assignment.surchargeAmount,
     0
@@ -208,6 +226,8 @@ function buildMockSeatAssignmentResponse(session: ManageBookingMockSession): Sea
     assignments: session.manageOptions.seatAssignments.map((assignment) => ({
       passengerId: assignment.passengerId,
       seatId: assignment.seatId,
+      flightId: assignment.flightId,
+      seatNumber: assignment.seatNumber,
       status: assignment.status,
       surchargeAmount: assignment.surchargeAmount,
       currency: assignment.currency,
@@ -297,9 +317,13 @@ function buildMockCheckInContinueResponse(
 
     const passengers = segment.passengerIds.map((passengerId) => {
       const passenger = lookup.passengers.find((item) => item.passengerId === passengerId);
-      const managedPassenger = manageOptions.passengers.find((item) => item.passengerId === passengerId);
+      const managedPassenger = manageOptions.passengers.find(
+        (item) => item.passengerId === passengerId
+      );
       const ticket = ticketsByFlightAndPassenger.get(`${segment.flightId}:${passengerId}`);
-      const segmentState = managedPassenger?.segments?.find((item) => item.flightId === segment.flightId);
+      const segmentState = managedPassenger?.segments?.find(
+        (item) => item.flightId === segment.flightId
+      );
       const seatAssignment = manageOptions.seatAssignments.find(
         (item) => item.flightId === segment.flightId && item.passengerId === passengerId
       );
@@ -369,11 +393,15 @@ function buildMockCheckInContinueResponse(
     };
   });
 
-  const selectedPassengers = selectedSegments.reduce((sum, segment) => sum + segment.passengers.length, 0);
+  const selectedPassengers = selectedSegments.reduce(
+    (sum, segment) => sum + segment.passengers.length,
+    0
+  );
   const readyPassengers = selectedSegments.reduce(
     (sum, segment) =>
       sum +
-      segment.passengers.filter((passenger) => passenger.eligible && passenger.seat.assigned).length,
+      segment.passengers.filter((passenger) => passenger.eligible && passenger.seat.assigned)
+        .length,
     0
   );
   const blockedPassengers = selectedSegments.reduce(
@@ -383,7 +411,8 @@ function buildMockCheckInContinueResponse(
   const passengersWithoutSeat = selectedSegments.reduce(
     (sum, segment) =>
       sum +
-      segment.passengers.filter((passenger) => passenger.eligible && !passenger.seat.assigned).length,
+      segment.passengers.filter((passenger) => passenger.eligible && !passenger.seat.assigned)
+        .length,
     0
   );
 
@@ -497,6 +526,8 @@ export function resolveMockManageBookingVariant(): ManageBookingMockVariant | nu
     import.meta.env.DEV &&
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const isManageRoute = isManageBookingRoute();
+  if (!isManageRoute) return null;
   const envFlag = import.meta.env?.VITE_MOCK_MANAGE_BOOKING === 'true';
   let urlFlag = false;
   let urlVariant: string | null = null;
@@ -505,18 +536,20 @@ export function resolveMockManageBookingVariant(): ManageBookingMockVariant | nu
     urlFlag = params.get('mockManageBooking') === '1';
     urlVariant = params.get('mockManageVariant');
   }
-  const { bookingLookup, lookupCriteria, manageOptions, mockManageBookingMode } = useBookingStore.getState();
+  const { bookingLookup, lookupCriteria, manageOptions, mockManageBookingMode } =
+    useBookingStore.getState();
   const looksLikePersistedMock =
     isDevLocal &&
-    (
-      bookingLookup?.booking?.pnrCode?.trim().toUpperCase() === 'ABC123' ||
+    (bookingLookup?.booking?.pnrCode?.trim().toUpperCase() === 'ABC123' ||
       lookupCriteria?.pnrCode?.trim().toUpperCase() === 'ABC123' ||
-      manageOptions?.bookingId === 90210
-    );
+      manageOptions?.bookingId === 90210);
 
   if (!envFlag && !urlFlag && !mockManageBookingMode && !looksLikePersistedMock) return null;
   if (urlVariant && isManageBookingMockVariant(urlVariant)) return urlVariant;
-  if ((manageOptions?.passengers?.length ?? 0) === 1 && (manageOptions?.itineraries?.length ?? 0) === 1) {
+  if (
+    (manageOptions?.passengers?.length ?? 0) === 1 &&
+    (manageOptions?.itineraries?.length ?? 0) === 1
+  ) {
     return 'CHECKIN_SINGLE';
   }
   return 'CONFIRMED';
@@ -568,7 +601,8 @@ export async function getManageOptions(
   bookingId: string | number
 ): Promise<BookingManageOptionsResponse> {
   const mockVariant =
-    resolveMockManageBookingVariant() ?? resolveImplicitMockManageBookingVariant(undefined, bookingId);
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
   if (mockVariant) {
     return Promise.resolve(cloneMock(getMockManageBookingSession(mockVariant).manageOptions));
   }
@@ -587,7 +621,8 @@ export async function getBookingTickets(
   bookingId: string | number
 ): Promise<BookingTicketResponse> {
   const mockVariant =
-    resolveMockManageBookingVariant() ?? resolveImplicitMockManageBookingVariant(undefined, bookingId);
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
   if (mockVariant) {
     return Promise.resolve(cloneMock(getMockBookingTicketsResponse(mockVariant)));
   }
@@ -607,9 +642,12 @@ export async function previewCancellation(
   body: BookingCancellationPreviewRequest
 ): Promise<BookingCancellationPreviewResponse> {
   const mockVariant =
-    resolveMockManageBookingVariant() ?? resolveImplicitMockManageBookingVariant(undefined, bookingId);
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
   if (mockVariant) {
-    return Promise.resolve(cloneMock(getMockCancellationPreviewResponse(mockVariant, body.ticketIds)));
+    return Promise.resolve(
+      cloneMock(getMockCancellationPreviewResponse(mockVariant, body.ticketIds))
+    );
   }
   const id = typeof bookingId === 'string' ? bookingId : String(bookingId);
   const res = await api.post<
@@ -627,9 +665,12 @@ export async function previewCancellationBySelection(
   body: BookingCancellationSelectionPreviewRequest
 ): Promise<BookingCancellationPreviewResponse> {
   const mockVariant =
-    resolveMockManageBookingVariant() ?? resolveImplicitMockManageBookingVariant(undefined, bookingId);
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
   if (mockVariant) {
-    return Promise.resolve(cloneMock(getMockCancellationSelectionPreviewResponse(mockVariant, body)));
+    return Promise.resolve(
+      cloneMock(getMockCancellationSelectionPreviewResponse(mockVariant, body))
+    );
   }
   const id = typeof bookingId === 'string' ? bookingId : String(bookingId);
   const res = await api.post<
@@ -647,7 +688,8 @@ export async function confirmCancellation(
   body: BookingCancellationConfirmRequest
 ): Promise<BookingCancellationConfirmResponse> {
   const mockVariant =
-    resolveMockManageBookingVariant() ?? resolveImplicitMockManageBookingVariant(undefined, bookingId);
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
   if (mockVariant) {
     return Promise.resolve(cloneMock(getMockCancellationConfirmResponse(mockVariant, body)));
   }
@@ -667,7 +709,8 @@ export async function putSeatAssignments(
   body: SeatAssignmentRequest
 ): Promise<SeatAssignmentResponse> {
   const mockVariant =
-    resolveMockManageBookingVariant() ?? resolveImplicitMockManageBookingVariant(undefined, bookingId);
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
   if (mockVariant) {
     const session = getMockManageBookingSession(mockVariant);
     const id = typeof bookingId === 'string' ? Number(bookingId) : bookingId;
@@ -681,10 +724,7 @@ export async function putSeatAssignments(
       }
       session.manageOptions.seatAssignments = session.manageOptions.seatAssignments.filter(
         (item) =>
-          !(
-            item.passengerId === assignment.passengerId &&
-            item.flightId === seatContext.flightId
-          )
+          !(item.passengerId === assignment.passengerId && item.flightId === seatContext.flightId)
       );
       session.manageOptions.seatAssignments.push({
         passengerId: assignment.passengerId,
@@ -717,7 +757,8 @@ export async function deleteSeatAssignments(
   body: SeatUnassignmentRequest
 ): Promise<SeatUnassignmentResponse> {
   const mockVariant =
-    resolveMockManageBookingVariant() ?? resolveImplicitMockManageBookingVariant(undefined, bookingId);
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
   if (mockVariant) {
     const session = getMockManageBookingSession(mockVariant);
     const id = typeof bookingId === 'string' ? Number(bookingId) : bookingId;
@@ -750,7 +791,8 @@ export async function patchSeatAssignment(
   body: SeatChangeRequest
 ): Promise<SeatChangeResponse> {
   const mockVariant =
-    resolveMockManageBookingVariant() ?? resolveImplicitMockManageBookingVariant(undefined, bookingId);
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
   if (mockVariant) {
     const session = getMockManageBookingSession(mockVariant);
     const id = typeof bookingId === 'string' ? Number(bookingId) : bookingId;
@@ -807,7 +849,8 @@ export async function putBookingServices(
   body: PutBookingServicesRequest
 ): Promise<PutBookingServicesResponse> {
   const mockVariant =
-    resolveMockManageBookingVariant() ?? resolveImplicitMockManageBookingVariant(undefined, bookingId);
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
   if (mockVariant) {
     const session = getMockManageBookingSession(mockVariant);
     const id = typeof bookingId === 'string' ? Number(bookingId) : bookingId;
@@ -880,9 +923,7 @@ export async function continueCheckIn(
   return raw;
 }
 
-export async function confirmCheckIn(
-  body: CheckInConfirmRequest
-): Promise<CheckInConfirmResponse> {
+export async function confirmCheckIn(body: CheckInConfirmRequest): Promise<CheckInConfirmResponse> {
   const mockVariant =
     resolveMockManageBookingVariant() ?? resolveImplicitMockManageBookingVariant(body);
   if (mockVariant) {

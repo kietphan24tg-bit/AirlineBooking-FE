@@ -86,10 +86,7 @@ function fallbackDisplayItem(code: string | null | undefined): SeatMapDisplayIte
   };
 }
 
-function getDisplayPriceText(
-  cell: SeatMapCell,
-  assigned?: AssignedSeatMeta | null
-): string {
+function getDisplayPriceText(cell: SeatMapCell, assigned?: AssignedSeatMeta | null): string {
   if (assigned?.label?.trim()) return assigned.label.trim();
   if (assigned?.isYours) return 'Reserved';
   if (assigned && !assigned.isYours) return 'Reserved';
@@ -123,7 +120,7 @@ function getSeatCellViewModel(
       title: cell.seatNumber,
       subtitle: 'Reserved',
       appearance: 'assigned',
-      disabled: true,
+      disabled: false,
     };
   }
 
@@ -214,7 +211,7 @@ function buildTooltip(cell: SeatMapCell): string {
   return `${cell.seatNumber} - ${seatType} - ${category} - ${status} - ${getDisplayPriceText(cell)}`;
 }
 
-function buildSelection(cell: SeatMapCell): SeatSelectionValue {
+export function buildSelection(cell: SeatMapCell): SeatSelectionValue {
   return {
     seatId: cell.seatId,
     seatNumber: cell.seatNumber,
@@ -237,7 +234,9 @@ function getSeatDetailViewModel(
   const categoryDisplay = seat.seatCategoryDisplay ?? fallbackDisplayItem(seat.seatCategory);
   const statusDisplay = seat.statusDisplay ?? fallbackDisplayItem(seat.status);
   const effectiveSurchargeAmount =
-    assigned?.isYours && assigned.surchargeAmount != null ? assigned.surchargeAmount : seat.extraPrice;
+    assigned?.isYours && assigned.surchargeAmount != null
+      ? assigned.surchargeAmount
+      : seat.extraPrice;
   const effectiveSurchargeCurrency =
     assigned?.isYours && assigned.currency != null ? assigned.currency : seat.currency;
 
@@ -304,7 +303,10 @@ function seatClassLabel(seatClass: SeatMapSeatClass, zoneLabel?: string): string
   return seatClass.replace(/_/g, ' ');
 }
 
-function findSeatCellById(seatMap: SeatMapResponse | null, seatId: number | null | undefined) {
+export function findSeatCellById(
+  seatMap: SeatMapResponse | null,
+  seatId: number | null | undefined
+) {
   if (!seatMap || !seatId) return null;
   for (const row of seatMap.rows) {
     const seat = row.cells.find((cell) => cell.seatId === seatId);
@@ -313,7 +315,7 @@ function findSeatCellById(seatMap: SeatMapResponse | null, seatId: number | null
   return null;
 }
 
-function DetailPanel({
+export function DetailPanel({
   seatMap,
   seat,
   onConfirm,
@@ -340,13 +342,15 @@ function DetailPanel({
           Use the workspace controls above to switch to extra services or return to the overview.
         </p>
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="auth-primary-btn mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Back to overview
-        </button>
+        {onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="auth-primary-btn mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Back to overview
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -428,7 +432,7 @@ function DetailPanel({
             className="mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md border border-rose-300 bg-rose-50 px-4 text-sm font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Check className="h-4 w-4" />
-            {confirmLoading ? 'Dang xu ly...' : 'Cancel seat'}
+            {confirmLoading ? 'Processing...' : 'Cancel seat'}
           </button>
         ) : (
           <div className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-md border border-slate-400/30 bg-slate-100/90 text-sm font-bold text-slate-800">
@@ -444,17 +448,19 @@ function DetailPanel({
           className="auth-primary-btn mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Check className="h-4 w-4" />
-          {confirmLoading ? 'Dang xu ly...' : 'Select seat'}
+          {confirmLoading ? 'Processing...' : 'Select seat'}
         </button>
       )}
-      <button
-        type="button"
-        onClick={onClose}
-        disabled={confirmLoading}
-        className="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md border border-slate-400/30 bg-slate-100/90 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        Back to overview
-      </button>
+      {onClose ? (
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={confirmLoading}
+          className="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md border border-slate-400/30 bg-slate-100/90 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Back to overview
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -507,7 +513,7 @@ function CompactSelectionBar({
             className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md border border-rose-300 bg-rose-50 px-5 text-sm font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Check className="h-4 w-4" />
-            {confirmLoading ? 'Dang xu ly...' : 'Cancel seat'}
+            {confirmLoading ? 'Processing...' : 'Cancel seat'}
           </button>
         ) : (
           <div className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md border border-slate-400/30 bg-slate-100/90 px-5 text-sm font-bold text-slate-800">
@@ -523,7 +529,7 @@ function CompactSelectionBar({
           className="auth-primary-btn inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md px-5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Check className="h-4 w-4" />
-          {confirmLoading ? 'Dang xu ly...' : 'Select seat'}
+          {confirmLoading ? 'Processing...' : 'Select seat'}
         </button>
       )}
     </div>
@@ -576,7 +582,9 @@ export default function AircraftSeatsMap({
           </h1>
           <p className="text-sm text-on-surface-variant">
             {headerSubtitle ??
-              (seatMap ? `${seatMap.fareCode} seat map` : 'Choose a seat that matches your fare conditions.')}
+              (seatMap
+                ? `${seatMap.fareCode} seat map`
+                : 'Choose a seat that matches your fare conditions.')}
           </p>
           {seatMap?.policyDisplay ? (
             <div className="mt-3 max-w-3xl">
@@ -619,7 +627,10 @@ export default function AircraftSeatsMap({
                       Seat status
                     </p>
                     <div className="flex flex-wrap gap-4">
-                      <LegendSwatch className="border-emerald-300 bg-emerald-50" label="Selectable" />
+                      <LegendSwatch
+                        className="border-emerald-300 bg-emerald-50"
+                        label="Selectable"
+                      />
                       <LegendSwatch
                         className="border-outline-variant/30 bg-surface-container-high"
                         label="Unavailable"
@@ -659,10 +670,7 @@ export default function AircraftSeatsMap({
 
                       <div className="overflow-x-auto pb-4 pr-2">
                         <div className="min-w-max space-y-2.5 pr-5">
-                          <div
-                            className="grid items-center gap-2"
-                            style={{ gridTemplateColumns }}
-                          >
+                          <div className="grid items-center gap-2" style={{ gridTemplateColumns }}>
                             {renderSeatCell(
                               'zone-header-label',
                               <span className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">

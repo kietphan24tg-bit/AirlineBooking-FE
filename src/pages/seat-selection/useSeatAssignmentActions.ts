@@ -28,8 +28,10 @@ export function useSeatAssignmentActions(params: {
   isManageBookingFlow: boolean;
   applySeatAssignmentResult: (
     data: SeatAssignmentResponse,
-    replacedPassengerIds?: number[]
+    replacedPassengerIds?: number[],
+    flightId?: number | null
   ) => void;
+  currentFlightId?: number | null;
   refetchSeatMap: () => Promise<unknown>;
   refetchManageOptions: () => Promise<unknown>;
   onCancelSuccess?: () => void;
@@ -41,13 +43,14 @@ export function useSeatAssignmentActions(params: {
     getSeatAssignmentErrorMessage,
     isManageBookingFlow,
     onCancelSuccess,
+    currentFlightId,
     refetchManageOptions,
     refetchSeatMap,
   } = params;
 
   const syncAfterSeatMutation = async (data: SeatAssignmentResponse, passengerId: number) => {
     if (bookingResponse) {
-      applySeatAssignmentResult(data, [passengerId]);
+      applySeatAssignmentResult(data, [passengerId], currentFlightId);
     }
     await refetchSeatMap();
     if (isManageBookingFlow) {

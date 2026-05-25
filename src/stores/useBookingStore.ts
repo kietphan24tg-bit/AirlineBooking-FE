@@ -26,6 +26,7 @@ export interface BookingDraftSegment {
   fareId: number;
   fareCode: string | null;
   cabinClass: string | null;
+  pricing: FlightRevalidatePricing | null;
 }
 
 export interface BookingPersistedDraft {
@@ -92,11 +93,13 @@ interface BookingStore {
   setBookingResponse: (data: BookingCreateResponse) => void;
   applySeatAssignmentResult: (
     data: SeatAssignmentResponse,
-    replacedPassengerIds?: number[]
+    replacedPassengerIds?: number[],
+    flightId?: number | null
   ) => void;
   applyServicesAssignmentResult: (
     data: PutBookingServicesResponse,
-    submittedPassengerIds: number[]
+    submittedPassengerIds: number[],
+    flightId?: number | null
   ) => void;
   clearBooking: () => void;
   isRevalidateExpired: () => boolean;
@@ -136,6 +139,7 @@ function normalizeDraftSegmentsFromRevalidate(
         fareId: segment.fareId,
         fareCode: segment.fareCode ?? null,
         cabinClass: segment.cabinClass ?? null,
+        pricing: 'pricing' in segment ? (segment.pricing ?? null) : null,
       }))
       .filter((segment) => Number.isFinite(segment.flightId) && Number.isFinite(segment.fareId));
   }
@@ -147,6 +151,7 @@ function normalizeDraftSegmentsFromRevalidate(
         fareId: data.fareId,
         fareCode: null,
         cabinClass: null,
+        pricing: 'pricing' in data ? data.pricing : null,
       },
     ];
   }
@@ -178,16 +183,26 @@ function mergeSessionPricingFromTotal(
 function mergeConfirmedServicesByPassengerId(
   previous: Record<number, BookingServiceSelectionItem[]>,
   data: PutBookingServicesResponse,
-  submittedPassengerIds: number[]
+  submittedPassengerIds: number[],
+  flightId?: number | null
 ): Record<number, BookingServiceSelectionItem[]> {
   const next = { ...previous };
 
   for (const passengerId of submittedPassengerIds) {
-    next[passengerId] = [];
+    const existing = next[passengerId] ?? [];
+    next[passengerId] =
+      flightId != null ? existing.filter((selection) => selection.flightId !== flightId) : [];
   }
 
   for (const passenger of data.passengers ?? []) {
-    next[passenger.passengerId] = passenger.selections ?? [];
+    const existing = next[passenger.passengerId] ?? [];
+    next[passenger.passengerId] =
+      flightId != null
+        ? [
+            ...existing.filter((selection) => selection.flightId !== flightId),
+            ...(passenger.selections ?? []).map((selection) => ({ ...selection, flightId })),
+          ]
+        : (passenger.selections ?? []);
   }
 
   return next;
@@ -284,7 +299,7 @@ export const useBookingStore = create<BookingStore>()(
         set((state) => ({
           bookingResponse: normalizeBookingResponse(state.bookingDraft, data),
         })),
-      applySeatAssignmentResult: (data, _replacedPassengerIds = []) =>
+      applySeatAssignmentResult: (data, _replacedPassengerIds = [], _flightId = null) =>
         set((state) => {
           const { bookingResponse } = state;
           if (!bookingResponse) return state;
@@ -305,7 +320,7 @@ export const useBookingStore = create<BookingStore>()(
             },
           };
         }),
-      applyServicesAssignmentResult: (data, submittedPassengerIds) =>
+      applyServicesAssignmentResult: (data, submittedPassengerIds, flightId = null) =>
         set((state) => {
           const { bookingResponse } = state;
           if (!bookingResponse) return state;
@@ -318,7 +333,8 @@ export const useBookingStore = create<BookingStore>()(
               confirmedServicesByPassengerId: mergeConfirmedServicesByPassengerId(
                 bookingResponse.confirmedServicesByPassengerId,
                 data,
-                submittedPassengerIds
+                submittedPassengerIds,
+                flightId
               ),
               lastServicesResult: data,
             },
@@ -377,6 +393,7 @@ export const useBookingStore = create<BookingStore>()(
                             fareId: state.bookingDraft.fareId,
                             fareCode: state.bookingDraft.fareCode ?? null,
                             cabinClass: null,
+                            pricing: state.bookingDraft.pricing,
                           },
                         ]
                       : [],

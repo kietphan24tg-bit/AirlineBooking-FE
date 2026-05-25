@@ -9,6 +9,8 @@ import PassengerInfo from '../pages/PassengerInfo';
 import PasswordResetConfirm from '../pages/PasswordResetConfirm';
 import Register from '../pages/Register';
 import SeatSelection from '../pages/SeatSelection';
+import ManageBookingSeatSelection from '../pages/ManageBookingSeatSelection';
+import ManageBookingAddExtras from '../pages/ManageBookingAddExtras';
 import TripHistory from '../pages/TripHistory';
 import ManageBooking from '../pages/ManageBooking';
 import Experience from '../pages/Experience';
@@ -96,11 +98,11 @@ const AppRouter = createBrowserRouter([
   },
   {
     path: '/manage-booking/seat-selection',
-    element: <SeatSelection />,
+    element: <ManageBookingSeatSelection />,
   },
   {
     path: '/manage-booking/add-services',
-    element: <SeatSelection />,
+    element: <ManageBookingAddExtras />,
   },
   {
     path: '/manage-booking/cancel',

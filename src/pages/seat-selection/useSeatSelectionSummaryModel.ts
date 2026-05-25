@@ -157,6 +157,7 @@ type SummaryPassengerItem = {
 };
 
 type SummarySeatItem = {
+  flightId: number | null;
   passengerId: number;
   passengerName: string;
   seatNumber: string;
@@ -168,6 +169,7 @@ type SummarySeatItem = {
 };
 
 type SummaryServiceItem = {
+  flightId: number | null;
   passengerId: number;
   passengerName: string;
   serviceName: string;
@@ -178,8 +180,12 @@ type SummaryServiceItem = {
 
 type SummaryTripSegment = {
   direction: 'OUTBOUND' | 'INBOUND' | null;
+  flightId: number | null;
   itineraryLabel: string | null;
   flightMetaLabel: string | null;
+  fareAmountLabel: string | null;
+  taxFeeItems: Array<{ label: string; value: string }>;
+  taxFeeTotalLabel: string | null;
 };
 
 function buildFallbackTripSegments(
@@ -214,8 +220,12 @@ function buildFallbackTripSegments(
               : null;
         return {
           direction: direction as SummaryTripSegment['direction'],
+          flightId: typeof segment.flightId === 'number' ? segment.flightId : null,
           itineraryLabel,
           flightMetaLabel,
+          fareAmountLabel: null,
+          taxFeeItems: [],
+          taxFeeTotalLabel: null,
         };
       })
       .filter((segment) => segment.itineraryLabel || segment.flightMetaLabel);
@@ -224,8 +234,33 @@ function buildFallbackTripSegments(
 
   return bookingDraft.segments.map((segment) => ({
     direction: segment.direction,
-    itineraryLabel: segment.direction === 'OUTBOUND' ? 'Outbound flight' : 'Return flight',
+    flightId: segment.flightId,
+    itineraryLabel: null,
     flightMetaLabel: `Flight #${segment.flightId}${segment.fareCode ? ` | ${segment.fareCode}` : ''}`,
+    fareAmountLabel: segment.pricing
+      ? formatMoney(
+          Math.max(0, (segment.pricing.baseFare ?? 0) - (segment.pricing.discountAmount ?? 0)),
+          segment.pricing.currency || 'VND'
+        )
+      : null,
+    taxFeeItems: segment.pricing
+      ? [
+          {
+            label: 'Taxes',
+            value: formatMoney(segment.pricing.taxes, segment.pricing.currency || 'VND'),
+          },
+          {
+            label: 'Fees',
+            value: formatMoney(segment.pricing.fees, segment.pricing.currency || 'VND'),
+          },
+        ]
+      : [],
+    taxFeeTotalLabel: segment.pricing
+      ? formatMoney(
+          (segment.pricing.taxes ?? 0) + (segment.pricing.fees ?? 0),
+          segment.pricing.currency || 'VND'
+        )
+      : null,
   }));
 }
 
@@ -268,6 +303,28 @@ export function useSeatSelectionSummaryModel(params: {
     [bookingLookup, manageOptions, pricing]
   );
 
+  const summaryFareAmountLabel =
+    pricing != null
+      ? formatMoney(
+          Math.max(0, (pricing.baseFare ?? 0) - (pricing.discountAmount ?? 0)),
+          pricing.currency || 'VND'
+        )
+      : null;
+  const summaryDiscountAmountLabel =
+    pricing != null && (pricing.discountAmount ?? 0) > 0
+      ? formatMoney(pricing.discountAmount, pricing.currency || 'VND')
+      : null;
+  const summaryTaxFeeItems = pricing
+    ? [
+        { label: 'Taxes', value: formatMoney(pricing.taxes, pricing.currency || 'VND') },
+        { label: 'Fees', value: formatMoney(pricing.fees, pricing.currency || 'VND') },
+      ]
+    : [];
+  const summaryTaxFeeTotalLabel =
+    pricing != null
+      ? formatMoney((pricing.taxes ?? 0) + (pricing.fees ?? 0), pricing.currency || 'VND')
+      : null;
+
   const summaryHeader = useMemo(() => {
     const summaryItinerary = manageOptions?.itineraries?.[0] ?? null;
     return summaryItinerary
@@ -294,8 +351,12 @@ export function useSeatSelectionSummaryModel(params: {
                 : 'INBOUND';
         return {
           direction,
+          flightId: itinerary.flightId,
           itineraryLabel: formatItineraryRouteLabel(itinerary),
           flightMetaLabel: formatItineraryMetaLabel(itinerary),
+          fareAmountLabel: null,
+          taxFeeItems: [],
+          taxFeeTotalLabel: null,
         };
       });
     }
@@ -306,11 +367,24 @@ export function useSeatSelectionSummaryModel(params: {
     return [
       {
         direction: null,
+        flightId: seatContext.flightId,
         itineraryLabel: summaryHeader.itineraryLabel,
         flightMetaLabel: summaryHeader.flightMetaLabel,
+        fareAmountLabel: summaryFareAmountLabel,
+        taxFeeItems: summaryTaxFeeItems,
+        taxFeeTotalLabel: summaryTaxFeeTotalLabel,
       },
     ].filter((segment) => segment.itineraryLabel || segment.flightMetaLabel);
-  }, [bookingDraft, bookingResponse, manageOptions?.itineraries, summaryHeader]);
+  }, [
+    bookingDraft,
+    bookingResponse,
+    manageOptions?.itineraries,
+    seatContext.flightId,
+    summaryFareAmountLabel,
+    summaryHeader,
+    summaryTaxFeeItems,
+    summaryTaxFeeTotalLabel,
+  ]);
 
   const summaryPassengerItems = useMemo<SummaryPassengerItem[]>(
     () =>
@@ -326,28 +400,6 @@ export function useSeatSelectionSummaryModel(params: {
       })),
     [passengerSource, passengers]
   );
-
-  const summaryFareAmountLabel =
-    pricing != null
-      ? formatMoney(
-          Math.max(0, (pricing.baseFare ?? 0) - (pricing.discountAmount ?? 0)),
-          pricing.currency || 'VND'
-        )
-      : null;
-  const summaryDiscountAmountLabel =
-    pricing != null && (pricing.discountAmount ?? 0) > 0
-      ? formatMoney(pricing.discountAmount, pricing.currency || 'VND')
-      : null;
-  const summaryTaxFeeItems = pricing
-    ? [
-        { label: 'Taxes', value: formatMoney(pricing.taxes, pricing.currency || 'VND') },
-        { label: 'Fees', value: formatMoney(pricing.fees, pricing.currency || 'VND') },
-      ]
-    : [];
-  const summaryTaxFeeTotalLabel =
-    pricing != null
-      ? formatMoney((pricing.taxes ?? 0) + (pricing.fees ?? 0), pricing.currency || 'VND')
-      : null;
 
   const summarySeatItems = useMemo<SummarySeatItem[]>(
     () =>
@@ -365,6 +417,7 @@ export function useSeatSelectionSummaryModel(params: {
             assignment.currency || pricing?.currency || manageOptions?.currency || 'VND';
 
           return {
+            flightId: assignment.flightId ?? null,
             passengerId,
             passengerName,
             seatNumber,
@@ -411,6 +464,7 @@ export function useSeatSelectionSummaryModel(params: {
           next.push({
             passengerId,
             passengerName,
+            flightId: selection.flightId ?? null,
             serviceName: selection.serviceName,
             optionName: selection.optionName,
             quantity:
@@ -440,6 +494,7 @@ export function useSeatSelectionSummaryModel(params: {
         summaryPassengerItems.find((item) => item.passengerId === passengerId)?.fullName ??
         `Passenger ${passengerId}`;
       next.push({
+        flightId: null,
         passengerId,
         passengerName,
         serviceName: selection.serviceName ?? 'Additional service',

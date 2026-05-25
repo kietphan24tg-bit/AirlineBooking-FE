@@ -27,6 +27,18 @@ export interface CreatePaymentRequest {
   method: string;
 }
 
+export interface CreateSeatChangePaymentRequest {
+  bookingId: string | number;
+  seatChangeSettlementId: string | number;
+  method: string;
+}
+
+export interface CreateServiceChangePaymentRequest {
+  bookingId: string | number;
+  serviceChangeSettlementId: string | number;
+  method: string;
+}
+
 export interface CreatePaymentResponse {
   payment: PaymentEntity;
   action: PaymentAction;

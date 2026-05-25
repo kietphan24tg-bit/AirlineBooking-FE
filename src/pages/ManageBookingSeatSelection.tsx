@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   ArrowRight,
   Check,
   CheckCircle2,
+  Clock,
   CreditCard,
   Loader2,
   Wallet,
@@ -70,7 +71,13 @@ type SeatChangeDelta = {
 
 type ConfirmModalStage = 'preview' | 'payment' | 'result';
 
-type ConfirmResultVariant = 'saved' | 'refund_submitted' | 'error';
+type ConfirmResultVariant =
+  | 'saved'
+  | 'refund_submitted'
+  | 'payment_failed'
+  | 'payment_cancelled'
+  | 'payment_expired'
+  | 'error';
 
 type SeatChangePaymentMethodKey = 'PAYOS' | 'STRIPE' | 'VIETQR';
 
@@ -84,13 +91,29 @@ type PaymentUiState = {
   paymentError: string | null;
 };
 
+type SeatChangePaymentResultViewModel = {
+  title: string;
+  message: string;
+  actionLabel: string;
+  icon: 'success' | 'error' | 'warning';
+};
+
 type SeatChangePreviewCardItem = {
   key: string;
   passengerName: string;
   flightLabel: string;
   seatChangeLabel: string;
+  surchargeLabel: string | null;
   delta: number;
 };
+
+type SeatChangeRedirectContext = {
+  paymentId: number;
+  amount: number;
+  currency: string;
+};
+
+const SEAT_CHANGE_REDIRECT_CONTEXT_KEY = 'seat-change-payment-redirect-context';
 
 function formatMoney(amount: number, currency: string): string {
   try {
@@ -102,6 +125,27 @@ function formatMoney(amount: number, currency: string): string {
   } catch {
     return `${amount.toLocaleString('vi-VN')} ${currency}`;
   }
+}
+
+function storeSeatChangeRedirectContext(context: SeatChangeRedirectContext): void {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.setItem(SEAT_CHANGE_REDIRECT_CONTEXT_KEY, JSON.stringify(context));
+}
+
+function readSeatChangeRedirectContext(): SeatChangeRedirectContext | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(SEAT_CHANGE_REDIRECT_CONTEXT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as SeatChangeRedirectContext;
+  } catch {
+    return null;
+  }
+}
+
+function clearSeatChangeRedirectContext(): void {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.removeItem(SEAT_CHANGE_REDIRECT_CONTEXT_KEY);
 }
 
 function formatFlightDate(iso: string | null | undefined): string {
@@ -190,7 +234,7 @@ function formatSeatChangeFlightLabelSafe(itinerary: ItineraryItem | null | undef
   return parts.join(' | ');
 }
 
-function formatSeatChangeFlightLabelFromPreviewItem(
+function _formatSeatChangeFlightLabelFromPreviewItem(
   item: SeatChangePreviewResponse['items'][number]
 ): string {
   const parts = [
@@ -210,6 +254,56 @@ function formatSeatChangeSeatLabelSafe(
   return `${fromSeatNumber ?? 'No seat'} -> ${toSeatNumber ?? 'No seat'}`;
 }
 
+function mapPaymentStatusToResultVariant(
+  status: PaymentStatus | null | undefined
+): ConfirmResultVariant | null {
+  if (status === 'SUCCESS') return 'saved';
+  if (status === 'FAILED') return 'payment_failed';
+  if (status === 'CANCELLED' || status === 'CANCELED') return 'payment_cancelled';
+  if (status === 'EXPIRED') return 'payment_expired';
+  return null;
+}
+
+function buildSeatChangePaymentResultViewModel(
+  variant: ConfirmResultVariant
+): SeatChangePaymentResultViewModel | null {
+  switch (variant) {
+    case 'payment_failed':
+      return {
+        title: 'Payment failed',
+        message:
+          'We could not complete the additional payment. Your seat changes have not been finalized yet.',
+        actionLabel: 'Try again',
+        icon: 'error',
+      };
+    case 'payment_cancelled':
+      return {
+        title: 'Payment cancelled',
+        message:
+          'The payment was cancelled before completion. Your seat changes are still pending.',
+        actionLabel: 'Choose another method',
+        icon: 'warning',
+      };
+    case 'payment_expired':
+      return {
+        title: 'Payment expired',
+        message: 'This payment code has expired. Please create a new payment to continue.',
+        actionLabel: 'Create new payment',
+        icon: 'warning',
+      };
+    case 'error':
+      return {
+        title: 'Could not verify payment',
+        message:
+          'We could not confirm the payment status right now. Please check again or choose another method.',
+        actionLabel: 'Choose another method',
+        icon: 'warning',
+      };
+    default:
+      return null;
+  }
+}
+
 function resolvePaymentMethodKey(method: PaymentMethod | null): SeatChangePaymentMethodKey {
   const provider = method?.provider?.trim().toUpperCase() ?? '';
   const code = method?.code?.trim().toUpperCase() ?? '';
@@ -225,6 +319,7 @@ function resolvePaymentId(response: CreatePaymentResponse | null): number | null
 
 export default function ManageBookingSeatSelection() {
   const navigate = useNavigate();
+  const location = useLocation();
   const manageOptions = useBookingStore((s) => s.manageOptions);
   const bookingLookup = useBookingStore((s) => s.bookingLookup);
   const bookingResponse = useBookingStore((s) => s.bookingResponse);
@@ -460,6 +555,8 @@ export default function ManageBookingSeatSelection() {
   const [confirmSubmitting, setConfirmSubmitting] = useState(false);
   const [confirmResponse, setConfirmResponse] = useState<SeatChangeConfirmResponse | null>(null);
   const [resultVariant, setResultVariant] = useState<ConfirmResultVariant>('saved');
+  const [resultAmountOverride, setResultAmountOverride] = useState<number | null>(null);
+  const [resultCurrencyOverride, setResultCurrencyOverride] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
   const [paymentUiState, setPaymentUiState] = useState<PaymentUiState>({
     activePayment: null,
@@ -594,6 +691,8 @@ export default function ManageBookingSeatSelection() {
     setConfirmSubmitting(false);
     setConfirmResponse(null);
     setResultVariant('saved');
+    setResultAmountOverride(null);
+    setResultCurrencyOverride(null);
     setSelectedPaymentMethod('');
     setPaymentUiState({
       activePayment: null,
@@ -670,10 +769,43 @@ export default function ManageBookingSeatSelection() {
     const variant = resultVariant;
     closeConfirmFlow();
     if (variant === 'refund_submitted') toast.success('Refund initiated.');
-    else if (variant === 'error') toast.error('Payment was not completed.');
-    else toast.success('Seat changes saved.');
+    else if (
+      variant === 'payment_failed' ||
+      variant === 'payment_cancelled' ||
+      variant === 'payment_expired' ||
+      variant === 'error'
+    ) {
+      toast.error('Payment was not completed.');
+    } else toast.success('Seat changes saved.');
     navigate('/manage-booking');
   };
+
+  const openSeatChangeResult = useCallback(
+    (
+      variant: ConfirmResultVariant,
+      overrides?: {
+        amount?: number | null;
+        currency?: string | null;
+      }
+    ) => {
+      setConfirmModalOpen(true);
+      setConfirmModalStage('result');
+      setResultVariant(variant);
+      setResultAmountOverride(overrides?.amount ?? null);
+      setResultCurrencyOverride(overrides?.currency ?? null);
+      setPaymentUiState((current) => ({
+        ...current,
+        activePayment: null,
+        paymentError: null,
+        paymentStatusOverride: null,
+        checkingPaymentStatus: false,
+        cancelingPayment: false,
+        creatingPayment: false,
+        regeneratingPayment: false,
+      }));
+    },
+    []
+  );
 
   const createSeatChangePayment = async () => {
     if (
@@ -697,6 +829,14 @@ export default function ManageBookingSeatSelection() {
       });
       const paymentUrl = response.action?.paymentUrl ?? response.payment.paymentUrl ?? null;
       if (paymentUrl && !response.action?.qrData && !response.payment.qrData) {
+        const paymentId = resolvePaymentId(response);
+        if (paymentId != null) {
+          storeSeatChangeRedirectContext({
+            paymentId,
+            amount: Math.abs(netAmount),
+            currency: confirmResponse?.currency ?? previewResponse?.currency ?? currency,
+          });
+        }
         window.location.assign(paymentUrl);
         return;
       }
@@ -760,7 +900,7 @@ export default function ManageBookingSeatSelection() {
     }
   };
 
-  const checkSeatChangePaymentStatus = async () => {
+  const checkSeatChangePaymentStatus = useCallback(async () => {
     const paymentId = resolvePaymentId(paymentUiState.activePayment);
     if (paymentId == null) return;
     setPaymentUiState((current) => ({
@@ -785,7 +925,7 @@ export default function ManageBookingSeatSelection() {
         checkingPaymentStatus: false,
       }));
     }
-  };
+  }, [paymentUiState.activePayment]);
 
   const cancelCreatedSeatChangePayment = async () => {
     const paymentId = resolvePaymentId(paymentUiState.activePayment);
@@ -825,21 +965,152 @@ export default function ManageBookingSeatSelection() {
     await checkSeatChangePaymentStatus();
   };
 
+  useEffect(() => {
+    const currentPayment = paymentUiState.activePayment;
+    const statusOverride = paymentUiState.paymentStatusOverride;
+    const paymentId = resolvePaymentId(currentPayment);
+    const resolvedStatus =
+      statusOverride ?? (currentPayment?.payment.status as PaymentStatus | undefined) ?? null;
+
+    if (paymentId == null) return;
+    if (resolvedStatus != null && resolvedStatus !== 'PENDING') {
+      const nextVariant = mapPaymentStatusToResultVariant(resolvedStatus);
+      if (nextVariant) {
+        setPaymentUiState((current) => ({
+          ...current,
+          activePayment: null,
+          paymentError: null,
+        }));
+        setResultVariant(nextVariant);
+        setConfirmModalStage('result');
+      }
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      void checkSeatChangePaymentStatus();
+    }, 4000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [
+    checkSeatChangePaymentStatus,
+    paymentUiState.activePayment,
+    paymentUiState.paymentStatusOverride,
+  ]);
+
   const closeSeatChangePaymentCard = () => {
     const effectiveStatus =
       paymentUiState.paymentStatusOverride ??
       (paymentUiState.activePayment?.payment.status as PaymentStatus | undefined) ??
       null;
+    const nextVariant = mapPaymentStatusToResultVariant(effectiveStatus);
     setPaymentUiState((current) => ({
       ...current,
       activePayment: null,
       paymentError: null,
     }));
-    if (effectiveStatus === 'SUCCESS') {
-      setResultVariant('saved');
+    if (nextVariant) {
+      setResultVariant(nextVariant);
       setConfirmModalStage('result');
     }
   };
+
+  const reopenSeatChangePaymentMethods = () => {
+    setPaymentUiState((current) => ({
+      ...current,
+      activePayment: null,
+      paymentError: null,
+      paymentStatusOverride: null,
+    }));
+    setConfirmModalStage('payment');
+  };
+
+  const backToSeatEdit = () => {
+    setPaymentUiState((current) => ({
+      ...current,
+      activePayment: null,
+      paymentError: null,
+      paymentStatusOverride: null,
+    }));
+    closeConfirmFlow();
+  };
+
+  const handledSeatChangeReturnRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (manageBookingId == null) return;
+    const params = new URLSearchParams(location.search);
+    const storedRedirectContext = readSeatChangeRedirectContext();
+    const rawPaymentId = params.get('seatChangePaymentId');
+    const seatChangeReturn = params.get('seatChangeReturn') === '1' || rawPaymentId != null;
+    if (!seatChangeReturn && !rawPaymentId) return;
+
+    const paymentId = Number(rawPaymentId ?? storedRedirectContext?.paymentId ?? NaN);
+    if (!Number.isFinite(paymentId) || paymentId <= 0) return;
+
+    const handledKey = `${manageBookingId}:${paymentId}:${location.search}`;
+    if (handledSeatChangeReturnRef.current === handledKey) return;
+    handledSeatChangeReturnRef.current = handledKey;
+
+    const amount = storedRedirectContext?.amount ?? null;
+    const resolvedCurrency = storedRedirectContext?.currency ?? currency;
+    let cancelled = false;
+    let timer: number | null = null;
+
+    const cleanupUrl = () => {
+      const nextParams = new URLSearchParams(location.search);
+      nextParams.delete('seatChangeReturn');
+      nextParams.delete('seatChangePaymentId');
+      const nextSearch = nextParams.toString();
+      navigate(
+        {
+          pathname: location.pathname,
+          search: nextSearch ? `?${nextSearch}` : '',
+        },
+        { replace: true }
+      );
+    };
+
+    const finishWithVariant = (variant: ConfirmResultVariant) => {
+      clearSeatChangeRedirectContext();
+      cleanupUrl();
+      openSeatChangeResult(variant, { amount, currency: resolvedCurrency });
+    };
+
+    const pollStatus = async () => {
+      try {
+        const response = await getPaymentStatus(paymentId);
+        if (cancelled) return;
+        const status = (response.payment?.status as PaymentStatus | undefined) ?? null;
+        if (status == null || status === 'PENDING') {
+          timer = window.setTimeout(() => {
+            void pollStatus();
+          }, 4000);
+          return;
+        }
+        const variant = mapPaymentStatusToResultVariant(status);
+        finishWithVariant(variant ?? 'error');
+      } catch {
+        if (cancelled) return;
+        finishWithVariant('error');
+      }
+    };
+
+    void pollStatus();
+
+    return () => {
+      cancelled = true;
+      if (timer != null) window.clearTimeout(timer);
+    };
+  }, [
+    currency,
+    location.pathname,
+    location.search,
+    manageBookingId,
+    navigate,
+    openSeatChangeResult,
+  ]);
 
   if (manageBookingId == null) {
     return (
@@ -1043,7 +1314,12 @@ export default function ManageBookingSeatSelection() {
           confirmSubmitting={confirmSubmitting}
           confirmResponse={confirmResponse}
           deltas={seatChangeDeltas}
+          additionalChargesTotal={additionalChargesTotal}
+          refundsTotal={refundsTotal}
+          netAmount={netAmount}
           resultVariant={resultVariant}
+          resultAmountOverride={resultAmountOverride}
+          resultCurrencyOverride={resultCurrencyOverride}
           passengers={allPassengers}
           itineraries={itineraries}
           paymentMethods={paymentMethods}
@@ -1052,6 +1328,8 @@ export default function ManageBookingSeatSelection() {
           onSelectPaymentMethod={setSelectedPaymentMethod}
           paymentUiState={paymentUiState}
           onClose={closeConfirmFlow}
+          onBackToEdit={backToSeatEdit}
+          onRetryPayment={reopenSeatChangePaymentMethods}
           onRefreshPreview={refreshConfirmPreview}
           onPreviewContinue={continueFromPreview}
           onCreatePayment={createSeatChangePayment}
@@ -1849,7 +2127,12 @@ function SeatChangeFlowModal({
   confirmSubmitting,
   confirmResponse,
   deltas,
+  additionalChargesTotal,
+  refundsTotal,
+  netAmount,
   resultVariant,
+  resultAmountOverride,
+  resultCurrencyOverride,
   passengers,
   itineraries,
   paymentMethods,
@@ -1858,6 +2141,8 @@ function SeatChangeFlowModal({
   onSelectPaymentMethod,
   paymentUiState,
   onClose,
+  onBackToEdit,
+  onRetryPayment,
   onRefreshPreview,
   onPreviewContinue,
   onCreatePayment,
@@ -1876,7 +2161,12 @@ function SeatChangeFlowModal({
   confirmSubmitting: boolean;
   confirmResponse: SeatChangeConfirmResponse | null;
   deltas: SeatChangeDelta[];
+  additionalChargesTotal: number;
+  refundsTotal: number;
+  netAmount: number;
   resultVariant: ConfirmResultVariant;
+  resultAmountOverride: number | null;
+  resultCurrencyOverride: string | null;
   passengers: ManagePassenger[];
   itineraries: ItineraryItem[];
   paymentMethods: PaymentMethod[];
@@ -1885,6 +2175,8 @@ function SeatChangeFlowModal({
   onSelectPaymentMethod: (value: string) => void;
   paymentUiState: PaymentUiState;
   onClose: () => void;
+  onBackToEdit: () => void;
+  onRetryPayment: () => void;
   onRefreshPreview: () => void;
   onPreviewContinue: () => void;
   onCreatePayment: () => void;
@@ -1947,6 +2239,10 @@ function SeatChangeFlowModal({
             previewLoading={previewLoading}
             previewError={previewError}
             previewResponse={previewResponse}
+            deltas={deltas}
+            additionalChargesTotal={additionalChargesTotal}
+            refundsTotal={refundsTotal}
+            netAmount={netAmount}
             passengers={passengers}
             itineraries={itineraries}
             confirmSubmitting={confirmSubmitting}
@@ -1960,6 +2256,7 @@ function SeatChangeFlowModal({
             previewResponse={previewResponse}
             confirmResponse={confirmResponse}
             deltas={deltas}
+            netAmount={netAmount}
             itineraries={itineraries}
             paymentMethods={paymentMethods}
             paymentMethodsLoading={paymentMethodsLoading}
@@ -1973,11 +2270,16 @@ function SeatChangeFlowModal({
         ) : (
           <SeatChangeResultStage
             variant={resultVariant}
-            amount={Math.abs(
-              confirmResponse?.summary.netAmount ?? previewResponse?.summary.netAmount ?? 0
-            )}
-            currency={confirmResponse?.currency ?? previewResponse?.currency ?? currency}
+            amount={Math.abs(resultAmountOverride ?? netAmount)}
+            currency={
+              resultCurrencyOverride ??
+              confirmResponse?.currency ??
+              previewResponse?.currency ??
+              currency
+            }
             refundMethod={confirmResponse?.refundMethod ?? null}
+            onBackToEdit={onBackToEdit}
+            onRetryPayment={onRetryPayment}
             onDone={onResultDone}
           />
         )}
@@ -1990,6 +2292,10 @@ function SeatChangePreviewStage({
   previewLoading,
   previewError,
   previewResponse,
+  deltas,
+  additionalChargesTotal,
+  refundsTotal,
+  netAmount,
   passengers,
   itineraries,
   confirmSubmitting,
@@ -2001,6 +2307,10 @@ function SeatChangePreviewStage({
   previewLoading: boolean;
   previewError: string | null;
   previewResponse: SeatChangePreviewResponse | null;
+  deltas: SeatChangeDelta[];
+  additionalChargesTotal: number;
+  refundsTotal: number;
+  netAmount: number;
   passengers: ManagePassenger[];
   itineraries: ItineraryItem[];
   confirmSubmitting: boolean;
@@ -2009,45 +2319,60 @@ function SeatChangePreviewStage({
   onContinue: () => void;
   onBack: () => void;
 }) {
+  const effectiveSettlementType =
+    netAmount > 0 ? 'COLLECT_PAYMENT' : netAmount < 0 ? 'REFUND' : 'NONE';
   const title =
-    previewResponse?.settlementType === 'COLLECT_PAYMENT'
+    effectiveSettlementType === 'COLLECT_PAYMENT'
       ? 'Additional payment required'
-      : previewResponse?.settlementType === 'REFUND'
+      : effectiveSettlementType === 'REFUND'
         ? 'Confirm refund'
         : 'Confirm seat changes';
   const ctaLabel =
-    previewResponse?.settlementType === 'COLLECT_PAYMENT'
+    effectiveSettlementType === 'COLLECT_PAYMENT'
       ? 'Continue'
-      : previewResponse?.settlementType === 'REFUND'
+      : effectiveSettlementType === 'REFUND'
         ? 'Confirm refund'
         : 'Confirm changes';
   const note =
-    previewResponse?.settlementType === 'COLLECT_PAYMENT'
+    effectiveSettlementType === 'COLLECT_PAYMENT'
       ? 'Seat availability has been revalidated. Continue to payment after confirmation.'
-      : previewResponse?.settlementType === 'REFUND'
+      : effectiveSettlementType === 'REFUND'
         ? 'Refund amount will be processed after confirmation.'
         : 'Seat availability has been revalidated before confirming these changes.';
   const previewItems = useMemo<SeatChangePreviewCardItem[]>(() => {
-    if (!previewResponse) return [];
-    return previewResponse.items.map((item) => {
-      const passenger = passengers.find((entry) => entry.passengerId === item.passengerId) ?? null;
-      const itinerary = itineraries.find((entry) => entry.flightId === item.flightId) ?? null;
-      const passengerName = passenger
-        ? [passenger.lastName, passenger.firstName].filter(Boolean).join(' ').trim()
-        : `Passenger ${item.passengerId}`;
+    return deltas
+      .filter((delta) => delta.changed)
+      .filter((delta) =>
+        effectiveSettlementType === 'COLLECT_PAYMENT'
+          ? delta.delta > 0
+          : effectiveSettlementType === 'REFUND'
+            ? delta.delta < 0
+            : true
+      )
+      .map((delta) => {
+        const passenger =
+          passengers.find((entry) => entry.passengerId === delta.passengerId) ?? null;
+        const itinerary = itineraries.find((entry) => entry.flightId === delta.flightId) ?? null;
+        const passengerName = passenger
+          ? [passenger.lastName, passenger.firstName].filter(Boolean).join(' ').trim()
+          : delta.passengerName;
 
-      return {
-        key: `${item.flightId}-${item.passengerId}-${item.toSeatId ?? 'none'}`,
-        passengerName: item.passengerName?.trim() || passengerName,
-        flightLabel:
-          formatSeatChangeFlightLabelFromPreviewItem(item) ||
-          formatSeatChangeFlightLabelSafe(itinerary) ||
-          `Flight #${item.flightId}`,
-        seatChangeLabel: formatSeatChangeSeatLabelSafe(item.fromSeatNumber, item.toSeatNumber),
-        delta: item.delta,
-      };
-    });
-  }, [itineraries, passengers, previewResponse]);
+        return {
+          key: `${delta.flightId}-${delta.passengerId}-${delta.currentSeatNumber ?? 'none'}`,
+          passengerName: passengerName || delta.passengerName,
+          flightLabel: formatSeatChangeFlightLabelSafe(itinerary) || `Flight #${delta.flightId}`,
+          seatChangeLabel: formatSeatChangeSeatLabelSafe(
+            delta.originalSeatNumber,
+            delta.currentSeatNumber
+          ),
+          surchargeLabel:
+            delta.originalSurcharge > 0
+              ? `Seat surcharge: ${formatMoney(delta.originalSurcharge, delta.currency)} \u2192 ${formatMoney(delta.currentSurcharge, delta.currency)}`
+              : null,
+          delta: delta.delta,
+        };
+      });
+  }, [deltas, effectiveSettlementType, itineraries, passengers]);
 
   if (previewLoading) {
     return (
@@ -2067,9 +2392,9 @@ function SeatChangePreviewStage({
     <>
       <div className="flex items-start gap-3 pr-10">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-midnight-burgundy/10">
-          {previewResponse?.settlementType === 'COLLECT_PAYMENT' ? (
+          {effectiveSettlementType === 'COLLECT_PAYMENT' ? (
             <CreditCard className="h-5 w-5 text-midnight-burgundy" strokeWidth={2} />
-          ) : previewResponse?.settlementType === 'REFUND' ? (
+          ) : effectiveSettlementType === 'REFUND' ? (
             <Wallet className="h-5 w-5 text-emerald-600" strokeWidth={2} />
           ) : (
             <CheckCircle2 className="h-5 w-5 text-emerald-600" strokeWidth={2} />
@@ -2104,6 +2429,9 @@ function SeatChangePreviewStage({
                     <p className="mt-1 text-xs font-semibold text-on-surface">
                       {item.seatChangeLabel}
                     </p>
+                    {item.surchargeLabel ? (
+                      <p className="mt-1 text-xs text-on-surface-variant">{item.surchargeLabel}</p>
+                    ) : null}
                   </div>
                   <span
                     className={`text-sm font-bold ${
@@ -2126,39 +2454,36 @@ function SeatChangePreviewStage({
           </div>
 
           <dl className="mt-5 rounded-xl border border-outline-variant/30 bg-surface p-4 text-sm">
-            {previewResponse.settlementType !== 'REFUND' ? (
+            {effectiveSettlementType !== 'REFUND' ? (
               <div className="flex items-center justify-between">
                 <dt className="text-on-surface-variant">Additional charges</dt>
                 <dd className="font-bold text-on-surface">
-                  {previewResponse.summary.additionalAmount > 0
-                    ? `+${formatMoney(previewResponse.summary.additionalAmount, previewResponse.currency)}`
+                  {additionalChargesTotal > 0
+                    ? `+${formatMoney(additionalChargesTotal, previewResponse.currency)}`
                     : '—'}
                 </dd>
               </div>
             ) : null}
-            {previewResponse.settlementType !== 'COLLECT_PAYMENT' ? (
+            {effectiveSettlementType !== 'COLLECT_PAYMENT' ? (
               <div
-                className={`${previewResponse.settlementType !== 'REFUND' ? 'mt-2 ' : ''}flex items-center justify-between`}
+                className={`${effectiveSettlementType !== 'REFUND' ? 'mt-2 ' : ''}flex items-center justify-between`}
               >
                 <dt className="text-on-surface-variant">Refunds</dt>
                 <dd className="font-bold text-emerald-600">
-                  {previewResponse.summary.refundAmount > 0
-                    ? `-${formatMoney(previewResponse.summary.refundAmount, previewResponse.currency)}`
+                  {refundsTotal > 0
+                    ? `-${formatMoney(refundsTotal, previewResponse.currency)}`
                     : '—'}
                 </dd>
               </div>
             ) : null}
             <div className="mt-3 flex items-center justify-between border-t border-outline-variant/20 pt-3">
               <dt className="text-[0.6875rem] font-black uppercase tracking-[0.22em] text-midnight-burgundy">
-                {previewResponse.settlementType === 'REFUND' ? 'Net refund' : 'Net amount'}
+                {effectiveSettlementType === 'REFUND' ? 'Net refund' : 'Net amount'}
               </dt>
               <dd className="font-headline text-xl font-black text-midnight-burgundy">
-                {previewResponse.summary.netAmount === 0
+                {netAmount === 0
                   ? '—'
-                  : formatMoney(
-                      Math.abs(previewResponse.summary.netAmount),
-                      previewResponse.currency || currency
-                    )}
+                  : formatMoney(Math.abs(netAmount), previewResponse.currency || currency)}
               </dd>
             </div>
           </dl>
@@ -2198,6 +2523,7 @@ function SeatChangePaymentStage({
   previewResponse,
   confirmResponse,
   deltas,
+  netAmount,
   itineraries: _itineraries,
   paymentMethods,
   paymentMethodsLoading,
@@ -2211,6 +2537,7 @@ function SeatChangePaymentStage({
   previewResponse: SeatChangePreviewResponse | null;
   confirmResponse: SeatChangeConfirmResponse | null;
   deltas: SeatChangeDelta[];
+  netAmount: number;
   itineraries: ItineraryItem[];
   paymentMethods: PaymentMethod[];
   paymentMethodsLoading: boolean;
@@ -2222,7 +2549,7 @@ function SeatChangePaymentStage({
   onCreatePayment: () => void;
 }) {
   const changedDeltas = deltas.filter((delta) => delta.changed);
-  const amountDue = confirmResponse?.summary.netAmount ?? previewResponse?.summary.netAmount ?? 0;
+  const amountDue = Math.max(0, netAmount);
 
   return (
     <>
@@ -2361,6 +2688,8 @@ function SeatChangeResultStage({
   amount,
   currency,
   refundMethod,
+  onBackToEdit,
+  onRetryPayment,
   onDone,
 }: {
   variant: ConfirmResultVariant;
@@ -2371,6 +2700,8 @@ function SeatChangeResultStage({
     maskedAccount?: string | null;
     estimatedDays: string;
   } | null;
+  onBackToEdit: () => void;
+  onRetryPayment: () => void;
   onDone: () => void;
 }) {
   if (variant === 'refund_submitted') {
@@ -2420,6 +2751,62 @@ function SeatChangeResultStage({
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-midnight-burgundy px-5 text-sm font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-[0.99]"
           >
             Done
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  const paymentResultVm = buildSeatChangePaymentResultViewModel(variant);
+  if (paymentResultVm) {
+    const icon =
+      paymentResultVm.icon === 'error' ? (
+        <X className="h-5 w-5 text-rose-700" strokeWidth={2.25} />
+      ) : (
+        <Clock className="h-5 w-5 text-amber-700" strokeWidth={2.25} />
+      );
+
+    return (
+      <>
+        <div className="flex items-start gap-3">
+          <div
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+              paymentResultVm.icon === 'error' ? 'bg-rose-50' : 'bg-amber-50'
+            }`}
+          >
+            {icon}
+          </div>
+          <div className="pt-1">
+            <h2 className="font-headline text-xl font-black text-on-surface">
+              {paymentResultVm.title}
+            </h2>
+            <p className="mt-1.5 text-sm text-on-surface-variant">{paymentResultVm.message}</p>
+          </div>
+        </div>
+
+        <dl className="mt-5 rounded-xl border border-outline-variant/30 bg-surface p-4 text-sm">
+          <div className="flex items-center justify-between">
+            <dt className="text-on-surface-variant">Amount due</dt>
+            <dd className="font-headline text-lg font-black text-midnight-burgundy">
+              {formatMoney(amount, currency)}
+            </dd>
+          </div>
+        </dl>
+
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onBackToEdit}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-outline-variant/50 bg-surface px-5 text-sm font-bold text-midnight-burgundy transition-colors hover:border-midnight-burgundy/40"
+          >
+            Back to edit
+          </button>
+          <button
+            type="button"
+            onClick={onRetryPayment}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-midnight-burgundy px-5 text-sm font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-[0.99]"
+          >
+            {paymentResultVm.actionLabel}
           </button>
         </div>
       </>

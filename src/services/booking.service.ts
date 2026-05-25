@@ -6,7 +6,11 @@ import {
   getMockCancellationSelectionPreviewResponse,
   getMockBookingLookupResponse,
   getMockManageOptionsResponse,
+  getMockServiceChangeConfirmResponse,
+  getMockServiceChangePreviewResponse,
   getMockSeatMapResponse,
+  getMockSeatChangeConfirmResponse,
+  getMockSeatChangePreviewResponse,
   isManageBookingMockVariant,
   type ManageBookingMockVariant,
 } from '../mocks/manageBooking';
@@ -33,6 +37,14 @@ import type {
   SeatChangeResponse,
   SeatAssignmentRequest,
   SeatAssignmentResponse,
+  ServiceChangeConfirmRequest,
+  ServiceChangeConfirmResponse,
+  ServiceChangePreviewRequest,
+  ServiceChangePreviewResponse,
+  SeatChangeConfirmRequest,
+  SeatChangeConfirmResponse,
+  SeatChangePreviewRequest,
+  SeatChangePreviewResponse,
   SeatUnassignmentRequest,
   SeatUnassignmentResponse,
 } from '../types/booking.types';
@@ -174,6 +186,7 @@ function syncMockLookupPassengerSelections(session: ManageBookingMockSession): v
     const services = session.manageOptions.serviceSelections
       .filter((selection) => selection.passengerId === passenger.passengerId)
       .map((selection) => ({
+        flightId: selection.flightId,
         serviceId: selection.serviceId ?? 0,
         serviceType: selection.serviceType ?? 'SERVICE',
         serviceName: selection.serviceName ?? 'Service',
@@ -277,6 +290,7 @@ function buildMockServicesResponse(session: ManageBookingMockSession): PutBookin
       selections: session.manageOptions.serviceSelections
         .filter((selection) => selection.passengerId === passenger.passengerId)
         .map((selection) => ({
+          flightId: selection.flightId,
           serviceId: selection.serviceId ?? 0,
           serviceType: selection.serviceType ?? 'SERVICE',
           serviceName: selection.serviceName ?? 'Service',
@@ -683,6 +697,102 @@ export async function previewCancellationBySelection(
   return raw;
 }
 
+export async function previewSeatChanges(
+  bookingId: string | number,
+  body: SeatChangePreviewRequest
+): Promise<SeatChangePreviewResponse> {
+  const mockVariant =
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
+  if (mockVariant) {
+    return Promise.resolve(cloneMock(getMockSeatChangePreviewResponse(mockVariant, body)));
+  }
+  const id = typeof bookingId === 'string' ? bookingId : String(bookingId);
+  const res = await api.post<SeatChangePreviewResponse | { data?: SeatChangePreviewResponse }>(
+    `/api/bookings/${id}/seat-changes/preview`,
+    body
+  );
+  const raw = unwrapData(res.data) as SeatChangePreviewResponse;
+  if (
+    !raw ||
+    typeof raw !== 'object' ||
+    typeof raw.bookingId !== 'number' ||
+    !Array.isArray(raw.items)
+  ) {
+    throw new Error('Seat change preview failed');
+  }
+  return raw;
+}
+
+export async function confirmSeatChanges(
+  bookingId: string | number,
+  body: SeatChangeConfirmRequest
+): Promise<SeatChangeConfirmResponse> {
+  const mockVariant =
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
+  if (mockVariant) {
+    return Promise.resolve(cloneMock(getMockSeatChangeConfirmResponse(mockVariant, body)));
+  }
+  const id = typeof bookingId === 'string' ? bookingId : String(bookingId);
+  const res = await api.post<SeatChangeConfirmResponse | { data?: SeatChangeConfirmResponse }>(
+    `/api/bookings/${id}/seat-changes/confirm`,
+    body
+  );
+  const raw = unwrapData(res.data) as SeatChangeConfirmResponse;
+  if (!raw || typeof raw !== 'object' || typeof raw.bookingId !== 'number') {
+    throw new Error('Seat change confirmation failed');
+  }
+  return raw;
+}
+
+export async function previewServiceChanges(
+  bookingId: string | number,
+  body: ServiceChangePreviewRequest
+): Promise<ServiceChangePreviewResponse> {
+  const mockVariant =
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
+  if (mockVariant) {
+    return Promise.resolve(cloneMock(getMockServiceChangePreviewResponse(mockVariant, body)));
+  }
+  const id = typeof bookingId === 'string' ? bookingId : String(bookingId);
+  const res = await api.post<
+    ServiceChangePreviewResponse | { data?: ServiceChangePreviewResponse }
+  >(`/api/bookings/${id}/service-changes/preview`, body);
+  const raw = unwrapData(res.data) as ServiceChangePreviewResponse;
+  if (
+    !raw ||
+    typeof raw !== 'object' ||
+    typeof raw.bookingId !== 'number' ||
+    !Array.isArray(raw.items)
+  ) {
+    throw new Error('Service change preview failed');
+  }
+  return raw;
+}
+
+export async function confirmServiceChanges(
+  bookingId: string | number,
+  body: ServiceChangeConfirmRequest
+): Promise<ServiceChangeConfirmResponse> {
+  const mockVariant =
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
+  if (mockVariant) {
+    return Promise.resolve(cloneMock(getMockServiceChangeConfirmResponse(mockVariant, body)));
+  }
+  const id = typeof bookingId === 'string' ? bookingId : String(bookingId);
+  const res = await api.post<
+    ServiceChangeConfirmResponse | { data?: ServiceChangeConfirmResponse }
+  >(`/api/bookings/${id}/service-changes/confirm`, body);
+  const raw = unwrapData(res.data) as ServiceChangeConfirmResponse;
+  if (!raw || typeof raw !== 'object' || typeof raw.bookingId !== 'number') {
+    throw new Error('Service change confirmation failed');
+  }
+  return raw;
+}
+
 export async function confirmCancellation(
   bookingId: string | number,
   body: BookingCancellationConfirmRequest
@@ -953,6 +1063,10 @@ export const bookingService = {
   getBookingTickets,
   previewCancellation,
   previewCancellationBySelection,
+  previewSeatChanges,
+  confirmSeatChanges,
+  previewServiceChanges,
+  confirmServiceChanges,
   confirmCancellation,
   putSeatAssignments,
   deleteSeatAssignments,

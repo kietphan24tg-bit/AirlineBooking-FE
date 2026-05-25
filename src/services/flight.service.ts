@@ -1,6 +1,7 @@
 import api from '../api/axios';
 import {
   getMockSeatMapResponse,
+  getMockServiceCatalogResponse,
   isManageBookingMockVariant,
   type ManageBookingMockVariant,
 } from '../mocks/manageBooking';
@@ -484,6 +485,11 @@ export async function getServicesMapped(
   flightId: number,
   fareId: number
 ): Promise<ServiceCatalogResponse> {
+  const mockVariant = resolveMockManageVariantForFlights();
+  if (mockVariant) {
+    const mockCatalog = getMockServiceCatalogResponse(mockVariant, flightId, fareId);
+    if (mockCatalog) return normalizeServiceCatalog(mockCatalog);
+  }
   const res = await api.get<ServiceCatalogResponse | { data?: ServiceCatalogResponse }>(
     '/api/services',
     {

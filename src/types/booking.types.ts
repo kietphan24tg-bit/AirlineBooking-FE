@@ -213,6 +213,7 @@ export type SeatChangeResponse = SeatAssignmentResponse;
 
 // PUT /api/bookings/{bookingId}/services
 export interface BookingServiceSelectionInput {
+  flightId?: number;
   optionId: number;
   quantity: number;
 }
@@ -250,6 +251,85 @@ export interface PutBookingServicesResponse {
   passengers: PassengerWithServiceSelections[];
 }
 
+export type ServiceChangeSettlementType = 'NONE' | 'COLLECT_PAYMENT' | 'REFUND';
+
+export interface ServiceChangePreviewRequest {
+  passengers: Array<{
+    passengerId: number;
+    selections: BookingServiceSelectionInput[];
+  }>;
+}
+
+export interface ServiceChangePreviewItem {
+  flightId?: number;
+  passengerId: number;
+  passengerName: string | null;
+  serviceId: number | null;
+  serviceType: string | null;
+  serviceName: string | null;
+  optionId: number | null;
+  optionName: string | null;
+  quantity: number;
+  oldAmount: number;
+  newAmount: number;
+  delta: number;
+  status: string;
+  message: string | null;
+}
+
+export interface ServiceChangePreviewResponse {
+  bookingId: number;
+  currency: string;
+  previewToken: string;
+  settlementType: ServiceChangeSettlementType;
+  items: ServiceChangePreviewItem[];
+  summary: {
+    additionalAmount: number;
+    refundAmount: number;
+    netAmount: number;
+  };
+}
+
+export interface ServiceChangeConfirmRequest {
+  passengers: ServiceChangePreviewRequest['passengers'];
+  previewToken?: string | null;
+  idempotencyKey: string;
+  expectedAdditionalAmount: number;
+  expectedRefundAmount: number;
+  expectedNetAmount: number;
+}
+
+export interface ServiceChangeConfirmResponse {
+  settlementId?: number | null;
+  bookingId: number;
+  currency: string;
+  settlementType: ServiceChangeSettlementType;
+  status: 'COMPLETED' | 'REFUND_PENDING' | 'REFUND_FAILED' | 'PAYMENT_REQUIRED';
+  refundStatus?: string | null;
+  provider?: string | null;
+  providerRefundId?: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  refundMethod?: {
+    type: string;
+    label: string;
+    maskedAccount: string | null;
+    estimatedDays: string | null;
+  } | null;
+  paymentMethods?: Array<{
+    code: string;
+    label: string;
+    provider: string;
+    icon: string | null;
+    supported: boolean;
+  }> | null;
+  summary: {
+    additionalAmount: number;
+    refundAmount: number;
+    netAmount: number;
+  };
+}
+
 export interface BookingLookupRequest {
   pnrCode: string;
   lastName: string;
@@ -265,6 +345,7 @@ export interface BookingLookupSeatAssignment {
 }
 
 export interface BookingLookupServiceSelection {
+  flightId?: number;
   serviceId: number;
   serviceType: string;
   serviceName: string;
@@ -428,6 +509,7 @@ export interface BookingManageOptionsResponse {
   }>;
   serviceSelections: Array<{
     passengerId: number;
+    flightId?: number;
     serviceId: number | null;
     serviceType: string | null;
     serviceName: string | null;

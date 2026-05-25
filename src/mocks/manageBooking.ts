@@ -7,13 +7,17 @@
   BookingLookupSeatAssignment,
   BookingLookupServiceSelection,
   BookingManageOptionsResponse,
+  ServiceChangeConfirmRequest,
+  ServiceChangeConfirmResponse,
+  ServiceChangePreviewRequest,
+  ServiceChangePreviewResponse,
   SeatChangeConfirmRequest,
   SeatChangeConfirmResponse,
   SeatChangePreviewRequest,
   SeatChangePreviewResponse,
   BookingTicketResponse,
 } from '../types/booking.types';
-import type { SeatMapResponse } from '../types/flight.types';
+import type { SeatMapResponse, ServiceCatalogResponse } from '../types/flight.types';
 
 /**
  * Variants we want the UI to be able to render without a working backend.
@@ -79,19 +83,55 @@ const SEAT_ROW_SECONDARY_RETURN = {
 const SERVICE_MEAL = {
   serviceId: 5001,
   serviceType: 'MEAL',
-  serviceName: 'Premium meal',
+  serviceName: 'Pre-order Meals',
   optionId: 5101,
-  optionName: 'Mi y bo bam',
-  price: 120000,
+  optionName: 'Beef Pho Meal',
+  price: 90000,
 };
 
 const SERVICE_BAGGAGE = {
   serviceId: 5002,
   serviceType: 'BAGGAGE',
-  serviceName: 'Checked baggage',
+  serviceName: 'Baggage Add-on',
   optionId: 5201,
-  optionName: 'Goi 20kg',
-  price: 350000,
+  optionName: 'Extra 15kg',
+  price: 180000,
+};
+
+const SERVICE_MEAL_RETURN = {
+  serviceId: 5001,
+  serviceType: 'MEAL',
+  serviceName: 'Pre-order Meals',
+  optionId: 6102,
+  optionName: 'Chicken Rice Meal',
+  price: 95000,
+};
+
+const SERVICE_BAGGAGE_RETURN = {
+  serviceId: 5002,
+  serviceType: 'BAGGAGE',
+  serviceName: 'Baggage Add-on',
+  optionId: 6202,
+  optionName: 'Extra 20kg',
+  price: 250000,
+};
+
+const DEFAULT_FULL_SERVICE_FEE =
+  SERVICE_MEAL.price +
+  SERVICE_MEAL_RETURN.price +
+  SERVICE_BAGGAGE.price +
+  SERVICE_BAGGAGE_RETURN.price;
+
+const SERVICE_INSURANCE = {
+  serviceId: 5003,
+  serviceType: 'INSURANCE',
+  serviceName: 'Travel Insurance',
+};
+
+const SERVICE_LOUNGE = {
+  serviceId: 5004,
+  serviceType: 'LOUNGE',
+  serviceName: 'Airport Lounge',
 };
 
 interface VariantOverrides {
@@ -120,7 +160,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
         seatAssignmentStatus: 'BOOKED',
         includeSeats: true,
         includeServices: true,
-        serviceFee: SERVICE_MEAL.price + SERVICE_BAGGAGE.price,
+        serviceFee: DEFAULT_FULL_SERVICE_FEE,
         seatFee: 200000,
         includeReturnFlight: true,
         includeSecondaryPassenger: true,
@@ -183,7 +223,7 @@ function getVariantOverrides(variant: ManageBookingMockVariant): VariantOverride
         seatAssignmentStatus: 'CHECKED_IN',
         includeSeats: true,
         includeServices: true,
-        serviceFee: SERVICE_MEAL.price + SERVICE_BAGGAGE.price,
+        serviceFee: DEFAULT_FULL_SERVICE_FEE,
         seatFee: 200000,
         includeReturnFlight: true,
         includeSecondaryPassenger: true,
@@ -271,29 +311,57 @@ function buildLookupServices(overrides: VariantOverrides): {
   secondary: BookingLookupServiceSelection[];
 } {
   if (!overrides.includeServices) return { primary: [], secondary: [] };
+  const primary: BookingLookupServiceSelection[] = [
+    {
+      flightId: FLIGHT_OUTBOUND_ID,
+      serviceId: SERVICE_MEAL.serviceId,
+      serviceType: SERVICE_MEAL.serviceType,
+      serviceName: SERVICE_MEAL.serviceName,
+      optionId: SERVICE_MEAL.optionId,
+      optionName: SERVICE_MEAL.optionName,
+      quantity: 1,
+      price: SERVICE_MEAL.price,
+    },
+    {
+      flightId: FLIGHT_RETURN_ID,
+      serviceId: SERVICE_MEAL_RETURN.serviceId,
+      serviceType: SERVICE_MEAL_RETURN.serviceType,
+      serviceName: SERVICE_MEAL_RETURN.serviceName,
+      optionId: SERVICE_MEAL_RETURN.optionId,
+      optionName: SERVICE_MEAL_RETURN.optionName,
+      quantity: 1,
+      price: SERVICE_MEAL_RETURN.price,
+    },
+  ];
+  const secondary: BookingLookupServiceSelection[] = [
+    {
+      flightId: FLIGHT_OUTBOUND_ID,
+      serviceId: SERVICE_BAGGAGE.serviceId,
+      serviceType: SERVICE_BAGGAGE.serviceType,
+      serviceName: SERVICE_BAGGAGE.serviceName,
+      optionId: SERVICE_BAGGAGE.optionId,
+      optionName: SERVICE_BAGGAGE.optionName,
+      quantity: 1,
+      price: SERVICE_BAGGAGE.price,
+    },
+    {
+      flightId: FLIGHT_RETURN_ID,
+      serviceId: SERVICE_BAGGAGE_RETURN.serviceId,
+      serviceType: SERVICE_BAGGAGE_RETURN.serviceType,
+      serviceName: SERVICE_BAGGAGE_RETURN.serviceName,
+      optionId: SERVICE_BAGGAGE_RETURN.optionId,
+      optionName: SERVICE_BAGGAGE_RETURN.optionName,
+      quantity: 1,
+      price: SERVICE_BAGGAGE_RETURN.price,
+    },
+  ];
   return {
-    primary: [
-      {
-        serviceId: SERVICE_MEAL.serviceId,
-        serviceType: SERVICE_MEAL.serviceType,
-        serviceName: SERVICE_MEAL.serviceName,
-        optionId: SERVICE_MEAL.optionId,
-        optionName: SERVICE_MEAL.optionName,
-        quantity: 1,
-        price: SERVICE_MEAL.price,
-      },
-    ],
-    secondary: [
-      {
-        serviceId: SERVICE_BAGGAGE.serviceId,
-        serviceType: SERVICE_BAGGAGE.serviceType,
-        serviceName: SERVICE_BAGGAGE.serviceName,
-        optionId: SERVICE_BAGGAGE.optionId,
-        optionName: SERVICE_BAGGAGE.optionName,
-        quantity: 1,
-        price: SERVICE_BAGGAGE.price,
-      },
-    ],
+    primary: primary.filter(
+      (service) => overrides.includeReturnFlight || service.flightId !== FLIGHT_RETURN_ID
+    ),
+    secondary: secondary.filter(
+      (service) => overrides.includeReturnFlight || service.flightId !== FLIGHT_RETURN_ID
+    ),
   };
 }
 
@@ -548,6 +616,7 @@ export function getMockManageOptionsResponse(
   const serviceSelections: BookingManageOptionsResponse['serviceSelections'] = [
     ...lookupServices.primary.map((service) => ({
       passengerId: PASSENGER_PRIMARY_ID,
+      flightId: service.flightId,
       serviceId: service.serviceId,
       serviceType: service.serviceType,
       serviceName: service.serviceName,
@@ -558,6 +627,7 @@ export function getMockManageOptionsResponse(
     })),
     ...lookupServices.secondary.map((service) => ({
       passengerId: PASSENGER_SECONDARY_ID,
+      flightId: service.flightId,
       serviceId: service.serviceId,
       serviceType: service.serviceType,
       serviceName: service.serviceName,
@@ -829,6 +899,307 @@ function findMockSeatDetails(
   return { seatNumber: seat.seatNumber, amount: seat.extraPrice ?? 0 };
 }
 
+export function getMockServiceCatalogResponse(
+  variant: ManageBookingMockVariant,
+  flightId: number,
+  fareId: number
+): ServiceCatalogResponse | null {
+  const overrides = getVariantOverrides(variant);
+  const validFlightIds = overrides.includeReturnFlight
+    ? [FLIGHT_OUTBOUND_ID, FLIGHT_RETURN_ID]
+    : [FLIGHT_OUTBOUND_ID];
+  if (!validFlightIds.includes(flightId)) return null;
+  if (flightId === FLIGHT_OUTBOUND_ID && fareId !== FARE_OUTBOUND_ID) return null;
+  if (flightId === FLIGHT_RETURN_ID && fareId !== FARE_RETURN_ID) return null;
+
+  const formatMoney = (amount: number) => `${amount.toLocaleString('vi-VN')} ${CURRENCY}`;
+  const isReturnFlight = flightId === FLIGHT_RETURN_ID;
+  const baggageOptionBase = isReturnFlight ? 6200 : 5200;
+  const mealOptionBase = isReturnFlight ? 6100 : 5100;
+
+  return {
+    currency: CURRENCY,
+    services: [
+      {
+        serviceId: SERVICE_BAGGAGE.serviceId,
+        serviceType: SERVICE_BAGGAGE.serviceType,
+        serviceName: SERVICE_BAGGAGE.serviceName,
+        iconUrl: 'https://img.icons8.com/fluency/96/suitcase.png',
+        selectionMode: 'SINGLE',
+        options: [
+          {
+            optionId: baggageOptionBase + 1,
+            serviceId: SERVICE_BAGGAGE.serviceId,
+            serviceType: SERVICE_BAGGAGE.serviceType,
+            serviceName: SERVICE_BAGGAGE.serviceName,
+            name: 'Extra 15kg',
+            description: 'Add one checked baggage allowance up to 15kg.',
+            price: 180000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(180000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1527631746610-bca00a040d60?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+          {
+            optionId: baggageOptionBase + 2,
+            serviceId: SERVICE_BAGGAGE.serviceId,
+            serviceType: SERVICE_BAGGAGE.serviceType,
+            serviceName: SERVICE_BAGGAGE.serviceName,
+            name: 'Extra 20kg',
+            description: 'Add one checked baggage allowance up to 20kg.',
+            price: 250000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(250000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1517479149777-5f3b1511d5ad?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+          {
+            optionId: baggageOptionBase + 3,
+            serviceId: SERVICE_BAGGAGE.serviceId,
+            serviceType: SERVICE_BAGGAGE.serviceType,
+            serviceName: SERVICE_BAGGAGE.serviceName,
+            name: 'Extra 25kg',
+            description: 'Add one checked baggage allowance up to 25kg.',
+            price: 320000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(320000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+          {
+            optionId: baggageOptionBase + 4,
+            serviceId: SERVICE_BAGGAGE.serviceId,
+            serviceType: SERVICE_BAGGAGE.serviceType,
+            serviceName: SERVICE_BAGGAGE.serviceName,
+            name: 'Extra 30kg',
+            description: 'Add one checked baggage allowance up to 30kg.',
+            price: 390000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(390000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1493558103817-58b2924bce98?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+          {
+            optionId: baggageOptionBase + 5,
+            serviceId: SERVICE_BAGGAGE.serviceId,
+            serviceType: SERVICE_BAGGAGE.serviceType,
+            serviceName: SERVICE_BAGGAGE.serviceName,
+            name: 'Extra 40kg',
+            description: 'Add one checked baggage allowance up to 40kg.',
+            price: 520000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(520000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+        ],
+      },
+      {
+        serviceId: SERVICE_MEAL.serviceId,
+        serviceType: SERVICE_MEAL.serviceType,
+        serviceName: SERVICE_MEAL.serviceName,
+        iconUrl: 'https://img.icons8.com/fluency/96/meal.png',
+        selectionMode: 'SINGLE',
+        options: [
+          {
+            optionId: mealOptionBase + 1,
+            serviceId: SERVICE_MEAL.serviceId,
+            serviceType: SERVICE_MEAL.serviceType,
+            serviceName: SERVICE_MEAL.serviceName,
+            name: 'Beef Pho Meal',
+            description: 'Hot Vietnamese beef pho served with beverage.',
+            price: 90000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(90000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+          {
+            optionId: mealOptionBase + 2,
+            serviceId: SERVICE_MEAL.serviceId,
+            serviceType: SERVICE_MEAL.serviceType,
+            serviceName: SERVICE_MEAL.serviceName,
+            name: 'Chicken Rice Meal',
+            description: 'Hot chicken rice meal with seasonal side dish.',
+            price: 95000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(95000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+          {
+            optionId: mealOptionBase + 3,
+            serviceId: SERVICE_MEAL.serviceId,
+            serviceType: SERVICE_MEAL.serviceType,
+            serviceName: SERVICE_MEAL.serviceName,
+            name: 'Vegetarian Delight',
+            description: 'Vegetarian meal with fresh vegetables and rice.',
+            price: 95000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(95000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+          {
+            optionId: mealOptionBase + 4,
+            serviceId: SERVICE_MEAL.serviceId,
+            serviceType: SERVICE_MEAL.serviceType,
+            serviceName: SERVICE_MEAL.serviceName,
+            name: 'Halal Chicken Meal',
+            description: 'Halal-certified chicken meal with side vegetables.',
+            price: 110000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(110000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1604908554027-97a5bbdf3f1c?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+          {
+            optionId: mealOptionBase + 5,
+            serviceId: SERVICE_MEAL.serviceId,
+            serviceType: SERVICE_MEAL.serviceType,
+            serviceName: SERVICE_MEAL.serviceName,
+            name: 'Kids Pasta Set',
+            description: 'Child-friendly pasta set with juice and dessert.',
+            price: 85000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(85000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+          {
+            optionId: 5106,
+            serviceId: SERVICE_MEAL.serviceId,
+            serviceType: SERVICE_MEAL.serviceType,
+            serviceName: SERVICE_MEAL.serviceName,
+            name: 'Premium Combo Meal',
+            description: 'Upgraded meal with main course, dessert, and beverage.',
+            price: 150000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(150000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+        ],
+      },
+      {
+        serviceId: SERVICE_INSURANCE.serviceId,
+        serviceType: SERVICE_INSURANCE.serviceType,
+        serviceName: SERVICE_INSURANCE.serviceName,
+        iconUrl: 'https://img.icons8.com/fluency/96/health-book.png',
+        selectionMode: 'SINGLE',
+        options: [
+          {
+            optionId: 5311,
+            serviceId: SERVICE_INSURANCE.serviceId,
+            serviceType: SERVICE_INSURANCE.serviceType,
+            serviceName: SERVICE_INSURANCE.serviceName,
+            name: 'Domestic Basic Cover',
+            description: 'Medical and trip protection for domestic itineraries.',
+            price: 65000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(65000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+          {
+            optionId: 5312,
+            serviceId: SERVICE_INSURANCE.serviceId,
+            serviceType: SERVICE_INSURANCE.serviceType,
+            serviceName: SERVICE_INSURANCE.serviceName,
+            name: 'Domestic Premium Cover',
+            description: 'Expanded medical, baggage, and delay protection for domestic trips.',
+            price: 99000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(99000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1521790797524-b2497295b8a0?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+          {
+            optionId: 5313,
+            serviceId: SERVICE_INSURANCE.serviceId,
+            serviceType: SERVICE_INSURANCE.serviceType,
+            serviceName: SERVICE_INSURANCE.serviceName,
+            name: 'International Basic Cover',
+            description: 'Essential overseas medical and baggage protection.',
+            price: 160000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(160000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+          {
+            optionId: 5314,
+            serviceId: SERVICE_INSURANCE.serviceId,
+            serviceType: SERVICE_INSURANCE.serviceType,
+            serviceName: SERVICE_INSURANCE.serviceName,
+            name: 'International Premium Cover',
+            description:
+              'Comprehensive international protection including delays and missed connections.',
+            price: 245000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(245000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+        ],
+      },
+      {
+        serviceId: SERVICE_LOUNGE.serviceId,
+        serviceType: SERVICE_LOUNGE.serviceType,
+        serviceName: SERVICE_LOUNGE.serviceName,
+        iconUrl: 'https://img.icons8.com/fluency/96/lounge-chair.png',
+        selectionMode: 'SINGLE',
+        options: [
+          {
+            optionId: 5411,
+            serviceId: SERVICE_LOUNGE.serviceId,
+            serviceType: SERVICE_LOUNGE.serviceType,
+            serviceName: SERVICE_LOUNGE.serviceName,
+            name: 'Domestic Lounge Pass',
+            description: 'Single-use domestic lounge access with snacks and Wi-Fi.',
+            price: 350000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(350000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1540339832862-474599807836?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+          {
+            optionId: 5412,
+            serviceId: SERVICE_LOUNGE.serviceId,
+            serviceType: SERVICE_LOUNGE.serviceType,
+            serviceName: SERVICE_LOUNGE.serviceName,
+            name: 'International Lounge Pass',
+            description:
+              'Single-use international lounge access with refreshments and shower facilities.',
+            price: 550000,
+            currency: CURRENCY,
+            priceLabel: formatMoney(550000),
+            imageUrl:
+              'https://images.unsplash.com/photo-1556388158-158ea5ccacbd?auto=format&fit=crop&w=800&q=80',
+            isActive: true,
+          },
+        ],
+      },
+    ],
+  };
+}
+
 export function getMockSeatChangePreviewResponse(
   variant: ManageBookingMockVariant,
   body: SeatChangePreviewRequest
@@ -909,6 +1280,228 @@ export function getMockSeatChangeConfirmResponse(
             estimatedDays: '3-7 business days',
           }
         : null,
+    summary: preview.summary,
+  };
+}
+
+export function getMockServiceChangePreviewResponse(
+  variant: ManageBookingMockVariant,
+  body: ServiceChangePreviewRequest
+): ServiceChangePreviewResponse {
+  const lookup = getMockBookingLookupResponse(variant);
+  const manageOptions = getMockManageOptionsResponse(variant);
+  const currentByPassenger = new Map<number, BookingLookupServiceSelection[]>();
+  for (const passenger of lookup.passengers) {
+    currentByPassenger.set(passenger.passengerId, [
+      ...(passenger.selections?.services ?? passenger.serviceSelections ?? []),
+    ]);
+  }
+
+  const itineraryByFlightId = new Map(
+    lookup.itineraries.map((itinerary) => [itinerary.flightId, itinerary])
+  );
+  const optionCatalogByFlightId = new Map<
+    number,
+    Map<
+      number,
+      {
+        serviceId: number;
+        serviceType: string;
+        serviceName: string;
+        name: string;
+        price: number;
+      }
+    >
+  >();
+  for (const itinerary of manageOptions.itineraries) {
+    const catalog = getMockServiceCatalogResponse(variant, itinerary.flightId, itinerary.fareId);
+    optionCatalogByFlightId.set(
+      itinerary.flightId,
+      new Map(
+        (catalog?.services ?? []).flatMap((service) =>
+          service.options.map((option) => [
+            option.optionId,
+            {
+              serviceId: option.serviceId,
+              serviceType: option.serviceType,
+              serviceName: option.serviceName,
+              name: option.name,
+              price: option.price,
+            },
+          ])
+        )
+      )
+    );
+  }
+
+  const selectionKey = (flightId: number | null, serviceId: number | null) =>
+    `${flightId ?? 'booking'}:${serviceId ?? 'unknown'}`;
+
+  const items = body.passengers.flatMap((passenger) => {
+    const currentSelections = currentByPassenger.get(passenger.passengerId) ?? [];
+    const passengerView = lookup.passengers.find(
+      (entry) => entry.passengerId === passenger.passengerId
+    );
+    const passengerName = passengerView
+      ? [passengerView.lastName, passengerView.firstName].filter(Boolean).join(' ')
+      : `Passenger ${passenger.passengerId}`;
+
+    const currentByGroup = new Map(
+      currentSelections.map((selection) => [
+        selectionKey(selection.flightId ?? null, selection.serviceId ?? null),
+        selection,
+      ])
+    );
+    const requestedByGroup = new Map<
+      string,
+      {
+        flightId: number | null;
+        optionId: number;
+        quantity: number;
+        serviceId: number | null;
+        serviceType: string | null;
+        serviceName: string | null;
+        optionName: string | null;
+        unitPrice: number;
+      }
+    >();
+
+    for (const selection of passenger.selections) {
+      const flightId = selection.flightId ?? null;
+      const optionDetails =
+        flightId != null ? optionCatalogByFlightId.get(flightId)?.get(selection.optionId) : null;
+      const fallbackCurrent =
+        flightId != null
+          ? (currentSelections.find(
+              (entry) => entry.flightId === flightId && entry.optionId === selection.optionId
+            ) ?? null)
+          : (currentSelections.find((entry) => entry.optionId === selection.optionId) ?? null);
+      const serviceId = optionDetails?.serviceId ?? fallbackCurrent?.serviceId ?? null;
+      const groupKey = selectionKey(flightId, serviceId);
+
+      requestedByGroup.set(groupKey, {
+        flightId,
+        optionId: selection.optionId,
+        quantity: selection.quantity,
+        serviceId,
+        serviceType: optionDetails?.serviceType ?? fallbackCurrent?.serviceType ?? null,
+        serviceName: optionDetails?.serviceName ?? fallbackCurrent?.serviceName ?? null,
+        optionName: optionDetails?.name ?? fallbackCurrent?.optionName ?? null,
+        unitPrice:
+          optionDetails?.price ??
+          (fallbackCurrent
+            ? fallbackCurrent.price / Math.max(1, fallbackCurrent.quantity)
+            : 250000),
+      });
+    }
+
+    const groupKeys = new Set([...currentByGroup.keys(), ...requestedByGroup.keys()]);
+    return [...groupKeys]
+      .map((groupKey) => {
+        const current = currentByGroup.get(groupKey) ?? null;
+        const requested = requestedByGroup.get(groupKey) ?? null;
+        const flightId = requested?.flightId ?? current?.flightId ?? null;
+        const quantity = requested?.quantity ?? 0;
+        const oldAmount = current ? current.price : 0;
+        const newAmount = requested ? requested.unitPrice * requested.quantity : 0;
+        const delta = newAmount - oldAmount;
+
+        if (delta === 0 && (current?.quantity ?? 0) === quantity) {
+          return null;
+        }
+
+        return {
+          flightId: flightId ?? undefined,
+          passengerId: passenger.passengerId,
+          passengerName,
+          serviceId: requested?.serviceId ?? current?.serviceId ?? null,
+          serviceType: requested?.serviceType ?? current?.serviceType ?? 'SERVICE',
+          serviceName: requested?.serviceName ?? current?.serviceName ?? 'Service',
+          optionId: requested?.optionId ?? current?.optionId ?? null,
+          optionName: requested?.optionName ?? current?.optionName ?? null,
+          quantity,
+          oldAmount,
+          newAmount,
+          delta,
+          status: 'VALID',
+          message:
+            flightId != null && !itineraryByFlightId.has(flightId)
+              ? 'Selected flight is not available in this booking.'
+              : null,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item != null);
+  });
+
+  const additionalAmount = items.reduce((sum, item) => sum + Math.max(0, item.delta), 0);
+  const refundAmount = items.reduce((sum, item) => sum + Math.max(0, -item.delta), 0);
+  const netAmount = additionalAmount - refundAmount;
+  const settlementType: ServiceChangePreviewResponse['settlementType'] =
+    netAmount > 0 ? 'COLLECT_PAYMENT' : netAmount < 0 ? 'REFUND' : 'NONE';
+
+  return {
+    bookingId: lookup.booking.bookingId,
+    currency: lookup.booking.currency,
+    previewToken: `svcchg_prev_${Date.now()}`,
+    settlementType,
+    items,
+    summary: {
+      additionalAmount,
+      refundAmount,
+      netAmount,
+    },
+  };
+}
+
+export function getMockServiceChangeConfirmResponse(
+  variant: ManageBookingMockVariant,
+  body: ServiceChangeConfirmRequest
+): ServiceChangeConfirmResponse {
+  const preview = getMockServiceChangePreviewResponse(variant, { passengers: body.passengers });
+  return {
+    settlementId: preview.settlementType === 'COLLECT_PAYMENT' ? Date.now() : null,
+    bookingId: preview.bookingId,
+    currency: preview.currency,
+    settlementType: preview.settlementType,
+    status:
+      preview.settlementType === 'COLLECT_PAYMENT'
+        ? 'PAYMENT_REQUIRED'
+        : preview.settlementType === 'REFUND'
+          ? 'REFUND_PENDING'
+          : 'COMPLETED',
+    refundStatus: preview.settlementType === 'REFUND' ? 'SUCCEEDED' : null,
+    provider: preview.settlementType === 'REFUND' ? 'STRIPE' : null,
+    providerRefundId: preview.settlementType === 'REFUND' ? `mock_refund_${Date.now()}` : null,
+    errorCode: null,
+    errorMessage: null,
+    refundMethod:
+      preview.settlementType === 'REFUND'
+        ? {
+            type: 'CARD',
+            label: 'Visa',
+            maskedAccount: '**** 4242',
+            estimatedDays: '3-7 business days',
+          }
+        : null,
+    paymentMethods:
+      preview.settlementType === 'COLLECT_PAYMENT'
+        ? [
+            {
+              code: 'PAYOS_QR',
+              label: 'Mobile Banking (VietQR)',
+              provider: 'PAYOS',
+              icon: null,
+              supported: true,
+            },
+            {
+              code: 'STRIPE_CARD',
+              label: 'International credit or debit card',
+              provider: 'STRIPE',
+              icon: null,
+              supported: true,
+            },
+          ]
+        : [],
     summary: preview.summary,
   };
 }

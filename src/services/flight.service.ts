@@ -10,6 +10,8 @@ import { useBookingStore } from '../stores/useBookingStore';
 import type {
   CabinClassKey,
   CabinFare,
+  FlightCalendarDay,
+  FlightCalendarSearchResult,
   FlightLeg,
   FlightPriceRange,
   FlightRevalidateFareRequest,
@@ -91,6 +93,30 @@ export interface FlightSearchDataDto {
 export type FlightSearchApiEnvelope = {
   success?: boolean;
   data?: FlightSearchDataDto;
+  message?: string;
+};
+
+export interface FlightCalendarDayDto {
+  date: string;
+  available: boolean;
+  lowestPrice: number | null;
+  highestPrice: number | null;
+  currency: string | null;
+  flightCount: number;
+  flights: SearchFlightDto[];
+}
+
+export interface FlightCalendarSearchDataDto {
+  centerDate: string;
+  selectedDate: string;
+  currency: string | null;
+  days: FlightCalendarDayDto[];
+  selectedDay: FlightCalendarDayDto | null;
+}
+
+export type FlightCalendarSearchApiEnvelope = {
+  success?: boolean;
+  data?: FlightCalendarSearchDataDto;
   message?: string;
 };
 
@@ -350,6 +376,45 @@ function mapBundle(
   };
 }
 
+function mapCalendarDay(
+  day: FlightCalendarDayDto,
+  criteria: FlightSearchCriteria
+): FlightCalendarDay {
+  const originCode = criteria.from.toUpperCase();
+  const destCode = criteria.to.toUpperCase();
+  const originCity = criteria.fromCity?.trim() || originCode;
+  const destCity = criteria.toCity?.trim() || destCode;
+  const ctx: AirportCityContext = { originCode, destCode, originCity, destCity };
+
+  return {
+    date: day.date,
+    available: day.available,
+    lowestPrice: day.lowestPrice,
+    highestPrice: day.highestPrice,
+    currency: day.currency,
+    flightCount: day.flightCount,
+    flights: (day.flights ?? []).map((flight) => mapSearchFlightToLeg(flight, ctx)),
+  };
+}
+
+function mapCalendarBundle(
+  data: FlightCalendarSearchDataDto,
+  criteria: FlightSearchCriteria
+): FlightCalendarSearchResult {
+  const days = (data.days ?? []).map((day) => mapCalendarDay(day, criteria));
+  const selectedDay =
+    days.find((day) => day.date === data.selectedDate) ??
+    (data.selectedDay ? mapCalendarDay(data.selectedDay, criteria) : null);
+
+  return {
+    centerDate: data.centerDate,
+    selectedDate: data.selectedDate,
+    currency: data.currency,
+    days,
+    selectedDay,
+  };
+}
+
 function serializeSearchParams(params: Record<string, unknown>): string {
   const sp = new URLSearchParams();
   for (const [key, raw] of Object.entries(params)) {
@@ -408,6 +473,264 @@ function buildApiQuery(
   return q;
 }
 
+function buildCalendarApiQuery(
+  criteria: FlightSearchCriteria,
+  filters: FlightSearchFilters,
+  sort: FlightResultsSort,
+  extra?: { limit?: number; daysBefore?: number; daysAfter?: number }
+): Record<string, unknown> {
+  const q = buildApiQuery(criteria, filters, sort, extra ? { limit: extra.limit } : undefined);
+  delete q.departureDate;
+  q.centerDate = criteria.departureDate;
+  if (extra?.daysBefore != null) q.daysBefore = extra.daysBefore;
+  if (extra?.daysAfter != null) q.daysAfter = extra.daysAfter;
+  return q;
+}
+
+function addDays(dateIso: string, offset: number): string {
+  const date = new Date(dateIso);
+  if (Number.isNaN(date.getTime())) return dateIso;
+  date.setDate(date.getDate() + offset);
+  return formatDateOnly(date);
+}
+
+function formatDateOnly(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayIso(): string {
+  return formatDateOnly(new Date());
+}
+
+function atLocalTime(dateIso: string, time: string): string {
+  return `${dateIso}T${time}+07:00`;
+}
+
+function buildMockCalendarFlight(
+  criteria: FlightSearchCriteria,
+  dayIso: string,
+  dayOffset: number,
+  index: number
+): SearchFlightDto {
+  const prices = [920000, 1080000, 1260000];
+  const departureTimes = ['06:30:00', '10:20:00', '18:45:00'];
+  const durations = [125, 130, 140];
+  const flightNumberSeed = 220 + dayOffset * 3 + index;
+  const flightIdSeed = 80000 + dayOffset * 10 + index;
+  const basePrice = prices[index] + dayOffset * 35000;
+  const mockFarePrices = {
+    economy: 700000,
+    premium: 1000000,
+    business: 1350000,
+    first: 1900000,
+  };
+  const departureTimeIso = atLocalTime(dayIso, departureTimes[index] ?? '08:30:00');
+  const departureDate = new Date(departureTimeIso);
+  const arrivalDate = new Date(departureDate.getTime() + (durations[index] ?? 125) * 60_000);
+  const arrivalTimeIso = arrivalDate.toISOString().replace('Z', '+00:00');
+
+  return {
+    flightId: flightIdSeed,
+    flightNumber: `VN${flightNumberSeed}`,
+    airlineCode: 'VN',
+    airlineName: 'Vietnam Airlines',
+    fromAirportCode: criteria.from.toUpperCase(),
+    toAirportCode: criteria.to.toUpperCase(),
+    flightDate: dayIso,
+    departureTime: departureTimeIso,
+    arrivalTime: arrivalTimeIso,
+    currency: 'VND',
+    fares: [
+      {
+        fareId: flightIdSeed * 10 + 1,
+        fareCode: 'ECONOMY',
+        cabinClass: 'ECONOMY',
+        fareStatus: 'AVAILABLE',
+        selectable: true,
+        originalTotalPrice: mockFarePrices.economy + 120000,
+        discountedTotalPrice: mockFarePrices.economy,
+        discountAmount: 180000,
+        discountPercent: 16,
+        promoStatus: 'APPLIED',
+        promoMessage: 'Mock calendar fare',
+        fareClassBenefits: {
+          fareClassId: 1,
+          fareClassName: 'Economy Flex',
+          fareClassCode: 'ECO',
+          baggageCheckinKg: 23,
+          baggageHandKg: 7,
+          changeFee: 350000,
+          refundFee: 650000,
+          refundable: true,
+          changeable: true,
+          priorityCheckin: false,
+          priorityBoarding: false,
+          mileageRate: 1,
+          loungeAccess: false,
+          seatSelection: true,
+          mealType: 'STANDARD',
+          wifiIncluded: false,
+          fastTrackSecurity: false,
+        },
+      },
+      {
+        fareId: flightIdSeed * 10 + 2,
+        fareCode: 'PREMIUM',
+        cabinClass: 'PREMIUM_ECONOMY',
+        fareStatus: 'AVAILABLE',
+        selectable: true,
+        originalTotalPrice: mockFarePrices.premium + 120000,
+        discountedTotalPrice: mockFarePrices.premium,
+        discountAmount: 100000,
+        discountPercent: 8,
+        promoStatus: 'APPLIED',
+        promoMessage: 'Mock premium fare',
+        fareClassBenefits: {
+          fareClassId: 2,
+          fareClassName: 'Premium Economy Flex',
+          fareClassCode: 'PRE',
+          baggageCheckinKg: 32,
+          baggageHandKg: 10,
+          changeFee: 250000,
+          refundFee: 450000,
+          refundable: true,
+          changeable: true,
+          priorityCheckin: true,
+          priorityBoarding: true,
+          mileageRate: 1.25,
+          loungeAccess: false,
+          seatSelection: true,
+          mealType: 'PREMIUM',
+          wifiIncluded: true,
+          fastTrackSecurity: false,
+        },
+      },
+      {
+        fareId: flightIdSeed * 10 + 3,
+        fareCode: 'BUSINESS',
+        cabinClass: 'BUSINESS',
+        fareStatus: 'AVAILABLE',
+        selectable: true,
+        originalTotalPrice: mockFarePrices.business + 180000,
+        discountedTotalPrice: mockFarePrices.business,
+        discountAmount: 190000,
+        discountPercent: 14,
+        promoStatus: 'APPLIED',
+        promoMessage: 'Mock business fare',
+        fareClassBenefits: {
+          fareClassId: 3,
+          fareClassName: 'Business Flex',
+          fareClassCode: 'BUS',
+          baggageCheckinKg: 46,
+          baggageHandKg: 14,
+          changeFee: 0,
+          refundFee: 250000,
+          refundable: true,
+          changeable: true,
+          priorityCheckin: true,
+          priorityBoarding: true,
+          mileageRate: 1.75,
+          loungeAccess: true,
+          seatSelection: true,
+          mealType: 'GOURMET',
+          wifiIncluded: true,
+          fastTrackSecurity: true,
+        },
+      },
+      {
+        fareId: flightIdSeed * 10 + 4,
+        fareCode: 'FIRST',
+        cabinClass: 'FIRST',
+        fareStatus: 'AVAILABLE',
+        selectable: true,
+        originalTotalPrice: mockFarePrices.first + 220000,
+        discountedTotalPrice: mockFarePrices.first,
+        discountAmount: 290000,
+        discountPercent: 12,
+        promoStatus: 'APPLIED',
+        promoMessage: 'Mock first fare',
+        fareClassBenefits: {
+          fareClassId: 4,
+          fareClassName: 'First Suite Flex',
+          fareClassCode: 'FST',
+          baggageCheckinKg: 64,
+          baggageHandKg: 18,
+          changeFee: 0,
+          refundFee: 0,
+          refundable: true,
+          changeable: true,
+          priorityCheckin: true,
+          priorityBoarding: true,
+          mileageRate: 2,
+          loungeAccess: true,
+          seatSelection: true,
+          mealType: 'GOURMET',
+          wifiIncluded: true,
+          fastTrackSecurity: true,
+        },
+      },
+    ],
+  };
+}
+
+function buildMockCalendarSearchResult(
+  criteria: FlightSearchCriteria,
+  extra?: { limit?: number; daysBefore?: number; daysAfter?: number }
+): FlightCalendarSearchResult {
+  const effectiveCenterDate =
+    criteria.departureDate < getTodayIso() ? getTodayIso() : criteria.departureDate;
+  const daysBefore = extra?.daysBefore ?? 3;
+  const daysAfter = extra?.daysAfter ?? 3;
+  const limit = extra?.limit ?? 10;
+  const days: FlightCalendarDay[] = [];
+
+  for (let offset = -daysBefore; offset <= daysAfter; offset += 1) {
+    const dayIso = addDays(effectiveCenterDate, offset);
+    const noFlights = Math.abs(offset) === 3;
+    const rawFlights = noFlights
+      ? []
+      : [0, 1, 2].map((index) => buildMockCalendarFlight(criteria, dayIso, offset, index)).slice(0, limit);
+    const flights = rawFlights.map((flight) =>
+      mapSearchFlightToLeg(flight, {
+        originCode: criteria.from.toUpperCase(),
+        destCode: criteria.to.toUpperCase(),
+        originCity: criteria.fromCity?.trim() || criteria.from.toUpperCase(),
+        destCity: criteria.toCity?.trim() || criteria.to.toUpperCase(),
+      })
+    );
+    const prices = flights
+      .map((flight) =>
+        flight.cabinFares
+          .filter((fare) => fare.selectable)
+          .map((fare) => fare.priceAmount)
+          .sort((a, b) => a - b)[0]
+      )
+      .filter((price): price is number => Number.isFinite(price));
+
+    days.push({
+      date: dayIso,
+      available: flights.length > 0,
+      lowestPrice: prices.length > 0 ? Math.min(...prices) : null,
+      highestPrice: prices.length > 0 ? Math.max(...prices) : null,
+      currency: flights.length > 0 ? 'VND' : null,
+      flightCount: flights.length,
+      flights,
+    });
+  }
+
+  const selectedDay = days.find((day) => day.date === effectiveCenterDate) ?? null;
+  return {
+    centerDate: effectiveCenterDate,
+    selectedDate: effectiveCenterDate,
+    currency: days.find((day) => day.currency)?.currency ?? null,
+    days,
+    selectedDay,
+  };
+}
+
 export async function searchFlightsMapped(
   criteria: FlightSearchCriteria,
   filters: FlightSearchFilters,
@@ -431,6 +754,35 @@ export async function searchFlightsMapped(
     };
   }
   return mapBundle(raw, criteria);
+}
+
+export async function searchCalendarMapped(
+  criteria: FlightSearchCriteria,
+  filters: FlightSearchFilters,
+  sort: FlightResultsSort,
+  extra?: { limit?: number; daysBefore?: number; daysAfter?: number }
+): Promise<FlightCalendarSearchResult> {
+  const mockVariant = resolveMockManageVariantForFlights();
+  if (mockVariant) {
+    return buildMockCalendarSearchResult(criteria, extra);
+  }
+
+  const query = buildCalendarApiQuery(criteria, filters, sort, extra);
+  const qs = serializeSearchParams(query);
+  const res = await api.get<FlightCalendarSearchApiEnvelope | FlightCalendarSearchDataDto>(
+    `/api/flights/search-calendar?${qs}`
+  );
+  const raw = unwrapData(res.data) as FlightCalendarSearchDataDto;
+  if (!raw || typeof raw !== 'object') {
+    return {
+      centerDate: criteria.departureDate,
+      selectedDate: criteria.departureDate,
+      currency: null,
+      days: [],
+      selectedDay: null,
+    };
+  }
+  return mapCalendarBundle(raw, criteria);
 }
 
 export async function revalidateFareMapped(
@@ -621,6 +973,7 @@ function normalizeServiceOption(
 }
 
 export const flightService = {
+  searchCalendar: searchCalendarMapped,
   searchFlights: searchFlightsMapped,
   revalidateFare: revalidateFareMapped,
   revalidateItinerary: revalidateItineraryMapped,

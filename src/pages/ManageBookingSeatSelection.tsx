@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   ArrowRight,
@@ -43,6 +43,10 @@ import type {
 } from '../types/booking.types';
 import type { PaymentMethod } from '../types/payment.types';
 import type { CreatePaymentResponse, PaymentStatus } from '../types/payment-create.types';
+import {
+  resetMockManageBookingVariant,
+  resolveMockManageBookingVariant,
+} from '../services/booking.service';
 
 type ItineraryItem = BookingManageOptionsResponse['itineraries'][number];
 type ManagePassenger = BookingManageOptionsResponse['passengers'][number];
@@ -114,6 +118,7 @@ type SeatChangeRedirectContext = {
 };
 
 const SEAT_CHANGE_REDIRECT_CONTEXT_KEY = 'seat-change-payment-redirect-context';
+type SeatChangeSettlementView = 'COLLECT_PAYMENT' | 'REFUND' | 'NONE';
 
 function formatMoney(amount: number, currency: string): string {
   try {
@@ -125,6 +130,12 @@ function formatMoney(amount: number, currency: string): string {
   } catch {
     return `${amount.toLocaleString('vi-VN')} ${currency}`;
   }
+}
+
+function getSeatChangeSettlementType(netAmount: number | null | undefined): SeatChangeSettlementView {
+  if ((netAmount ?? 0) > 0) return 'COLLECT_PAYMENT';
+  if ((netAmount ?? 0) < 0) return 'REFUND';
+  return 'NONE';
 }
 
 function storeSeatChangeRedirectContext(context: SeatChangeRedirectContext): void {
@@ -320,6 +331,7 @@ function resolvePaymentId(response: CreatePaymentResponse | null): number | null
 export default function ManageBookingSeatSelection() {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const manageOptions = useBookingStore((s) => s.manageOptions);
   const bookingLookup = useBookingStore((s) => s.bookingLookup);
   const bookingResponse = useBookingStore((s) => s.bookingResponse);
@@ -327,6 +339,7 @@ export default function ManageBookingSeatSelection() {
   const applySeatAssignmentResult = useBookingStore((s) => s.applySeatAssignmentResult);
 
   const manageBookingId = resolveManageBookingId({ manageOptions, bookingLookup, bookingResponse });
+  const [entryReady, setEntryReady] = useState(false);
 
   const redirectingRef = useRef(false);
   useEffect(() => {
@@ -337,11 +350,23 @@ export default function ManageBookingSeatSelection() {
     }
   }, [manageBookingId, navigate]);
 
+  useEffect(() => {
+    if (manageBookingId == null) return;
+    const variant = resolveMockManageBookingVariant();
+    setManageOptions(null);
+    originalAssignmentsRef.current = null;
+    if (variant) resetMockManageBookingVariant(variant);
+    queryClient.removeQueries({ queryKey: ['manage-options', manageBookingId], exact: true });
+    queryClient.removeQueries({ queryKey: ['seat-map'] });
+    setEntryReady(true);
+  }, [manageBookingId, queryClient, setManageOptions]);
+
   const manageOptionsQuery = useQuery({
     queryKey: ['manage-options', manageBookingId],
     queryFn: () => bookingService.getManageOptions(manageBookingId as number),
-    enabled: manageBookingId != null,
-    staleTime: 60_000,
+    enabled: entryReady && manageBookingId != null,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   useEffect(() => {
@@ -453,7 +478,8 @@ export default function ManageBookingSeatSelection() {
   const currency = manageOptions?.currency ?? bookingLookup?.booking?.currency ?? 'VND';
 
   const originalAssignmentsRef = useRef<Map<string, OriginalAssignment> | null>(null);
-  if (originalAssignmentsRef.current == null && manageOptions) {
+  useEffect(() => {
+    if (!manageOptions || originalAssignmentsRef.current != null) return;
     const map = new Map<string, OriginalAssignment>();
     for (const a of manageOptions.seatAssignments) {
       map.set(`${a.flightId}:${a.passengerId}`, {
@@ -466,7 +492,7 @@ export default function ManageBookingSeatSelection() {
       });
     }
     originalAssignmentsRef.current = map;
-  }
+  }, [manageOptions]);
 
   const seatChangeDeltas = useMemo<SeatChangeDelta[]>(() => {
     const originals = originalAssignmentsRef.current ?? new Map<string, OriginalAssignment>();
@@ -750,11 +776,12 @@ export default function ManageBookingSeatSelection() {
       })
       .then((response) => {
         setConfirmResponse(response);
-        if (response.settlementType === 'COLLECT_PAYMENT') {
+        const settlementType = getSeatChangeSettlementType(response.summary?.netAmount);
+        if (settlementType === 'COLLECT_PAYMENT') {
           setConfirmModalStage('payment');
           return;
         }
-        setResultVariant(response.settlementType === 'REFUND' ? 'refund_submitted' : 'saved');
+        setResultVariant(settlementType === 'REFUND' ? 'refund_submitted' : 'saved');
         setConfirmModalStage('result');
       })
       .catch((error) => {
@@ -1295,6 +1322,7 @@ export default function ManageBookingSeatSelection() {
               netAmount={netAmount}
               totalSeatsRequired={totalSeatsRequired}
               totalSeatsPicked={totalSeatsPicked}
+              previewResponse={confirmModalOpen ? previewResponse : null}
               onBackToEdit={() => navigate('/manage-booking')}
               onConfirmChanges={openConfirmPreview}
               isSaving={isSeatMutationPending}
@@ -1641,6 +1669,7 @@ function ChangeSummaryCard({
   netAmount,
   totalSeatsRequired,
   totalSeatsPicked,
+  previewResponse,
   onBackToEdit,
   onConfirmChanges,
   isSaving,
@@ -1654,20 +1683,33 @@ function ChangeSummaryCard({
   netAmount: number;
   totalSeatsRequired: number;
   totalSeatsPicked: number;
+  previewResponse?: SeatChangePreviewResponse | null;
   onBackToEdit: () => void;
   onConfirmChanges: () => void;
   isSaving: boolean;
 }) {
   const hasChangedSeats = deltas.some((delta) => delta.changed);
-  const netLabel = netAmount > 0 ? 'Amount due now' : netAmount < 0 ? 'Refund to you' : 'No change';
+  const effectiveAdditionalCharges = previewResponse?.summary.additionalAmount ?? additionalChargesTotal;
+  const effectiveRefunds = previewResponse?.summary.refundAmount ?? refundsTotal;
+  const effectiveNetAmount = previewResponse?.summary.netAmount ?? netAmount;
+  const netLabel =
+    effectiveNetAmount > 0
+      ? 'Amount due now'
+      : effectiveNetAmount < 0
+        ? 'Refund to you'
+        : 'No change';
   const netClass =
-    netAmount > 0
+    effectiveNetAmount > 0
       ? 'text-midnight-burgundy'
-      : netAmount < 0
+      : effectiveNetAmount < 0
         ? 'text-emerald-600'
         : 'text-on-surface-variant';
   const netBox =
-    netAmount > 0 ? 'bg-midnight-burgundy/5' : netAmount < 0 ? 'bg-emerald-50' : 'bg-surface';
+    effectiveNetAmount > 0
+      ? 'bg-midnight-burgundy/5'
+      : effectiveNetAmount < 0
+        ? 'bg-emerald-50'
+        : 'bg-surface';
 
   return (
     <div className="rounded-2xl border border-outline-variant/30 bg-surface-lowest p-5">
@@ -1766,12 +1808,12 @@ function ChangeSummaryCard({
       <dl className="flex flex-col gap-2 text-sm">
         <Row
           k="Additional charges"
-          v={additionalChargesTotal > 0 ? `+${formatMoney(additionalChargesTotal, currency)}` : '—'}
+          v={effectiveAdditionalCharges > 0 ? `+${formatMoney(effectiveAdditionalCharges, currency)}` : '—'}
         />
         <Row
           k="Refunds"
-          v={refundsTotal > 0 ? `−${formatMoney(refundsTotal, currency)}` : '—'}
-          negative={refundsTotal > 0}
+          v={effectiveRefunds > 0 ? `−${formatMoney(effectiveRefunds, currency)}` : '—'}
+          negative={effectiveRefunds > 0}
         />
       </dl>
 
@@ -1779,7 +1821,7 @@ function ChangeSummaryCard({
         <div>
           <p
             className={`text-[0.6875rem] font-black uppercase tracking-[0.22em] ${
-              netAmount < 0 ? 'text-emerald-700' : 'text-midnight-burgundy'
+              effectiveNetAmount < 0 ? 'text-emerald-700' : 'text-midnight-burgundy'
             }`}
           >
             {netLabel}
@@ -1789,11 +1831,11 @@ function ChangeSummaryCard({
           </p>
         </div>
         <p className={`font-headline text-2xl font-black ${netClass}`}>
-          {netAmount === 0
+          {effectiveNetAmount === 0
             ? '—'
-            : netAmount > 0
-              ? `+${formatMoney(netAmount, currency)}`
-              : `−${formatMoney(Math.abs(netAmount), currency)}`}
+            : effectiveNetAmount > 0
+              ? `+${formatMoney(effectiveNetAmount, currency)}`
+              : `−${formatMoney(Math.abs(effectiveNetAmount), currency)}`}
         </p>
       </div>
 
@@ -2292,11 +2334,11 @@ function SeatChangePreviewStage({
   previewLoading,
   previewError,
   previewResponse,
-  deltas,
-  additionalChargesTotal,
-  refundsTotal,
+  deltas: _deltas,
+  additionalChargesTotal: _additionalChargesTotal,
+  refundsTotal: _refundsTotal,
   netAmount,
-  passengers,
+  passengers: _passengers,
   itineraries,
   confirmSubmitting,
   currency,
@@ -2319,8 +2361,9 @@ function SeatChangePreviewStage({
   onContinue: () => void;
   onBack: () => void;
 }) {
+  const effectiveNetAmount = previewResponse?.summary.netAmount ?? netAmount;
   const effectiveSettlementType =
-    netAmount > 0 ? 'COLLECT_PAYMENT' : netAmount < 0 ? 'REFUND' : 'NONE';
+    previewResponse?.settlementType ?? getSeatChangeSettlementType(effectiveNetAmount);
   const title =
     effectiveSettlementType === 'COLLECT_PAYMENT'
       ? 'Additional payment required'
@@ -2340,39 +2383,29 @@ function SeatChangePreviewStage({
         ? 'Refund amount will be processed after confirmation.'
         : 'Seat availability has been revalidated before confirming these changes.';
   const previewItems = useMemo<SeatChangePreviewCardItem[]>(() => {
-    return deltas
-      .filter((delta) => delta.changed)
-      .filter((delta) =>
+    return (previewResponse?.items ?? [])
+      .filter((item) =>
         effectiveSettlementType === 'COLLECT_PAYMENT'
-          ? delta.delta > 0
+          ? item.delta > 0
           : effectiveSettlementType === 'REFUND'
-            ? delta.delta < 0
+            ? item.delta < 0
             : true
       )
-      .map((delta) => {
-        const passenger =
-          passengers.find((entry) => entry.passengerId === delta.passengerId) ?? null;
-        const itinerary = itineraries.find((entry) => entry.flightId === delta.flightId) ?? null;
-        const passengerName = passenger
-          ? [passenger.lastName, passenger.firstName].filter(Boolean).join(' ').trim()
-          : delta.passengerName;
-
-        return {
-          key: `${delta.flightId}-${delta.passengerId}-${delta.currentSeatNumber ?? 'none'}`,
-          passengerName: passengerName || delta.passengerName,
-          flightLabel: formatSeatChangeFlightLabelSafe(itinerary) || `Flight #${delta.flightId}`,
-          seatChangeLabel: formatSeatChangeSeatLabelSafe(
-            delta.originalSeatNumber,
-            delta.currentSeatNumber
-          ),
-          surchargeLabel:
-            delta.originalSurcharge > 0
-              ? `Seat surcharge: ${formatMoney(delta.originalSurcharge, delta.currency)} \u2192 ${formatMoney(delta.currentSurcharge, delta.currency)}`
-              : null,
-          delta: delta.delta,
-        };
-      });
-  }, [deltas, effectiveSettlementType, itineraries, passengers]);
+      .map((item) => ({
+        key: `${item.flightId}-${item.passengerId}-${item.toSeatNumber ?? 'none'}`,
+        passengerName: item.passengerName ?? `Passenger ${item.passengerId}`,
+        flightLabel:
+          formatSeatChangeFlightLabelSafe(
+            itineraries.find((entry) => entry.flightId === item.flightId) ?? null
+          ) || `Flight #${item.flightId}`,
+        seatChangeLabel: formatSeatChangeSeatLabelSafe(item.fromSeatNumber, item.toSeatNumber),
+        surchargeLabel:
+          item.oldAmount > 0
+            ? `Seat surcharge: ${formatMoney(item.oldAmount, previewResponse?.currency ?? currency)} \u2192 ${formatMoney(item.newAmount, previewResponse?.currency ?? currency)}`
+            : null,
+        delta: item.delta,
+      }));
+  }, [currency, effectiveSettlementType, itineraries, previewResponse]);
 
   if (previewLoading) {
     return (
@@ -2458,8 +2491,11 @@ function SeatChangePreviewStage({
               <div className="flex items-center justify-between">
                 <dt className="text-on-surface-variant">Additional charges</dt>
                 <dd className="font-bold text-on-surface">
-                  {additionalChargesTotal > 0
-                    ? `+${formatMoney(additionalChargesTotal, previewResponse.currency)}`
+                  {previewResponse.summary.additionalAmount > 0
+                    ? `+${formatMoney(
+                        previewResponse.summary.additionalAmount,
+                        previewResponse.currency
+                      )}`
                     : '—'}
                 </dd>
               </div>
@@ -2470,8 +2506,11 @@ function SeatChangePreviewStage({
               >
                 <dt className="text-on-surface-variant">Refunds</dt>
                 <dd className="font-bold text-emerald-600">
-                  {refundsTotal > 0
-                    ? `-${formatMoney(refundsTotal, previewResponse.currency)}`
+                  {previewResponse.summary.refundAmount > 0
+                    ? `-${formatMoney(
+                        previewResponse.summary.refundAmount,
+                        previewResponse.currency
+                      )}`
                     : '—'}
                 </dd>
               </div>
@@ -2481,9 +2520,12 @@ function SeatChangePreviewStage({
                 {effectiveSettlementType === 'REFUND' ? 'Net refund' : 'Net amount'}
               </dt>
               <dd className="font-headline text-xl font-black text-midnight-burgundy">
-                {netAmount === 0
+                {effectiveNetAmount === 0
                   ? '—'
-                  : formatMoney(Math.abs(netAmount), previewResponse.currency || currency)}
+                  : formatMoney(
+                      Math.abs(effectiveNetAmount),
+                      previewResponse.currency || currency
+                    )}
               </dd>
             </div>
           </dl>
@@ -2549,7 +2591,10 @@ function SeatChangePaymentStage({
   onCreatePayment: () => void;
 }) {
   const changedDeltas = deltas.filter((delta) => delta.changed);
-  const amountDue = Math.max(0, netAmount);
+  const amountDue = Math.max(
+    0,
+    confirmResponse?.summary.netAmount ?? previewResponse?.summary.netAmount ?? netAmount
+  );
 
   return (
     <>

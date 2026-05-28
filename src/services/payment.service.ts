@@ -10,6 +10,7 @@ import type {
   CancelPaymentResponse,
   CreatePaymentRequest,
   CreatePaymentResponse,
+  CreateFlightChangePaymentRequest,
   CreateServiceChangePaymentRequest,
   CreateSeatChangePaymentRequest,
   GetPaymentResponse,
@@ -34,14 +35,6 @@ const MOCK_PAYMENT_METHODS: PaymentMethodsResponse = {
           code: 'STRIPE_CARD',
           label: 'Credit or debit card',
           provider: 'STRIPE',
-          icon: null,
-          supported: true,
-          meta: null,
-        },
-        {
-          code: 'PAYOS_QR',
-          label: 'Mobile Banking (VietQR)',
-          provider: 'PAYOS',
           icon: null,
           supported: true,
           meta: null,
@@ -481,6 +474,42 @@ export async function createServiceChangePaymentLink(
       return createMockSeatChangePaymentResponse({
         bookingId: payload.bookingId,
         seatChangeSettlementId: payload.serviceChangeSettlementId,
+        method: payload.method,
+      });
+    }
+    throw error;
+  }
+}
+
+export async function createFlightChangePaymentLink(
+  payload: CreateFlightChangePaymentRequest
+): Promise<CreatePaymentResponse> {
+  if (shouldUseMockSeatChangePayment()) {
+    return Promise.resolve(
+      createMockSeatChangePaymentResponse({
+        bookingId: payload.bookingId,
+        seatChangeSettlementId: payload.flightChangeSettlementId,
+        method: payload.method,
+      })
+    );
+  }
+  if (shouldUseMockPaymentResult()) {
+    return Promise.resolve(
+      getMockCreatePaymentResponse({ bookingId: payload.bookingId, method: payload.method })
+    );
+  }
+  try {
+    const res = await api.post<ApiEnvelope<CreatePaymentResponse> | CreatePaymentResponse>(
+      '/api/flight-change-payments',
+      payload,
+      { timeout: SEAT_CHANGE_PAYMENT_TIMEOUT_MS }
+    );
+    return unwrapApiEnvelope(res.data);
+  } catch (error) {
+    if (shouldAutoFallbackToSeatChangeMock()) {
+      return createMockSeatChangePaymentResponse({
+        bookingId: payload.bookingId,
+        seatChangeSettlementId: payload.flightChangeSettlementId,
         method: payload.method,
       });
     }

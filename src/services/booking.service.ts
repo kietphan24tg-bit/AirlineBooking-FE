@@ -5,7 +5,9 @@ import {
   getMockCancellationPreviewResponse,
   getMockCancellationSelectionPreviewResponse,
   getMockBookingLookupResponse,
+  getMockFlightChangeQuoteResponse,
   getMockManageOptionsResponse,
+  getMockServiceCatalogResponse,
   getMockServiceChangeConfirmResponse,
   getMockServiceChangePreviewResponse,
   getMockSeatMapResponse,
@@ -21,8 +23,13 @@ import type {
   BookingCancellationPreviewRequest,
   BookingCancellationPreviewResponse,
   BookingCancellationSelectionPreviewRequest,
+  FlightChangeConfirmRequest,
+  FlightChangeConfirmResponse,
+  FlightChangeQuoteRequest,
+  FlightChangeQuoteResponse,
   BookingLookupRequest,
   BookingLookupResponse,
+  BookingLookupServiceSelection,
   BookingManageOptionsResponse,
   BookingTicketResponse,
   BookingCreateRequest,
@@ -63,6 +70,10 @@ type ManageBookingMockSession = {
 };
 
 const mockManageBookingSessions = new Map<ManageBookingMockVariant, ManageBookingMockSession>();
+const mockManageBookingCommittedSessions = new Map<
+  ManageBookingMockVariant,
+  ManageBookingMockSession
+>();
 const DEFAULT_IMPLICIT_MOCK_VARIANT: ManageBookingMockVariant = 'CONFIRMED';
 const DEFAULT_IMPLICIT_MOCK_LOOKUP = getMockBookingLookupResponse(DEFAULT_IMPLICIT_MOCK_VARIANT);
 const DEFAULT_IMPLICIT_MOCK_PNR = DEFAULT_IMPLICIT_MOCK_LOOKUP.booking.pnrCode.trim().toUpperCase();
@@ -88,12 +99,255 @@ function createMockManageBookingSession(
   };
 }
 
-function getMockManageBookingSession(variant: ManageBookingMockVariant): ManageBookingMockSession {
+function getPersistedMockStoreSession(): Pick<ManageBookingMockSession, 'lookup' | 'manageOptions'> | null {
+  const { bookingLookup, manageOptions } = useBookingStore.getState();
+  const normalizedPnr = bookingLookup?.booking?.pnrCode?.trim().toUpperCase() ?? null;
+  const looksLikeMockLookup = normalizedPnr === DEFAULT_IMPLICIT_MOCK_PNR;
+  const looksLikeMockManageOptions =
+    typeof manageOptions?.bookingId === 'number' &&
+    manageOptions.bookingId === DEFAULT_IMPLICIT_MOCK_LOOKUP.booking.bookingId;
+
+  if (!looksLikeMockLookup || !looksLikeMockManageOptions || !bookingLookup || !manageOptions) {
+    return null;
+  }
+
+  return {
+    lookup: cloneMock(bookingLookup),
+    manageOptions: cloneMock(manageOptions),
+  };
+}
+
+function ensureMockManageBookingSession(
+  variant: ManageBookingMockVariant,
+  currentFlightId?: number
+): ManageBookingMockSession {
+  const persisted = getPersistedMockStoreSession();
   const existing = mockManageBookingSessions.get(variant);
+
+  if (!persisted) {
+    if (existing) return existing;
+    const created = cloneMock(getCommittedMockManageBookingSession(variant));
+    mockManageBookingSessions.set(variant, created);
+    return created;
+  }
+
+  if (!existing) {
+    const hydrated = { variant, ...persisted };
+    mockManageBookingSessions.set(variant, hydrated);
+    return hydrated;
+  }
+
+  if (currentFlightId == null) {
+    return existing;
+  }
+
+  const existingHasCurrentFlight =
+    existing.lookup.itineraries.some((item) => item.flightId === currentFlightId) ||
+    existing.manageOptions.itineraries.some((item) => item.flightId === currentFlightId);
+  if (existingHasCurrentFlight) {
+    return existing;
+  }
+
+  const persistedHasCurrentFlight =
+    persisted.lookup.itineraries.some((item) => item.flightId === currentFlightId) ||
+    persisted.manageOptions.itineraries.some((item) => item.flightId === currentFlightId);
+  if (!persistedHasCurrentFlight) {
+    return existing;
+  }
+
+  const hydrated = { variant, ...persisted };
+  mockManageBookingSessions.set(variant, hydrated);
+  return hydrated;
+}
+
+function getCommittedMockManageBookingSession(
+  variant: ManageBookingMockVariant
+): ManageBookingMockSession {
+  const existing = mockManageBookingCommittedSessions.get(variant);
   if (existing) return existing;
   const created = createMockManageBookingSession(variant);
-  mockManageBookingSessions.set(variant, created);
+  mockManageBookingCommittedSessions.set(variant, created);
   return created;
+}
+
+function getMockManageBookingSession(variant: ManageBookingMockVariant): ManageBookingMockSession {
+  return ensureMockManageBookingSession(variant);
+}
+
+function commitMockManageBookingSession(variant: ManageBookingMockVariant): void {
+  const session = getMockManageBookingSession(variant);
+  mockManageBookingCommittedSessions.set(variant, cloneMock(session));
+}
+
+function applyMockServiceChangeRequest(
+  session: ManageBookingMockSession,
+  body: ServiceChangeConfirmRequest | ServiceChangePreviewRequest
+): void {
+  const optionCatalogByFlightId = new Map<
+    number,
+    Map<
+      number,
+      {
+        serviceId: number;
+        serviceType: string;
+        serviceName: string;
+        name: string;
+        price: number;
+      }
+    >
+  >();
+  for (const itinerary of session.manageOptions.itineraries) {
+    const catalog = getMockServiceCatalogResponse(session.variant, itinerary.flightId, itinerary.fareId);
+    optionCatalogByFlightId.set(
+      itinerary.flightId,
+      new Map(
+        (catalog?.services ?? []).flatMap((service) =>
+          service.options.map((option) => [
+            option.optionId,
+            {
+              serviceId: option.serviceId,
+              serviceType: option.serviceType,
+              serviceName: option.serviceName,
+              name: option.name,
+              price: option.price,
+            },
+          ])
+        )
+      )
+    );
+  }
+
+  const existingByOption = new Map(
+    session.manageOptions.serviceSelections.map((selection) => [selection.optionId, selection])
+  );
+
+  for (const passenger of body.passengers) {
+    session.manageOptions.serviceSelections = session.manageOptions.serviceSelections.filter(
+      (selection) => selection.passengerId !== passenger.passengerId
+    );
+
+    for (const selection of passenger.selections) {
+      const existing = existingByOption.get(selection.optionId);
+      const flightId = selection.flightId;
+      const optionDetails =
+        flightId != null ? optionCatalogByFlightId.get(flightId)?.get(selection.optionId) : null;
+      session.manageOptions.serviceSelections.push({
+        passengerId: passenger.passengerId,
+        flightId,
+        serviceId: existing?.serviceId ?? optionDetails?.serviceId ?? null,
+        serviceType: existing?.serviceType ?? optionDetails?.serviceType ?? 'SERVICE',
+        serviceName: existing?.serviceName ?? optionDetails?.serviceName ?? 'Service',
+        optionId: selection.optionId,
+        optionName: existing?.optionName ?? optionDetails?.name ?? `Option ${selection.optionId}`,
+        quantity: selection.quantity,
+        price: existing?.price ?? (optionDetails?.price ?? 0) * selection.quantity,
+      });
+    }
+  }
+}
+
+function applyMockFlightChangeRequest(
+  session: ManageBookingMockSession,
+  quoteToken: string
+): FlightChangeQuoteResponse {
+  const matches = /^mock_fcq_(\d+)_(\d+)_(\d+)$/i.exec(quoteToken.trim());
+  if (!matches) {
+    throw new Error('Invalid mock flight-change quote token.');
+  }
+
+  const currentFlightId = Number(matches[1]);
+  const newFlightId = Number(matches[2]);
+  const newFareId = Number(matches[3]);
+  const alignedSession = ensureMockManageBookingSession(session.variant, currentFlightId);
+  const quote = getMockFlightChangeQuoteResponse(session.variant, {
+    ticketIds: getMockBookingTicketsResponse(session.variant).tickets.map((ticket) => ticket.id),
+    currentFlightId,
+    newFlightId,
+    newFareId,
+  }, {
+    lookup: alignedSession.lookup,
+    manageOptions: alignedSession.manageOptions,
+  });
+  const replacementFlight = quote.newFlight;
+
+  alignedSession.lookup.itineraries = alignedSession.lookup.itineraries.map((itinerary) =>
+    itinerary.flightId !== currentFlightId
+      ? itinerary
+      : {
+          ...itinerary,
+          flightId: replacementFlight.flightId,
+          flightNumber: replacementFlight.flightNumber,
+          departureTime: replacementFlight.departureTime,
+          departureAirportCode: replacementFlight.from,
+          arrivalAirportCode: replacementFlight.to,
+        }
+  );
+
+  alignedSession.manageOptions.itineraries = alignedSession.manageOptions.itineraries.map((itinerary) =>
+    itinerary.flightId !== currentFlightId
+      ? itinerary
+      : {
+          ...itinerary,
+          flightId: replacementFlight.flightId,
+          fareId: newFareId,
+          flightNumber: replacementFlight.flightNumber,
+          departureTime: replacementFlight.departureTime,
+          departureAirportCode: replacementFlight.from,
+          arrivalAirportCode: replacementFlight.to,
+        }
+  );
+
+  alignedSession.lookup.passengers = alignedSession.lookup.passengers.map((passenger) => ({
+    ...passenger,
+    segments: (passenger.segments ?? []).map((segment) =>
+      segment.flightId !== currentFlightId
+        ? segment
+        : {
+            ...segment,
+            flightId: replacementFlight.flightId,
+            seatAssigned: false,
+            seatNumber: null,
+            warnings: [],
+          }
+    ),
+    selections: {
+      seats: (passenger.selections?.seats ?? []).filter((seat) => seat.flightId !== currentFlightId),
+      services: (passenger.selections?.services ?? []).filter(
+        (service) => service.flightId !== currentFlightId
+      ),
+    },
+    seatAssignments: (passenger.seatAssignments ?? []).filter(
+      (seat) => seat.flightId !== currentFlightId
+    ),
+    serviceSelections: (passenger.serviceSelections ?? []).filter(
+      (service) => service.flightId !== currentFlightId
+    ),
+  }));
+
+  alignedSession.manageOptions.passengers = alignedSession.manageOptions.passengers.map((passenger) => ({
+    ...passenger,
+    segments: (passenger.segments ?? []).map((segment) =>
+      segment.flightId !== currentFlightId
+        ? segment
+        : {
+            ...segment,
+            flightId: replacementFlight.flightId,
+            seatAssigned: false,
+            seatNumber: null,
+            warnings: [],
+          }
+    ),
+  }));
+
+  alignedSession.manageOptions.seatAssignments = alignedSession.manageOptions.seatAssignments.filter(
+    (seat) => seat.flightId !== currentFlightId
+  );
+  alignedSession.manageOptions.serviceSelections = alignedSession.manageOptions.serviceSelections.filter(
+    (service) => service.flightId !== currentFlightId
+  );
+
+  syncMockLookupPassengerSelections(alignedSession);
+  return quote;
 }
 
 export function getMockReservedSeatsForFlight(
@@ -245,6 +499,268 @@ function buildMockSeatAssignmentResponse(
       surchargeAmount: assignment.surchargeAmount,
       currency: assignment.currency,
     })),
+  };
+}
+
+function resolveMockSeatChangeSeatDetails(
+  session: ManageBookingMockSession,
+  change: SeatChangePreviewRequest['changes'][number],
+  kind: 'from' | 'to'
+): { seatNumber: string | null; amount: number } {
+  const seatId = kind === 'from' ? change.fromSeatId : change.toSeatId;
+  if (seatId == null) return { seatNumber: null, amount: 0 };
+
+  const activeAssignment = session.manageOptions.seatAssignments.find(
+    (assignment) =>
+      assignment.passengerId === change.passengerId &&
+      assignment.flightId === change.flightId &&
+      assignment.seatId === seatId
+  );
+  if (activeAssignment) {
+    return {
+      seatNumber: activeAssignment.seatNumber,
+      amount: activeAssignment.surchargeAmount,
+    };
+  }
+
+  const baselineSession = createMockManageBookingSession(session.variant);
+  const baselineAssignment = baselineSession.manageOptions.seatAssignments.find(
+    (assignment) =>
+      assignment.passengerId === change.passengerId &&
+      assignment.flightId === change.flightId &&
+      assignment.seatId === seatId
+  );
+  if (baselineAssignment) {
+    return {
+      seatNumber: baselineAssignment.seatNumber,
+      amount: baselineAssignment.surchargeAmount,
+    };
+  }
+
+  const seatContext = resolveMockSeatAssignmentContext(session, seatId);
+  return {
+    seatNumber: seatContext?.seatNumber ?? null,
+    amount: seatContext?.surchargeAmount ?? 0,
+  };
+}
+
+function buildMockSeatChangePreviewResponse(
+  session: ManageBookingMockSession,
+  body: SeatChangePreviewRequest
+): SeatChangePreviewResponse {
+  const items = body.changes.map((change) => {
+    const from = resolveMockSeatChangeSeatDetails(session, change, 'from');
+    const to = resolveMockSeatChangeSeatDetails(session, change, 'to');
+    const passenger = session.lookup.passengers.find(
+      (item) => item.passengerId === change.passengerId
+    );
+    const itinerary = session.lookup.itineraries.find((item) => item.flightId === change.flightId);
+    const delta = to.amount - from.amount;
+
+    return {
+      passengerId: change.passengerId,
+      passengerName: passenger ? `${passenger.lastName} ${passenger.firstName}`.trim() : null,
+      flightId: change.flightId,
+      flightNumber: itinerary?.flightNumber ?? null,
+      departureAirportCode: itinerary?.departureAirportCode ?? null,
+      arrivalAirportCode: itinerary?.arrivalAirportCode ?? null,
+      departureTime: itinerary?.departureTime ?? null,
+      fromSeatId: change.fromSeatId,
+      fromSeatNumber: from.seatNumber,
+      toSeatId: change.toSeatId,
+      toSeatNumber: to.seatNumber,
+      oldAmount: from.amount,
+      newAmount: to.amount,
+      delta,
+      status: 'VALID',
+      message: null,
+    };
+  });
+
+  const additionalAmount = items.reduce((sum, item) => sum + Math.max(0, item.delta), 0);
+  const refundAmount = items.reduce((sum, item) => sum + Math.max(0, -item.delta), 0);
+  const netAmount = additionalAmount - refundAmount;
+  const settlementType: SeatChangePreviewResponse['settlementType'] =
+    netAmount > 0 ? 'COLLECT_PAYMENT' : netAmount < 0 ? 'REFUND' : 'NONE';
+
+  return {
+    bookingId: session.lookup.booking.bookingId,
+    currency: session.lookup.booking.currency,
+    previewToken: `seatchg_prev_${Date.now()}`,
+    settlementType,
+    items,
+    summary: {
+      additionalAmount,
+      refundAmount,
+      netAmount,
+    },
+  };
+}
+
+function buildMockServiceChangePreviewResponse(
+  session: ManageBookingMockSession,
+  body: ServiceChangePreviewRequest
+): ServiceChangePreviewResponse {
+  const currentByPassenger = new Map<number, BookingLookupServiceSelection[]>();
+  for (const passenger of session.lookup.passengers) {
+    currentByPassenger.set(passenger.passengerId, [
+      ...(passenger.selections?.services ?? passenger.serviceSelections ?? []),
+    ]);
+  }
+
+  const itineraryByFlightId = new Map(
+    session.lookup.itineraries.map((itinerary) => [itinerary.flightId, itinerary])
+  );
+  const optionCatalogByFlightId = new Map<
+    number,
+    Map<
+      number,
+      {
+        serviceId: number;
+        serviceType: string;
+        serviceName: string;
+        name: string;
+        price: number;
+      }
+    >
+  >();
+  for (const itinerary of session.manageOptions.itineraries) {
+    const catalog = getMockServiceCatalogResponse(session.variant, itinerary.flightId, itinerary.fareId);
+    optionCatalogByFlightId.set(
+      itinerary.flightId,
+      new Map(
+        (catalog?.services ?? []).flatMap((service) =>
+          service.options.map((option) => [
+            option.optionId,
+            {
+              serviceId: option.serviceId,
+              serviceType: option.serviceType,
+              serviceName: option.serviceName,
+              name: option.name,
+              price: option.price,
+            },
+          ])
+        )
+      )
+    );
+  }
+
+  const selectionKey = (flightId: number | null, serviceId: number | null) =>
+    `${flightId ?? 'booking'}:${serviceId ?? 'unknown'}`;
+
+  const items = body.passengers.flatMap((passenger) => {
+    const currentSelections = currentByPassenger.get(passenger.passengerId) ?? [];
+    const passengerView = session.lookup.passengers.find(
+      (entry) => entry.passengerId === passenger.passengerId
+    );
+    const passengerName = passengerView
+      ? [passengerView.lastName, passengerView.firstName].filter(Boolean).join(' ')
+      : `Passenger ${passenger.passengerId}`;
+
+    const currentByGroup = new Map(
+      currentSelections.map((selection) => [
+        selectionKey(selection.flightId ?? null, selection.serviceId ?? null),
+        selection,
+      ])
+    );
+    const requestedByGroup = new Map<
+      string,
+      {
+        flightId: number | null;
+        optionId: number;
+        quantity: number;
+        serviceId: number | null;
+        serviceType: string | null;
+        serviceName: string | null;
+        optionName: string | null;
+        unitPrice: number;
+      }
+    >();
+
+    for (const selection of passenger.selections) {
+      const flightId = selection.flightId ?? null;
+      const optionDetails =
+        flightId != null ? optionCatalogByFlightId.get(flightId)?.get(selection.optionId) : null;
+      const fallbackCurrent =
+        flightId != null
+          ? (currentSelections.find(
+              (entry) => entry.flightId === flightId && entry.optionId === selection.optionId
+            ) ?? null)
+          : (currentSelections.find((entry) => entry.optionId === selection.optionId) ?? null);
+      const serviceId = optionDetails?.serviceId ?? fallbackCurrent?.serviceId ?? null;
+      const groupKey = selectionKey(flightId, serviceId);
+
+      requestedByGroup.set(groupKey, {
+        flightId,
+        optionId: selection.optionId,
+        quantity: selection.quantity,
+        serviceId,
+        serviceType: optionDetails?.serviceType ?? fallbackCurrent?.serviceType ?? null,
+        serviceName: optionDetails?.serviceName ?? fallbackCurrent?.serviceName ?? null,
+        optionName: optionDetails?.name ?? fallbackCurrent?.optionName ?? null,
+        unitPrice:
+          optionDetails?.price ??
+          (fallbackCurrent
+            ? fallbackCurrent.price / Math.max(1, fallbackCurrent.quantity)
+            : 250000),
+      });
+    }
+
+    const groupKeys = new Set([...currentByGroup.keys(), ...requestedByGroup.keys()]);
+    return [...groupKeys]
+      .map((groupKey) => {
+        const current = currentByGroup.get(groupKey) ?? null;
+        const requested = requestedByGroup.get(groupKey) ?? null;
+        const flightId = requested?.flightId ?? current?.flightId ?? null;
+        const quantity = requested?.quantity ?? 0;
+        const oldAmount = current ? current.price : 0;
+        const newAmount = requested ? requested.unitPrice * requested.quantity : 0;
+        const delta = newAmount - oldAmount;
+
+        if (delta === 0 && (current?.quantity ?? 0) === quantity) {
+          return null;
+        }
+
+        return {
+          flightId: flightId ?? undefined,
+          passengerId: passenger.passengerId,
+          passengerName,
+          serviceId: requested?.serviceId ?? current?.serviceId ?? null,
+          serviceType: requested?.serviceType ?? current?.serviceType ?? 'SERVICE',
+          serviceName: requested?.serviceName ?? current?.serviceName ?? 'Service',
+          optionId: requested?.optionId ?? current?.optionId ?? null,
+          optionName: requested?.optionName ?? current?.optionName ?? null,
+          quantity,
+          oldAmount,
+          newAmount,
+          delta,
+          status: 'VALID',
+          message:
+            flightId != null && !itineraryByFlightId.has(flightId)
+              ? 'Selected flight is not available in this booking.'
+              : null,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item != null);
+  });
+
+  const additionalAmount = items.reduce((sum, item) => sum + Math.max(0, item.delta), 0);
+  const refundAmount = items.reduce((sum, item) => sum + Math.max(0, -item.delta), 0);
+  const netAmount = additionalAmount - refundAmount;
+  const settlementType: ServiceChangePreviewResponse['settlementType'] =
+    netAmount > 0 ? 'COLLECT_PAYMENT' : netAmount < 0 ? 'REFUND' : 'NONE';
+
+  return {
+    bookingId: session.lookup.booking.bookingId,
+    currency: session.lookup.booking.currency,
+    previewToken: `svcchg_prev_${Date.now()}`,
+    settlementType,
+    items,
+    summary: {
+      additionalAmount,
+      refundAmount,
+      netAmount,
+    },
   };
 }
 
@@ -571,7 +1087,11 @@ export function resolveMockManageBookingVariant(): ManageBookingMockVariant | nu
 
 export function resetMockManageBookingVariant(variant: ManageBookingMockVariant): void {
   implicitMockManageBookingVariant = variant;
-  mockManageBookingSessions.set(variant, createMockManageBookingSession(variant));
+  mockManageBookingSessions.set(variant, cloneMock(getCommittedMockManageBookingSession(variant)));
+}
+
+export function commitMockManageBookingVariant(variant: ManageBookingMockVariant): void {
+  commitMockManageBookingSession(variant);
 }
 
 export async function createBooking(payload: BookingCreateRequest): Promise<BookingCreateResponse> {
@@ -697,6 +1217,122 @@ export async function previewCancellationBySelection(
   return raw;
 }
 
+export async function quoteFlightChange(
+  bookingId: string | number,
+  body: FlightChangeQuoteRequest
+): Promise<FlightChangeQuoteResponse> {
+  const mockVariant =
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
+  if (mockVariant) {
+    const session = ensureMockManageBookingSession(mockVariant, body.currentFlightId);
+    return Promise.resolve(
+      cloneMock(
+        getMockFlightChangeQuoteResponse(mockVariant, body, {
+          lookup: session.lookup,
+          manageOptions: session.manageOptions,
+        })
+      )
+    );
+  }
+  const id = typeof bookingId === 'string' ? bookingId : String(bookingId);
+  const res = await api.post<FlightChangeQuoteResponse | { data?: FlightChangeQuoteResponse }>(
+    `/api/bookings/${id}/flight-change/quote`,
+    body
+  );
+  const raw = unwrapData(res.data) as FlightChangeQuoteResponse;
+  if (
+    !raw ||
+    typeof raw !== 'object' ||
+    typeof raw.bookingId !== 'number' ||
+    !raw.summary ||
+    !Array.isArray(raw.items)
+  ) {
+    throw new Error('Flight change quote failed');
+  }
+  return raw;
+}
+
+export async function confirmFlightChange(
+  bookingId: string | number,
+  body: FlightChangeConfirmRequest
+): Promise<FlightChangeConfirmResponse> {
+  const mockVariant =
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, bookingId);
+  if (mockVariant) {
+    const session = getMockManageBookingSession(mockVariant);
+    const quote = applyMockFlightChangeRequest(session, body.quoteToken);
+    const currency = session.lookup.booking.currency ?? 'VND';
+    const settlementType = quote.settlementType ?? 'NO_CHANGE';
+    const response: FlightChangeConfirmResponse = {
+      settlementId: body.expectedNetAmount > 0 ? Date.now() : null,
+      bookingId: session.lookup.booking.bookingId,
+      currency,
+      settlementType,
+      status:
+        body.expectedNetAmount > 0
+          ? 'PAYMENT_REQUIRED'
+          : body.expectedNetAmount < 0
+            ? 'REFUND_PENDING'
+            : 'COMPLETED',
+      refundStatus: body.expectedNetAmount < 0 ? 'SUCCEEDED' : null,
+      provider: body.expectedNetAmount < 0 ? 'STRIPE' : null,
+      providerRefundId:
+        body.expectedNetAmount < 0 ? `mock_refund_${Date.now()}` : null,
+      errorCode: null,
+      errorMessage: null,
+      refundMethod:
+        body.expectedNetAmount < 0
+          ? {
+              type: 'CARD',
+              label: 'Visa',
+              maskedAccount: '**** 4242',
+              estimatedDays: '3-7 business days',
+            }
+          : null,
+      paymentMethods:
+        body.expectedNetAmount > 0
+          ? [
+              {
+                code: 'PAYOS_QR',
+                label: 'Mobile Banking (VietQR)',
+                provider: 'PAYOS',
+                icon: null,
+                supported: true,
+              },
+              {
+                code: 'STRIPE_CARD',
+                label: 'International credit or debit card',
+                provider: 'STRIPE',
+                icon: null,
+                supported: true,
+              },
+            ]
+          : [],
+      summary: {
+        additionalAmount: body.expectedAdditionalAmount,
+        refundAmount: body.expectedRefundAmount,
+        netAmount: body.expectedNetAmount,
+      },
+    };
+    if (response.settlementType !== 'COLLECT_PAYMENT') {
+      commitMockManageBookingSession(mockVariant);
+    }
+    return Promise.resolve(response);
+  }
+  const id = typeof bookingId === 'string' ? bookingId : String(bookingId);
+  const res = await api.post<FlightChangeConfirmResponse | { data?: FlightChangeConfirmResponse }>(
+    `/api/bookings/${id}/flight-changes/confirm`,
+    body
+  );
+  const raw = unwrapData(res.data) as FlightChangeConfirmResponse;
+  if (!raw || typeof raw !== 'object' || typeof raw.bookingId !== 'number') {
+    throw new Error('Flight change confirmation failed');
+  }
+  return raw;
+}
+
 export async function previewSeatChanges(
   bookingId: string | number,
   body: SeatChangePreviewRequest
@@ -705,7 +1341,9 @@ export async function previewSeatChanges(
     resolveMockManageBookingVariant() ??
     resolveImplicitMockManageBookingVariant(undefined, bookingId);
   if (mockVariant) {
-    return Promise.resolve(cloneMock(getMockSeatChangePreviewResponse(mockVariant, body)));
+    return Promise.resolve(
+      cloneMock(buildMockSeatChangePreviewResponse(getMockManageBookingSession(mockVariant), body))
+    );
   }
   const id = typeof bookingId === 'string' ? bookingId : String(bookingId);
   const res = await api.post<SeatChangePreviewResponse | { data?: SeatChangePreviewResponse }>(
@@ -732,7 +1370,42 @@ export async function confirmSeatChanges(
     resolveMockManageBookingVariant() ??
     resolveImplicitMockManageBookingVariant(undefined, bookingId);
   if (mockVariant) {
-    return Promise.resolve(cloneMock(getMockSeatChangeConfirmResponse(mockVariant, body)));
+    const session = getMockManageBookingSession(mockVariant);
+    const preview = buildMockSeatChangePreviewResponse(session, {
+      changes: body.changes,
+    });
+    if (preview.settlementType !== 'COLLECT_PAYMENT') {
+      commitMockManageBookingSession(mockVariant);
+    }
+    return Promise.resolve(
+      cloneMock({
+        bookingId: preview.bookingId,
+        currency: preview.currency,
+        settlementType: preview.settlementType,
+        status:
+          preview.settlementType === 'COLLECT_PAYMENT'
+            ? 'PAYMENT_REQUIRED'
+            : preview.settlementType === 'REFUND'
+              ? 'REFUND_PENDING'
+              : 'COMPLETED',
+        refundStatus: preview.settlementType === 'REFUND' ? 'SUCCEEDED' : null,
+        provider: preview.settlementType === 'REFUND' ? 'STRIPE' : null,
+        providerRefundId:
+          preview.settlementType === 'REFUND' ? `mock_refund_${Date.now()}` : null,
+        errorCode: null,
+        errorMessage: null,
+        refundMethod:
+          preview.settlementType === 'REFUND'
+            ? {
+                type: 'CARD',
+                label: 'Visa',
+                maskedAccount: '**** 4242',
+                estimatedDays: '3-7 business days',
+              }
+            : null,
+        summary: preview.summary,
+      } satisfies SeatChangeConfirmResponse)
+    );
   }
   const id = typeof bookingId === 'string' ? bookingId : String(bookingId);
   const res = await api.post<SeatChangeConfirmResponse | { data?: SeatChangeConfirmResponse }>(
@@ -754,7 +1427,9 @@ export async function previewServiceChanges(
     resolveMockManageBookingVariant() ??
     resolveImplicitMockManageBookingVariant(undefined, bookingId);
   if (mockVariant) {
-    return Promise.resolve(cloneMock(getMockServiceChangePreviewResponse(mockVariant, body)));
+    return Promise.resolve(
+      cloneMock(buildMockServiceChangePreviewResponse(getMockManageBookingSession(mockVariant), body))
+    );
   }
   const id = typeof bookingId === 'string' ? bookingId : String(bookingId);
   const res = await api.post<
@@ -780,7 +1455,60 @@ export async function confirmServiceChanges(
     resolveMockManageBookingVariant() ??
     resolveImplicitMockManageBookingVariant(undefined, bookingId);
   if (mockVariant) {
-    return Promise.resolve(cloneMock(getMockServiceChangeConfirmResponse(mockVariant, body)));
+    const session = getMockManageBookingSession(mockVariant);
+    applyMockServiceChangeRequest(session, body);
+    const preview = buildMockServiceChangePreviewResponse(session, { passengers: body.passengers });
+    const response = cloneMock({
+      settlementId: preview.settlementType === 'COLLECT_PAYMENT' ? Date.now() : null,
+      bookingId: preview.bookingId,
+      currency: preview.currency,
+      settlementType: preview.settlementType,
+      status:
+        preview.settlementType === 'COLLECT_PAYMENT'
+          ? 'PAYMENT_REQUIRED'
+          : preview.settlementType === 'REFUND'
+            ? 'REFUND_PENDING'
+            : 'COMPLETED',
+      refundStatus: preview.settlementType === 'REFUND' ? 'SUCCEEDED' : null,
+      provider: preview.settlementType === 'REFUND' ? 'STRIPE' : null,
+      providerRefundId:
+        preview.settlementType === 'REFUND' ? `mock_refund_${Date.now()}` : null,
+      errorCode: null,
+      errorMessage: null,
+      refundMethod:
+        preview.settlementType === 'REFUND'
+          ? {
+              type: 'CARD',
+              label: 'Visa',
+              maskedAccount: '**** 4242',
+              estimatedDays: '3-7 business days',
+            }
+          : null,
+      paymentMethods:
+        preview.settlementType === 'COLLECT_PAYMENT'
+          ? [
+              {
+                code: 'PAYOS_QR',
+                label: 'Mobile Banking (VietQR)',
+                provider: 'PAYOS',
+                icon: null,
+                supported: true,
+              },
+              {
+                code: 'STRIPE_CARD',
+                label: 'International credit or debit card',
+                provider: 'STRIPE',
+                icon: null,
+                supported: true,
+              },
+            ]
+          : [],
+      summary: preview.summary,
+    } satisfies ServiceChangeConfirmResponse);
+    if (response.settlementType !== 'COLLECT_PAYMENT') {
+      commitMockManageBookingSession(mockVariant);
+    }
+    return Promise.resolve(response);
   }
   const id = typeof bookingId === 'string' ? bookingId : String(bookingId);
   const res = await api.post<
@@ -1063,6 +1791,8 @@ export const bookingService = {
   getBookingTickets,
   previewCancellation,
   previewCancellationBySelection,
+  quoteFlightChange,
+  confirmFlightChange,
   previewSeatChanges,
   confirmSeatChanges,
   previewServiceChanges,

@@ -99,6 +99,24 @@ export interface FlightSearchResultBundle {
   inboundPriceRange: FlightPriceRange | null;
 }
 
+export interface FlightCalendarDay {
+  date: string;
+  available: boolean;
+  lowestPrice: number | null;
+  highestPrice: number | null;
+  currency: string | null;
+  flightCount: number;
+  flights: FlightLeg[];
+}
+
+export interface FlightCalendarSearchResult {
+  centerDate: string;
+  selectedDate: string;
+  currency: string | null;
+  days: FlightCalendarDay[];
+  selectedDay: FlightCalendarDay | null;
+}
+
 export interface FlightRevalidatePassengerSummary {
   adult: number;
   child: number;

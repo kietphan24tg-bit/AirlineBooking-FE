@@ -668,6 +668,100 @@ export interface BookingTicketResponse {
   }>;
 }
 
+export type FlightChangeSettlementType = 'NO_CHANGE' | 'COLLECT_PAYMENT' | 'REFUND';
+
+export interface FlightChangeQuoteRequest {
+  ticketIds: number[];
+  currentFlightId: number;
+  newFlightId: number;
+  newFareId: number;
+}
+
+export interface FlightChangeQuoteResponse {
+  bookingId: number;
+  currency: string;
+  quoteToken?: string | null;
+  quoteExpiresAt?: string | null;
+  eligible: boolean;
+  settlementType: FlightChangeSettlementType | null;
+  oldFlight: {
+    flightId: number;
+    flightNumber: string;
+    from: string;
+    to: string;
+    departureTime: string;
+  };
+  newFlight: {
+    flightId: number;
+    flightNumber: string;
+    from: string;
+    to: string;
+    departureTime: string;
+  };
+  items: Array<{
+    ticketId: number;
+    passengerId: number;
+    passengerName: string;
+    passengerType: string;
+    eligible: boolean;
+    reason: string | null;
+    originalFareAmount: number;
+    newFareAmount: number;
+    fareDifference: number;
+    changeFee: number;
+    taxDifference: number;
+    netAmount: number;
+  }>;
+  summary: {
+    originalFareAmount: number;
+    newFareAmount: number;
+    fareDifference: number;
+    changeFee: number;
+    taxDifference: number;
+    refundFee: number;
+    netAmount: number;
+  };
+  impacts: {
+    seatAction: string;
+    serviceAction: string;
+  };
+  messages: string[];
+}
+
+export interface FlightChangeConfirmRequest {
+  quoteToken: string;
+  idempotencyKey: string;
+  expectedAdditionalAmount: number;
+  expectedRefundAmount: number;
+  expectedNetAmount: number;
+}
+
+export interface FlightChangeConfirmResponse {
+  settlementId?: number | null;
+  bookingId: number;
+  currency: string;
+  settlementType: FlightChangeSettlementType;
+  status: 'COMPLETED' | 'REFUND_PENDING' | 'REFUND_FAILED' | 'PAYMENT_REQUIRED';
+  refundStatus?: string | null;
+  provider?: string | null;
+  providerRefundId?: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  refundMethod?: BookingRefundMethod | null;
+  paymentMethods?: Array<{
+    code: string;
+    label: string;
+    provider: string;
+    icon: string | null;
+    supported: boolean;
+  }> | null;
+  summary: {
+    additionalAmount: number;
+    refundAmount: number;
+    netAmount: number;
+  };
+}
+
 export interface BookingCancellationPreviewRequest {
   ticketIds: number[];
 }

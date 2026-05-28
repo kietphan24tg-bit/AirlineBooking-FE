@@ -118,15 +118,19 @@ function StepIndicator({ step }: { step: CancelStep }) {
                   active
                     ? 'bg-primary text-white'
                     : done
-                      ? 'bg-green-500 text-white'
-                      : 'bg-surface-container-high text-on-surface-variant'
+                      ? 'bg-luxury-gold text-midnight-burgundy'
+                      : 'border border-luxury-gold/20 bg-white text-on-surface-variant'
                 }`}
               >
                 {done ? 'OK' : item.num}
               </div>
               <span
                 className={`whitespace-nowrap text-xs font-semibold ${
-                  active ? 'text-primary' : done ? 'text-green-600' : 'text-on-surface-variant'
+                  active
+                    ? 'text-primary'
+                    : done
+                      ? 'text-midnight-burgundy'
+                      : 'text-on-surface-variant'
                 }`}
               >
                 {item.label}
@@ -135,7 +139,7 @@ function StepIndicator({ step }: { step: CancelStep }) {
             {index < steps.length - 1 ? (
               <div
                 className={`mx-3 h-px flex-1 ${
-                  step > item.num ? 'bg-green-400' : 'bg-surface-container-high'
+                  step > item.num ? 'bg-luxury-gold/60' : 'bg-luxury-gold/15'
                 }`}
               />
             ) : null}
@@ -159,24 +163,34 @@ function FlightRow({
 }) {
   const content = (
     <div
-      className={`mt-3 flex items-stretch gap-0 overflow-hidden rounded-xl border transition-all ${
-        selected ? 'border-primary/40 bg-primary/5' : 'border-surface-container-high bg-white'
+      className={`mt-3 flex items-stretch gap-0 overflow-hidden rounded-[22px] border transition-all ${
+        selected
+          ? 'border-luxury-gold/35 bg-[linear-gradient(180deg,rgba(125,6,51,0.035),rgba(255,255,255,0.98))] shadow-[0_14px_32px_rgba(125,6,51,0.08)]'
+          : 'border-luxury-gold/14 bg-white hover:border-luxury-gold/24'
       }`}
     >
-      <div className="flex min-w-[90px] flex-col items-center justify-center bg-primary/10 px-3 py-3 text-center">
-        <span className="text-[10px] font-black uppercase text-primary">{flight.label}</span>
+      <div
+        className={`flex min-w-[104px] flex-col items-center justify-center px-3 py-3 text-center ${
+          selected ? 'bg-[linear-gradient(180deg,rgba(212,175,55,0.14),rgba(125,6,51,0.06))]' : 'bg-surface-lowest'
+        }`}
+      >
+        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-midnight-burgundy">
+          {flight.label}
+        </span>
         <span className="mt-1 text-[10px] text-on-surface-variant">{flight.date}</span>
       </div>
       <div className="flex flex-1 items-center justify-between gap-2 px-4 py-3">
         {selectable ? (
           <div
-            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-all ${
-              selected ? 'border-primary bg-primary' : 'border-gray-300 bg-white'
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-all ${
+              selected
+                ? 'border-midnight-burgundy bg-midnight-burgundy text-luxury-gold'
+                : 'border-luxury-gold/25 bg-white'
             }`}
           >
             {selected ? (
               <svg
-                className="h-3 w-3 text-white"
+                className="h-3.5 w-3.5"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -188,25 +202,25 @@ function FlightRow({
           </div>
         ) : null}
         <div className="text-left">
-          <p className="text-sm font-black text-on-surface">{flight.time}</p>
-          <p className="text-base font-black text-on-surface">{flight.fromCode}</p>
+          <p className="text-[1.1rem] font-black text-on-surface">{flight.time}</p>
+          <p className="text-[1.45rem] font-black text-on-surface">{flight.fromCode}</p>
           <p className="text-[10px] text-on-surface-variant">{flight.fromCity}</p>
           <p className="text-[10px] text-on-surface-variant">{flight.fromTerminal}</p>
         </div>
         <div className="flex flex-1 flex-col items-center gap-1 px-2">
-          <p className="text-[10px] text-on-surface-variant">{flight.flightNo}</p>
+          <p className="text-[10px] text-midnight-burgundy">{flight.flightNo}</p>
           <div className="flex w-full items-center gap-1">
-            <div className="h-px flex-1 border-t-2 border-dashed border-gray-300" />
-            <Plane className="h-4 w-4 text-primary" />
-            <div className="h-px flex-1 border-t-2 border-dashed border-gray-300" />
+            <div className="h-px flex-1 border-t-2 border-dashed border-luxury-gold/45" />
+            <Plane className="h-4 w-4 text-midnight-burgundy" />
+            <div className="h-px flex-1 border-t-2 border-dashed border-luxury-gold/45" />
           </div>
           <p className="text-[10px] font-semibold uppercase text-on-surface-variant">
             {flight.cabin}
           </p>
         </div>
         <div className="text-right">
-          <p className="text-sm font-black text-on-surface">{flight.arrivalTime}</p>
-          <p className="text-base font-black text-on-surface">{flight.toCode}</p>
+          <p className="text-[1.1rem] font-black text-on-surface">{flight.arrivalTime}</p>
+          <p className="text-[1.45rem] font-black text-on-surface">{flight.toCode}</p>
           <p className="text-[10px] text-on-surface-variant">{flight.toCity}</p>
           <p className="text-[10px] text-on-surface-variant">{flight.toTerminal}</p>
         </div>
@@ -220,7 +234,7 @@ function FlightRow({
     <button
       type="button"
       onClick={onToggle}
-      className="w-full text-left transition-transform hover:scale-[1.005] active:scale-[0.995]"
+      className="w-full text-left"
     >
       {content}
     </button>
@@ -250,7 +264,9 @@ function PreviewSummaryCard({
 }) {
   return (
     <div className="glass-panel self-start rounded-2xl border border-surface-container-high p-5 shadow-sm">
-      <p className="mb-4 text-base font-bold text-on-surface">Cancellation summary</p>
+      <p className="mb-4 font-headline text-[1.5rem] font-black text-on-surface">
+        Cancellation summary
+      </p>
 
       {selectedCount === 0 ? (
         <div className="rounded-xl border border-dashed border-surface-container-high px-4 py-5 text-sm text-on-surface-variant">
@@ -290,7 +306,7 @@ function PreviewSummaryCard({
             ))}
           </div>
 
-          <div className="my-3 border-t border-surface-container-high" />
+          <div className="my-3 border-t border-luxury-gold/12" />
 
           <div className="mb-3">
             <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">
@@ -315,7 +331,7 @@ function PreviewSummaryCard({
             ))}
           </div>
 
-          <div className="my-3 border-t border-surface-container-high" />
+          <div className="my-3 border-t border-luxury-gold/12" />
 
           <div className="mb-3">
             <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">
@@ -342,18 +358,18 @@ function PreviewSummaryCard({
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-on-surface-variant">Cancellation fee</span>
-                <span className="text-red-500">
+                <span className="text-midnight-burgundy">
                   -{formatMoney(preview.summary.refundFee, preview.currency)}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="my-3 border-t-2 border-surface-container-high" />
+          <div className="my-3 border-t-2 border-luxury-gold/18" />
 
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-bold text-on-surface">Total refund</span>
-            <span className="text-lg font-black text-primary">
+            <span className="text-lg font-black text-midnight-burgundy">
               {formatMoney(preview.summary.netRefund, preview.currency)}
             </span>
           </div>
@@ -371,7 +387,7 @@ function PreviewSummaryCard({
                 type="button"
                 onClick={onConfirm}
                 disabled={confirmLoading}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-black text-white shadow-lg transition-all hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-midnight-burgundy py-3 text-sm font-black text-luxury-gold shadow-[0_14px_30px_rgba(125,6,51,0.18)] transition-all hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {confirmLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
                 Confirm cancellation
@@ -662,13 +678,15 @@ function Step3({
   const canChangeFlight = bookingLookup.actions?.canChangeFlight ?? false;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="space-y-5">
       <div
-        className={`glass-panel rounded-2xl border p-8 text-center shadow-sm ${
-          isFailed ? 'border-red-200 bg-red-50/50' : 'border-green-200 bg-green-50/50'
+        className={`glass-panel rounded-[28px] border p-7 shadow-[0_18px_44px_rgba(125,6,51,0.08)] ${
+          isFailed
+            ? 'border-red-200 bg-[linear-gradient(180deg,rgba(254,242,242,0.9),rgba(255,255,255,0.98))]'
+            : 'border-luxury-gold/18 bg-[linear-gradient(180deg,rgba(212,175,55,0.08),rgba(255,255,255,0.98))]'
         }`}
       >
-        <div className="mb-3 flex justify-center">
+        <div className="mb-4 flex">
           <div
             className={`flex h-16 w-16 items-center justify-center rounded-full ${
               isFailed ? 'bg-red-100' : 'bg-green-100'
@@ -681,10 +699,14 @@ function Step3({
             )}
           </div>
         </div>
-        <h2 className={`mb-2 text-xl font-black ${isFailed ? 'text-red-700' : 'text-green-700'}`}>
+        <h2
+          className={`mb-2 font-headline text-[2rem] font-black ${
+            isFailed ? 'text-red-700' : 'text-on-surface'
+          }`}
+        >
           {isFailed ? 'Cancellation failed!' : 'Cancellation successful!'}
         </h2>
-        <p className="mb-4 text-sm text-on-surface-variant">
+        <p className="mb-4 max-w-2xl text-sm text-on-surface-variant">
           {isFailed
             ? 'Your cancellation request could not be processed.'
             : 'Your flight cancellation request has been processed.'}
@@ -708,7 +730,7 @@ function Step3({
       </div>
 
       {isFailed && preview.errorMessage ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4">
+        <div className="flex items-start gap-3 rounded-[24px] border border-red-200 bg-red-50 p-4">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
           <div>
             <p className="text-sm font-bold text-red-700">Failure reason</p>
@@ -717,188 +739,205 @@ function Step3({
         </div>
       ) : null}
 
-      <div className="glass-panel rounded-2xl border border-surface-container-high p-5 shadow-sm">
-        <p className="mb-3 text-base font-bold text-on-surface">Booking information</p>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-              PNR
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-5">
+          <div className="glass-panel rounded-[28px] border border-luxury-gold/18 p-5 shadow-[0_18px_44px_rgba(125,6,51,0.08)]">
+            <p className="mb-4 font-headline text-[1.5rem] font-black text-on-surface">
+              Booking information
             </p>
-            <p className="mt-1 text-sm font-black text-green-600">{booking.pnr}</p>
-          </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-              Booking date
-            </p>
-            <p className="mt-1 text-sm font-bold text-on-surface">{booking.bookingDate}</p>
-          </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-              Status
-            </p>
-            <p
-              className={`mt-1 inline-block rounded px-2 py-0.5 text-[11px] font-black uppercase ${
-                isFailed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-              }`}
-            >
-              {isFailed ? 'Confirmed' : 'Cancelled'}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-              {isFailed ? 'Requested at' : 'Cancelled at'}
-            </p>
-            <p className="mt-1 text-sm font-bold text-on-surface">
-              {formatDateTimeLabel(preview.cancelledAt)}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="glass-panel rounded-2xl border border-surface-container-high p-5 shadow-sm">
-        <p className="mb-2 text-base font-bold text-on-surface">
-          {isFailed ? 'Itinerary' : 'Cancelled itinerary'}
-        </p>
-        {cancelledFlightIds.map((flightId) => {
-          const flight = flightsById.get(flightId);
-          if (!flight) return null;
-          const passengerNames = passengersByFlightId.get(flightId) ?? [];
-          return (
-            <div key={flightId}>
-              <FlightRow flight={flight} />
-              <div className="mt-2 flex flex-wrap items-start justify-between gap-2 rounded-xl bg-surface-low px-4 py-2 text-[11px]">
-                <p className="text-on-surface-variant">
-                  Passenger:{' '}
-                  <span className="font-bold uppercase text-on-surface">
-                    {passengerNames.join(', ')}
-                  </span>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-[22px] border border-luxury-gold/12 bg-surface-lowest px-4 py-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                  PNR
                 </p>
-                {baggage ? (
-                  <p className="text-on-surface-variant">
-                    Baggage:{' '}
-                    <span className="font-bold text-on-surface">
-                      {baggage.baggageCheckinKg}kg checked, {baggage.baggageHandKg}kg cabin
-                    </span>
-                  </p>
-                ) : null}
+                <p className="mt-1 text-lg font-black text-midnight-burgundy">{booking.pnr}</p>
+              </div>
+              <div className="rounded-[22px] border border-luxury-gold/12 bg-surface-lowest px-4 py-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                  Booking date
+                </p>
+                <p className="mt-1 text-sm font-bold text-on-surface">{booking.bookingDate}</p>
+              </div>
+              <div className="rounded-[22px] border border-luxury-gold/12 bg-surface-lowest px-4 py-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                  Status
+                </p>
+                <p
+                  className={`mt-1 inline-block rounded-full px-2.5 py-1 text-[11px] font-black uppercase ${
+                    isFailed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                  }`}
+                >
+                  {isFailed ? 'Confirmed' : 'Cancelled'}
+                </p>
+              </div>
+              <div className="rounded-[22px] border border-luxury-gold/12 bg-surface-lowest px-4 py-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                  {isFailed ? 'Requested at' : 'Cancelled at'}
+                </p>
+                <p className="mt-1 text-sm font-bold text-on-surface">
+                  {formatDateTimeLabel(preview.cancelledAt)}
+                </p>
               </div>
             </div>
-          );
-        })}
-      </div>
+          </div>
 
-      {!isFailed ? (
-        <div className="glass-panel rounded-2xl border border-surface-container-high p-5 shadow-sm">
-          <p className="mb-3 text-base font-bold text-on-surface">Refund information</p>
-          <div className="rounded-xl bg-green-50 px-4 py-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-[11px] font-semibold text-on-surface-variant">Total refund</p>
-                <p className="mt-1 text-2xl font-black text-green-600">
-                  {formatMoney(preview.summary.netRefund, preview.currency)}
-                </p>
+          <div className="glass-panel rounded-[28px] border border-luxury-gold/18 p-5 shadow-[0_18px_44px_rgba(125,6,51,0.08)]">
+            <p className="mb-3 font-headline text-[1.5rem] font-black text-on-surface">
+              {isFailed ? 'Itinerary' : 'Cancelled itinerary'}
+            </p>
+            <div className="space-y-4">
+              {cancelledFlightIds.map((flightId) => {
+                const flight = flightsById.get(flightId);
+                if (!flight) return null;
+                const passengerNames = passengersByFlightId.get(flightId) ?? [];
+                return (
+                  <div key={flightId}>
+                    <FlightRow flight={flight} />
+                    <div className="mt-2 flex flex-wrap items-start justify-between gap-2 rounded-[18px] bg-surface-lowest px-4 py-2 text-[11px]">
+                      <p className="text-on-surface-variant">
+                        Passenger:{' '}
+                        <span className="font-bold uppercase text-on-surface">
+                          {passengerNames.join(', ')}
+                        </span>
+                      </p>
+                      {baggage ? (
+                        <p className="text-on-surface-variant">
+                          Baggage:{' '}
+                          <span className="font-bold text-on-surface">
+                            {baggage.baggageCheckinKg}kg checked, {baggage.baggageHandKg}kg cabin
+                          </span>
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {!isFailed ? (
+            <div className="glass-panel rounded-[28px] border border-luxury-gold/18 p-5 shadow-[0_18px_44px_rgba(125,6,51,0.08)]">
+              <p className="mb-3 font-headline text-[1.5rem] font-black text-on-surface">
+                Refund information
+              </p>
+              <div className="rounded-[22px] border border-luxury-gold/14 bg-surface-lowest px-4 py-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] font-semibold text-on-surface-variant">Total refund</p>
+                    <p className="mt-1 text-2xl font-black text-midnight-burgundy">
+                      {formatMoney(preview.summary.netRefund, preview.currency)}
+                    </p>
+                  </div>
+                  {preview.refundMethod ? (
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-3">
+                        <span className="text-on-surface-variant">Refund method</span>
+                        <span className="text-right font-bold text-on-surface">
+                          {preview.refundMethod.maskedAccount
+                            ? `${preview.refundMethod.label} (${preview.refundMethod.maskedAccount})`
+                            : preview.refundMethod.label}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <span className="text-on-surface-variant">Estimated time</span>
+                        <span className="text-right font-bold text-on-surface">
+                          {preview.refundMethod.estimatedDays}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </div>
               {preview.refundMethod ? (
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between gap-3">
-                    <span className="text-on-surface-variant">Refund method</span>
-                    <span className="text-right font-bold text-on-surface">
-                      {preview.refundMethod.maskedAccount
-                        ? `${preview.refundMethod.label} (${preview.refundMethod.maskedAccount})`
-                        : preview.refundMethod.label}
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-on-surface-variant">Estimated time</span>
-                    <span className="text-right font-bold text-on-surface">
-                      {preview.refundMethod.estimatedDays}
-                    </span>
-                  </div>
+                <div className="mt-3 flex items-start gap-2 rounded-[18px] border border-luxury-gold/14 bg-midnight-burgundy/5 px-3 py-2 text-[11px] text-midnight-burgundy">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-midnight-burgundy" />
+                  <p>
+                    The refund will be processed to your account/card within{' '}
+                    {preview.refundMethod.estimatedDays} depending on your card issuer.
+                  </p>
                 </div>
               ) : null}
             </div>
-          </div>
-          {preview.refundMethod ? (
-            <div className="mt-3 flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-800">
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
-              <p>
-                The refund will be processed to your account/card within{' '}
-                {preview.refundMethod.estimatedDays} depending on your card issuer.
+          ) : null}
+
+          {isFailed ? (
+            <div className="glass-panel rounded-[28px] border border-luxury-gold/18 p-5 shadow-[0_18px_44px_rgba(125,6,51,0.08)]">
+              <p className="mb-3 font-headline text-[1.5rem] font-black text-on-surface">
+                Suggestions for you
               </p>
+              {canChangeFlight ? (
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-luxury-gold/12 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <RefreshCw className="h-4 w-4 text-on-surface-variant" />
+                    <p className="text-[12px] text-on-surface-variant">
+                      You may change to another flight if seats are available and your fare allows.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/manage-booking/cancel')}
+                    className="rounded-full border border-midnight-burgundy/20 px-3 py-1.5 text-[12px] font-bold text-midnight-burgundy transition-all hover:bg-midnight-burgundy/5"
+                  >
+                    Change flight
+                  </button>
+                </div>
+              ) : null}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-luxury-gold/12 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <Headphones className="h-4 w-4 text-on-surface-variant" />
+                  <p className="text-[12px] text-on-surface-variant">
+                    Contact our hotline <span className="font-bold text-midnight-burgundy">1900 1886</span> for
+                    detailed support.
+                  </p>
+                </div>
+                <a
+                  href="tel:19001886"
+                  className="rounded-full border border-midnight-burgundy/20 px-3 py-1.5 text-[12px] font-bold text-midnight-burgundy transition-all hover:bg-midnight-burgundy/5"
+                >
+                  Call now
+                </a>
+              </div>
             </div>
           ) : null}
         </div>
-      ) : null}
 
-      {isFailed ? (
-        <div className="glass-panel rounded-2xl border border-surface-container-high p-5 shadow-sm">
-          <p className="mb-3 text-base font-bold text-on-surface">Suggestions for you</p>
-          {canChangeFlight ? (
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-container-high px-4 py-3">
-              <div className="flex items-center gap-3">
-                <RefreshCw className="h-4 w-4 text-on-surface-variant" />
-                <p className="text-[12px] text-on-surface-variant">
-                  You may change to another flight if seats are available and your fare allows.
-                </p>
-              </div>
+        <div className="space-y-5">
+          <div className="glass-panel rounded-[28px] border border-luxury-gold/18 p-5 shadow-[0_18px_44px_rgba(125,6,51,0.08)]">
+            <p className="mb-4 font-headline text-[1.5rem] font-black text-on-surface">
+              Next actions
+            </p>
+            <div className="space-y-3">
               <button
                 type="button"
-                onClick={() => navigate('/manage-booking/cancel')}
-                className="rounded-lg border border-primary px-3 py-1.5 text-[12px] font-bold text-primary transition-all hover:bg-primary/5 active:scale-95"
+                onClick={() => navigate('/manage-booking')}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-midnight-burgundy px-4 py-3 text-sm font-bold text-luxury-gold shadow-[0_14px_30px_rgba(125,6,51,0.18)] transition-all hover:brightness-110 active:scale-95"
               >
-                Change flight
+                Manage booking
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-luxury-gold/16 bg-white px-4 py-3 text-sm font-bold text-midnight-burgundy transition-all hover:bg-midnight-burgundy/5 active:scale-95"
+              >
+                <Home className="h-4 w-4" />
+                Back to home
               </button>
             </div>
-          ) : null}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-container-high px-4 py-3">
-            <div className="flex items-center gap-3">
-              <Headphones className="h-4 w-4 text-on-surface-variant" />
-              <p className="text-[12px] text-on-surface-variant">
-                Contact our hotline <span className="font-bold text-primary">1900 1886</span> for
-                detailed support.
-              </p>
-            </div>
-            <a
-              href="tel:19001886"
-              className="rounded-lg border border-primary px-3 py-1.5 text-[12px] font-bold text-primary transition-all hover:bg-primary/5 active:scale-95"
-            >
-              Call now
-            </a>
           </div>
-        </div>
-      ) : null}
 
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <button
-          type="button"
-          onClick={() => navigate('/')}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-surface-container-high bg-white px-4 py-3 text-sm font-bold text-on-surface transition-all hover:bg-surface-low active:scale-95"
-        >
-          <Home className="h-4 w-4" />
-          Back to home
-        </button>
-        <button
-          type="button"
-          onClick={() => navigate('/manage-booking')}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-all active:scale-95 ${
-            isFailed
-              ? 'bg-primary text-white shadow-lg hover:brightness-110'
-              : 'border border-surface-container-high bg-white text-on-surface hover:bg-surface-low'
-          }`}
-        >
-          Manage booking
-        </button>
-      </div>
-
-      <div className="glass-panel flex items-center gap-3 rounded-2xl border border-surface-container-high p-4 shadow-sm">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
-          <Headphones className="h-4 w-4 text-primary" />
-        </div>
-        <div className="flex-1">
-          <p className="text-sm font-bold text-on-surface">Need support?</p>
-          <p className="text-[11px] text-on-surface-variant">
-            Call hotline <span className="font-bold text-primary">1900 1886</span> for assistance.
-          </p>
+          <div className="glass-panel rounded-[28px] border border-luxury-gold/18 p-4 shadow-[0_18px_44px_rgba(125,6,51,0.08)]">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-midnight-burgundy/8">
+                <Headphones className="h-4 w-4 text-midnight-burgundy" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-on-surface">Need support?</p>
+                <p className="text-[11px] text-on-surface-variant">
+                  Call hotline <span className="font-bold text-midnight-burgundy">1900 1886</span> for assistance.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -923,6 +962,7 @@ export default function CancelFlight() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const autoBootstrappedRef = useRef(false);
+  const autoResyncedRef = useRef(false);
   const previewRequestSeqRef = useRef(0);
 
   useEffect(() => {
@@ -953,6 +993,40 @@ export default function CancelFlight() {
     setMockManageBookingMode(true);
     resetMockManageBookingVariant(variant);
   }, [bookingLookup, setMockManageBookingMode]);
+
+  useEffect(() => {
+    if (!bookingLookup || autoResyncedRef.current) return;
+
+    const normalizedPnr = bookingLookup.booking.pnrCode.trim().toUpperCase();
+    const normalizedLastName = foldAsciiUpper(bookingLookup.passengers[0]?.lastName ?? '');
+
+    if (normalizedPnr !== 'ABC123' || normalizedLastName !== 'NGUYEN') return;
+
+    autoResyncedRef.current = true;
+    setBootstrapping(true);
+    setSelectedFlightKeys(new Set());
+    setPreview(null);
+    setPreviewError(null);
+    setConfirmError(null);
+    setConfirmedCancellation(null);
+
+    void (async () => {
+      try {
+        resetMockManageBookingVariant('CONFIRMED');
+        const lookup = await bookingService.lookupBooking({
+          pnrCode: 'ABC123',
+          lastName: 'Nguyen',
+        });
+        setBookingLookup(lookup);
+        const options = await bookingService.getManageOptions(lookup.booking.bookingId);
+        setManageOptions(options);
+      } catch {
+        // Keep existing store state if the sample resync fails.
+      } finally {
+        setBootstrapping(false);
+      }
+    })();
+  }, [bookingLookup, setBookingLookup, setManageOptions]);
 
   useEffect(() => {
     if (bookingLookup || autoBootstrappedRef.current) return;
@@ -1161,13 +1235,21 @@ export default function CancelFlight() {
     <div className="relative min-h-screen bg-surface text-on-surface antialiased">
       <SiteHeader />
       <main className="mx-auto min-h-svh w-full max-w-400 px-6 pb-16 pt-24 sm:pt-28 md:px-8">
-        <div className="mb-6 flex items-center gap-3">
+        <div className="mb-8">
+          <div className="mb-2 text-[0.72rem] font-black uppercase tracking-[0.22em] text-midnight-burgundy">
+            Booking cancellation
+          </div>
+          <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
             <XCircle className="h-5 w-5 text-primary" />
           </div>
           <h1 className="font-headline text-2xl font-black text-on-surface md:text-3xl">
             Cancel flight
           </h1>
+        </div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-on-surface-variant">
+            Keep the same cancellation content and confirmation flow, aligned to the shared Sovereign booking management style.
+          </p>
         </div>
 
         <StepIndicator step={step} />

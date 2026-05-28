@@ -3,6 +3,8 @@
   BookingCancellationConfirmResponse,
   BookingCancellationPreviewResponse,
   BookingCancellationSelectionPreviewRequest,
+  FlightChangeQuoteRequest,
+  FlightChangeQuoteResponse,
   BookingLookupResponse,
   BookingLookupSeatAssignment,
   BookingLookupServiceSelection,
@@ -62,6 +64,10 @@ const FLIGHT_OUTBOUND_ID = 600;
 const FLIGHT_RETURN_ID = 601;
 const FARE_OUTBOUND_ID = 7001;
 const FARE_RETURN_ID = 7002;
+
+const MOCK_CHANGE_FLIGHT_PRICES = [920000, 1080000, 1260000] as const;
+const MOCK_CHANGE_FLIGHT_DEPARTURE_TIMES = ['06:30:00', '10:20:00', '18:45:00'] as const;
+const MOCK_CHANGE_FLIGHT_DURATIONS = [125, 130, 140] as const;
 
 const SEAT_ROW_PRIMARY = {
   seatId: 8001,
@@ -133,6 +139,117 @@ const SERVICE_LOUNGE = {
   serviceType: 'LOUNGE',
   serviceName: 'Airport Lounge',
 };
+
+function formatMockDateOnly(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addMockDays(dateIso: string, offset: number): string {
+  const date = new Date(`${dateIso}T00:00:00+07:00`);
+  date.setDate(date.getDate() + offset);
+  return formatMockDateOnly(date);
+}
+
+function atMockLocalTime(dateIso: string, time: string): string {
+  return `${dateIso}T${time}+07:00`;
+}
+
+function resolveMockFlightChangeScenario(newFareId: number): {
+  priceAmount: number;
+  changeFee: number;
+  settlementType: 'REFUND' | 'NO_CHANGE' | 'COLLECT_PAYMENT';
+  label: string;
+} | null {
+  const fareVariant = newFareId % 10;
+  switch (fareVariant) {
+    case 1:
+      return {
+        priceAmount: 700000,
+        changeFee: 0,
+        settlementType: 'REFUND',
+        label: 'Economy -> refund',
+      };
+    case 2:
+      return {
+        priceAmount: 1000000,
+        changeFee: 0,
+        settlementType: 'NO_CHANGE',
+        label: 'Premium -> no additional payment',
+      };
+    case 3:
+      return {
+        priceAmount: 1350000,
+        changeFee: 150000,
+        settlementType: 'COLLECT_PAYMENT',
+        label: 'Business -> collect payment',
+      };
+    case 4:
+      return {
+        priceAmount: 1900000,
+        changeFee: 250000,
+        settlementType: 'COLLECT_PAYMENT',
+        label: 'First -> collect payment',
+      };
+    default:
+      return null;
+  }
+}
+
+function resolveMockCalendarFlightOption(
+  currentItinerary: BookingLookupResponse['itineraries'][number],
+  newFlightId: number,
+  newFareId: number
+):
+  | {
+      flightId: number;
+      fareId: number;
+      flightNumber: string;
+      departureTime: string;
+      arrivalTime: string;
+      departureAirportCode: string;
+      arrivalAirportCode: string;
+      priceAmount: number;
+    }
+  | null {
+  const scenario = resolveMockFlightChangeScenario(newFareId);
+  if (!scenario) return null;
+
+  for (let index = 0; index < 3; index += 1) {
+    const dayOffsetRaw = newFlightId - 80000 - index;
+    if (dayOffsetRaw % 10 !== 0) continue;
+
+    const dayOffset = dayOffsetRaw / 10;
+    const expectedFareId = newFlightId * 10 + (newFareId % 10);
+    if (newFareId !== expectedFareId) continue;
+
+    const baseDate = formatMockDateOnly(new Date(currentItinerary.departureTime));
+    const departureDate = addMockDays(baseDate, dayOffset);
+    const departureTime = atMockLocalTime(
+      departureDate,
+      MOCK_CHANGE_FLIGHT_DEPARTURE_TIMES[index] ?? '08:30:00'
+    );
+    const arrivalDate = new Date(departureTime);
+    arrivalDate.setMinutes(
+      arrivalDate.getMinutes() + (MOCK_CHANGE_FLIGHT_DURATIONS[index] ?? 125)
+    );
+
+    return {
+      flightId: newFlightId,
+      fareId: newFareId,
+      flightNumber: `VN${220 + dayOffset * 3 + index}`,
+      departureTime,
+      arrivalTime: arrivalDate.toISOString().replace('Z', '+00:00'),
+      departureAirportCode: currentItinerary.departureAirportCode,
+      arrivalAirportCode: currentItinerary.arrivalAirportCode,
+      priceAmount: scenario.priceAmount,
+    };
+  }
+
+  return null;
+}
 
 interface VariantOverrides {
   status: string;
@@ -1555,6 +1672,139 @@ export function getMockBookingTicketsResponse(
       (ticket) =>
         overrides.includeSecondaryPassenger || ticket.passenger.id !== PASSENGER_SECONDARY_ID
     ),
+  };
+}
+
+export function getMockFlightChangeQuoteResponse(
+  variant: ManageBookingMockVariant,
+  body: FlightChangeQuoteRequest,
+  sources?: {
+    lookup?: BookingLookupResponse;
+    manageOptions?: BookingManageOptionsResponse;
+    tickets?: BookingTicketResponse['tickets'];
+  }
+): FlightChangeQuoteResponse {
+  const lookup = sources?.lookup ?? getMockBookingLookupResponse(variant);
+  const manageOptions = sources?.manageOptions ?? getMockManageOptionsResponse(variant);
+  const tickets = sources?.tickets ?? getMockBookingTicketsResponse(variant).tickets;
+  const oldItinerary = lookup.itineraries.find((item) => item.flightId === body.currentFlightId);
+  const newItinerary =
+    manageOptions.itineraries.find((item) => item.flightId === body.newFlightId) ?? null;
+
+  if (!oldItinerary) {
+    throw new Error('Current flight could not be found for the mock quote.');
+  }
+  const resolvedNewFlight =
+    newItinerary && newItinerary.fareId === body.newFareId
+      ? {
+          flightId: newItinerary.flightId,
+          fareId: newItinerary.fareId,
+          flightNumber: newItinerary.flightNumber,
+          departureTime: newItinerary.departureTime,
+          arrivalTime: newItinerary.arrivalTime,
+          departureAirportCode: newItinerary.departureAirportCode,
+          arrivalAirportCode: newItinerary.arrivalAirportCode,
+          priceAmount: newItinerary.flightId === FLIGHT_OUTBOUND_ID ? 920000 : 1080000,
+        }
+      : resolveMockCalendarFlightOption(oldItinerary, body.newFlightId, body.newFareId);
+
+  if (!resolvedNewFlight) {
+    throw new Error('New flight or fare could not be found for the mock quote.');
+  }
+  if (oldItinerary.flightId === resolvedNewFlight.flightId) {
+    throw new Error('The new flight must differ from the current flight.');
+  }
+  if (
+    oldItinerary.departureAirportCode !== resolvedNewFlight.departureAirportCode ||
+    oldItinerary.arrivalAirportCode !== resolvedNewFlight.arrivalAirportCode
+  ) {
+    throw new Error('The selected mock flight is not valid for this route.');
+  }
+
+  const selectedTickets = tickets.filter((ticket) => body.ticketIds.includes(ticket.id));
+  if (selectedTickets.length === 0) {
+    throw new Error('No valid ticket was found for the flight change quote.');
+  }
+
+  const fareNetPerTicket = 1000000;
+  const newFarePerTicket = resolvedNewFlight.priceAmount;
+  const scenario = resolveMockFlightChangeScenario(body.newFareId);
+  const changeFeePerTicket = scenario?.changeFee ?? oldItinerary.fareBenefits.changeFee;
+
+  const items = selectedTickets.map((ticket) => {
+    const fareDifference = newFarePerTicket - fareNetPerTicket;
+    const netAmount = fareDifference + changeFeePerTicket;
+    return {
+      ticketId: ticket.id,
+      passengerId: ticket.passenger.id,
+      passengerName: `${ticket.passenger.lastName} ${ticket.passenger.firstName}`.trim(),
+      passengerType: ticket.passenger.passengerType,
+      eligible: true,
+      reason: null,
+      originalFareAmount: fareNetPerTicket,
+      newFareAmount: newFarePerTicket,
+      fareDifference,
+      changeFee: changeFeePerTicket,
+      taxDifference: 0,
+      netAmount,
+    };
+  });
+
+  const summary = items.reduce(
+    (acc, item) => ({
+      originalFareAmount: acc.originalFareAmount + item.originalFareAmount,
+      newFareAmount: acc.newFareAmount + item.newFareAmount,
+      fareDifference: acc.fareDifference + item.fareDifference,
+      changeFee: acc.changeFee + item.changeFee,
+      taxDifference: acc.taxDifference + item.taxDifference,
+      refundFee: 0,
+      netAmount: acc.netAmount + item.netAmount,
+    }),
+    {
+      originalFareAmount: 0,
+      newFareAmount: 0,
+      fareDifference: 0,
+      changeFee: 0,
+      taxDifference: 0,
+      refundFee: 0,
+      netAmount: 0,
+    }
+  );
+
+  return {
+    bookingId: lookup.booking.bookingId,
+    currency: lookup.booking.currency,
+    quoteToken: `mock_fcq_${body.currentFlightId}_${body.newFlightId}_${body.newFareId}`,
+    quoteExpiresAt: '2026-05-27T10:45:00+07:00',
+    eligible: true,
+    settlementType:
+      summary.netAmount > 0 ? 'COLLECT_PAYMENT' : summary.netAmount < 0 ? 'REFUND' : 'NO_CHANGE',
+    oldFlight: {
+      flightId: oldItinerary.flightId,
+      flightNumber: oldItinerary.flightNumber,
+      from: oldItinerary.departureAirportCode,
+      to: oldItinerary.arrivalAirportCode,
+      departureTime: oldItinerary.departureTime,
+    },
+    newFlight: {
+      flightId: resolvedNewFlight.flightId,
+      flightNumber: resolvedNewFlight.flightNumber,
+      from: resolvedNewFlight.departureAirportCode,
+      to: resolvedNewFlight.arrivalAirportCode,
+      departureTime: resolvedNewFlight.departureTime,
+    },
+    items,
+    summary,
+    impacts: {
+      seatAction: 'RESELECT_REQUIRED',
+      serviceAction: 'REVIEW_REQUIRED',
+    },
+    messages: [
+      'Quote co hieu luc trong 15 phut.',
+      scenario?.label
+        ? `Mock scenario: ${scenario.label}.`
+        : 'Mock scenario: standard collect payment.',
+    ],
   };
 }
 

@@ -39,6 +39,12 @@ export interface CreateServiceChangePaymentRequest {
   method: string;
 }
 
+export interface CreateFlightChangePaymentRequest {
+  bookingId: string | number;
+  flightChangeSettlementId: string | number;
+  method: string;
+}
+
 export interface CreatePaymentResponse {
   payment: PaymentEntity;
   action: PaymentAction;

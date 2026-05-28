@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   BriefcaseBusiness,
@@ -22,6 +22,11 @@ import MarketingNav from '../components/layout/MarketingNav';
 import SiteFooter from '../components/layout/SiteFooter';
 import { bookingService } from '../services/booking.service';
 import { flightService } from '../services/flight.service';
+import {
+  commitMockManageBookingVariant,
+  resetMockManageBookingVariant,
+  resolveMockManageBookingVariant,
+} from '../services/booking.service';
 import {
   cancelPayment,
   createServiceChangePaymentLink,
@@ -221,6 +226,7 @@ function buildInitialSelections(
 export default function ManageBookingAddExtras() {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const manageOptions = useBookingStore((s) => s.manageOptions);
   const bookingLookup = useBookingStore((s) => s.bookingLookup);
   const bookingResponse = useBookingStore((s) => s.bookingResponse);
@@ -231,6 +237,7 @@ export default function ManageBookingAddExtras() {
     bookingLookup,
     bookingResponse,
   });
+  const [entryReady, setEntryReady] = useState(false);
 
   const redirectingRef = useRef(false);
   useEffect(() => {
@@ -241,11 +248,21 @@ export default function ManageBookingAddExtras() {
     }
   }, [manageBookingId, navigate]);
 
+  useEffect(() => {
+    if (manageBookingId == null) return;
+    const variant = resolveMockManageBookingVariant();
+    setManageOptions(null);
+    if (variant) resetMockManageBookingVariant(variant);
+    queryClient.removeQueries({ queryKey: ['manage-options', manageBookingId], exact: true });
+    setEntryReady(true);
+  }, [manageBookingId, queryClient, setManageOptions]);
+
   const manageOptionsQuery = useQuery({
     queryKey: ['manage-options', manageBookingId],
     queryFn: () => bookingService.getManageOptions(manageBookingId as number),
-    enabled: manageBookingId != null,
-    staleTime: 60_000,
+    enabled: entryReady && manageBookingId != null,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   useEffect(() => {
@@ -305,6 +322,13 @@ export default function ManageBookingAddExtras() {
     setSelections(originalSelections);
     hydratedRef.current = true;
   }, [originalSelections, passengers.length]);
+
+  useEffect(() => {
+    if (!entryReady) return;
+    hydratedRef.current = false;
+    setSelections({});
+    setPreviewOption(null);
+  }, [entryReady]);
 
   const canLoadCatalog = activeItinerary?.flightId != null && activeItinerary?.fareId != null;
   const servicesQuery = useQuery<ServiceCatalogResponse>({
@@ -746,6 +770,8 @@ export default function ManageBookingAddExtras() {
       const status = (response.payment?.status as PaymentStatus | undefined) ?? null;
       setPaymentUiState((current) => ({ ...current, paymentStatusOverride: status }));
       if (status === 'SUCCESS') {
+        const variant = resolveMockManageBookingVariant();
+        if (variant) commitMockManageBookingVariant(variant);
         await refreshSelectionsFromServer();
       }
       const nextVariant = mapPaymentStatusToResultVariant(status);
@@ -807,7 +833,13 @@ export default function ManageBookingAddExtras() {
       const nextVariant = mapPaymentStatusToResultVariant(resolvedStatus);
       if (nextVariant) {
         void (
-          resolvedStatus === 'SUCCESS' ? refreshSelectionsFromServer() : Promise.resolve()
+          resolvedStatus === 'SUCCESS'
+            ? (() => {
+                const variant = resolveMockManageBookingVariant();
+                if (variant) commitMockManageBookingVariant(variant);
+                return refreshSelectionsFromServer();
+              })()
+            : Promise.resolve()
         ).finally(() => {
           openServiceChangeResult(nextVariant, {
             amount: Math.abs(amountDueNow),

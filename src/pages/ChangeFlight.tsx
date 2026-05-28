@@ -126,17 +126,17 @@ type CompletedFlightChange = {
 const FLIGHT_CHANGE_REDIRECT_CONTEXT_KEY = 'flight-change-payment-redirect-context';
 
 const CHANGE_STEP_ITEMS = [
-  { id: 1, label: 'Chọn chuyến bay' },
-  { id: 2, label: 'Chọn chuyến mới' },
-  { id: 3, label: 'Xác nhận thay đổi' },
-  { id: 4, label: 'Thanh toán' },
-  { id: 5, label: 'Hoàn tất' },
+  { id: 1, label: 'Select flight' },
+  { id: 2, label: 'Select new flight' },
+  { id: 3, label: 'Confirm changes' },
+  { id: 4, label: 'Payment' },
+  { id: 5, label: 'Complete' },
 ] as const;
 
 function formatTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleTimeString('vi-VN', {
+  return date.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -145,7 +145,7 @@ function formatTime(value: string): string {
 function formatShortDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('vi-VN', {
+  return date.toLocaleDateString('en-US', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -155,7 +155,7 @@ function formatShortDate(value: string): string {
 function formatDayMonth(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('vi-VN', {
+  return date.toLocaleDateString('en-US', {
     day: '2-digit',
     month: '2-digit',
   });
@@ -163,8 +163,8 @@ function formatDayMonth(value: string): string {
 
 function formatWeekday(value: string): string {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Ngày bay';
-  const weekday = date.toLocaleDateString('vi-VN', { weekday: 'short' }).replace('.', '');
+  if (Number.isNaN(date.getTime())) return 'Flight day';
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'short' }).replace('.', '');
   return weekday.charAt(0).toUpperCase() + weekday.slice(1);
 }
 
@@ -208,7 +208,7 @@ function formatDuration(start: string, end: string): string {
 function formatMoney(amount: number | null | undefined, currency = 'VND'): string {
   if (!Number.isFinite(amount)) return '--';
   const safeAmount = amount as number;
-  return `${safeAmount.toLocaleString('vi-VN')} ${currency}`;
+  return `${safeAmount.toLocaleString('en-US')} ${currency}`;
 }
 
 function resolvePaymentId(response: CreatePaymentResponse | null): number | null {
@@ -252,13 +252,13 @@ function getFlightChangePaymentErrorMessage(
 ): string {
   switch (variant) {
     case 'payment_failed':
-      return 'Thanh toan khong thanh cong. Vui long thu lai hoac chon phuong thuc khac.';
+      return 'Payment failed. Please try again or choose a different method.';
     case 'payment_cancelled':
-      return 'Giao dich da bi huy truoc khi hoan tat. Vui long tao lai giao dich de tiep tuc.';
+      return 'The transaction was cancelled before it was completed. Please create a new one to continue.';
     case 'payment_expired':
-      return 'Ma thanh toan da het han. Vui long tao ma moi de tiep tuc.';
+      return 'The payment link has expired. Please generate a new one to continue.';
     default:
-      return 'Khong the xac nhan trang thai thanh toan luc nay. Vui long thu lai.';
+      return 'Unable to confirm payment status right now. Please try again.';
   }
 }
 
@@ -273,9 +273,9 @@ function cabinLabel(value: string): string {
 
 function passengerTypeLabel(value: string): string {
   const normalized = value.trim().toUpperCase();
-  if (normalized === 'ADULT') return 'Người lớn';
-  if (normalized === 'CHILD') return 'Trẻ em';
-  if (normalized === 'INFANT') return 'Em bé';
+  if (normalized === 'ADULT') return 'Adult';
+  if (normalized === 'CHILD') return 'Child';
+  if (normalized === 'INFANT') return 'Infant';
   return value;
 }
 
@@ -298,36 +298,33 @@ function mapQuoteSummaryToSettlement(
   };
 }
 
-function mapFlightLegToOption(leg: FlightLeg): NewFlightOption | null {
-  const cheapestFare = [...leg.cabinFares]
-    .filter((fare) => fare.selectable)
-    .sort((a, b) => a.priceAmount - b.priceAmount)[0];
-
-  if (!cheapestFare || typeof cheapestFare.fareId !== 'number') return null;
-
-  return {
-    id: `${leg.id}:${cheapestFare.fareId}`,
-    flightId: Number(leg.id),
-    fareId: cheapestFare.fareId,
-    flightNumber: leg.flightNumber,
-    aircraft: leg.aircraft,
-    departureCode: leg.departureCode,
-    arrivalCode: leg.arrivalCode,
-    departureTime: leg.departureTime,
-    arrivalTime: leg.arrivalTime,
-    durationLabel: leg.durationLabel,
-    cabin: cabinLabel(cheapestFare.cabin),
-    fareName: cheapestFare.fareCode ?? cheapestFare.cabin,
-    priceAmount: cheapestFare.priceAmount,
-    priceLabel: cheapestFare.priceLabel,
-    currency: cheapestFare.currency ?? 'VND',
-  };
+function mapFlightLegToOptions(leg: FlightLeg): NewFlightOption[] {
+  return [...leg.cabinFares]
+    .filter((fare) => fare.selectable && typeof fare.fareId === 'number')
+    .sort((a, b) => a.priceAmount - b.priceAmount)
+    .map((fare) => ({
+      id: `${leg.id}:${fare.fareId}`,
+      flightId: Number(leg.id),
+      fareId: fare.fareId as number,
+      flightNumber: leg.flightNumber,
+      aircraft: leg.aircraft,
+      departureCode: leg.departureCode,
+      arrivalCode: leg.arrivalCode,
+      departureTime: leg.departureTime,
+      arrivalTime: leg.arrivalTime,
+      durationLabel: leg.durationLabel,
+      cabin: cabinLabel(fare.cabin),
+      fareName: fare.fareCode ?? fare.cabin,
+      priceAmount: fare.priceAmount,
+      priceLabel: fare.priceLabel,
+      currency: fare.currency ?? 'VND',
+    }));
 }
 
 function ChangeFlightStepper({ currentStepId }: { currentStepId: number }) {
   return (
     <div className="mb-8 overflow-x-auto pb-2">
-      <div className="flex min-w-max items-center gap-4 border-b border-stone-200 pb-4">
+      <div className="flex min-w-max items-center gap-4 border-b border-luxury-gold/15 pb-4">
         {CHANGE_STEP_ITEMS.map((step, index) => {
           const status =
             step.id < currentStepId
@@ -340,26 +337,28 @@ function ChangeFlightStepper({ currentStepId }: { currentStepId: number }) {
             <div key={step.id} className="flex items-center gap-4">
               <div className="flex items-center gap-2.5">
                 <div
-                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-black ${
                     status === 'completed'
-                      ? 'bg-emerald-500 text-white'
+                      ? 'bg-luxury-gold text-midnight-burgundy'
                       : status === 'active'
-                        ? 'bg-red-600 text-white'
-                        : 'bg-stone-100 text-stone-700'
+                        ? 'bg-midnight-burgundy text-white'
+                        : 'border border-luxury-gold/20 bg-white text-on-surface-variant'
                   }`}
                 >
                   {status === 'completed' ? <Check className="h-3.5 w-3.5" /> : step.id}
                 </div>
                 <span
                   className={`whitespace-nowrap text-sm ${
-                    status === 'active' ? 'font-bold text-red-700' : 'font-medium text-stone-700'
+                    status === 'active'
+                      ? 'font-semibold text-midnight-burgundy'
+                      : 'font-medium text-on-surface-variant'
                   }`}
                 >
                   {step.label}
                 </span>
               </div>
               {index < CHANGE_STEP_ITEMS.length - 1 ? (
-                <div className="h-px w-10 bg-stone-200 md:w-16" />
+                <div className="h-px w-10 bg-luxury-gold/20 md:w-16" />
               ) : null}
             </div>
           );
@@ -382,46 +381,64 @@ function FlightChangeCard({
 }) {
   return (
     <article
-      className={`rounded-xl border bg-white transition-colors ${
-        selected ? 'border-red-300 bg-red-50/20' : 'border-stone-200'
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+      className={`cursor-pointer overflow-hidden rounded-[1.4rem] border bg-white/95 shadow-sm transition-all ${
+        selected
+          ? 'border-luxury-gold/40 bg-[linear-gradient(180deg,rgba(125,6,51,0.035),rgba(255,255,255,0.98))] shadow-[0_18px_36px_rgba(125,6,51,0.08)]'
+          : 'border-luxury-gold/15 hover:border-luxury-gold/28 hover:bg-surface-lowest hover:shadow-[0_12px_24px_rgba(125,6,51,0.05)]'
       }`}
     >
       <div className="flex flex-col md:flex-row">
         <div
-          className={`flex w-full items-start gap-3 border-b border-stone-100 p-4 md:w-56 md:shrink-0 md:border-b-0 md:border-r ${
-            selected ? 'bg-red-50/40' : ''
+          className={`flex w-full items-start gap-3 border-b p-4 md:w-56 md:shrink-0 md:border-b-0 md:border-r ${
+            selected
+              ? 'border-luxury-gold/10 bg-[linear-gradient(180deg,rgba(212,175,55,0.12),rgba(255,255,255,0.45))]'
+              : 'border-luxury-gold/10'
           }`}
         >
           <button
             type="button"
-            onClick={onSelect}
-            aria-label={`Chọn chuyến bay ${index + 1}`}
-            className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelect();
+            }}
+            aria-label={`Select flight ${index + 1}`}
+            className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
               selected
-                ? 'border-red-600 bg-red-600'
-                : 'border-stone-300 bg-white hover:border-red-400'
+                ? 'border-midnight-burgundy bg-midnight-burgundy text-luxury-gold'
+                : 'border-luxury-gold/25 bg-white text-transparent hover:border-midnight-burgundy/50'
             }`}
           >
-            {selected ? <span className="block h-2 w-2 rounded-full bg-white" /> : null}
+            {selected ? <Check className="h-3.5 w-3.5" /> : null}
           </button>
 
           <div className="flex flex-col items-start">
-            <span className="mb-2 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-700">
-              Chuyến bay {index + 1}
+            <span className="mb-2 rounded-full bg-luxury-gold/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary">
+              Flight {index + 1}
             </span>
-            <div className="text-base font-bold text-stone-950">{flight.flightNumber}</div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-stone-900">
+            <div className="font-headline text-base font-black text-midnight-burgundy">
+              {flight.flightNumber}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-on-surface">
               {flight.departureCode}
-              <ArrowRight className="h-3 w-3 text-stone-400" />
+              <ArrowRight className="h-3 w-3 text-luxury-gold" />
               {flight.arrivalCode}
             </div>
-            <div className="mt-1.5 text-xs text-stone-500">
+            <div className="mt-1.5 text-xs text-on-surface-variant">
               {flight.departureTime} - {flight.arrivalTime} • {flight.departureDate}
             </div>
             {!flight.changeable ? (
-              <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium text-stone-500">
+              <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-surface-low px-2 py-0.5 text-[10px] font-medium text-on-surface-variant">
                 <Info className="h-3 w-3" />
-                Không được đổi
+                Not changeable
               </div>
             ) : null}
           </div>
@@ -429,42 +446,42 @@ function FlightChangeCard({
 
         <div className="grid flex-1 grid-cols-2 gap-4 p-4 md:grid-cols-4">
           <div className="flex flex-col text-sm">
-            <div className="text-base font-bold text-stone-950">{flight.departureTime}</div>
-            <div className="mt-0.5 font-semibold text-stone-900">{flight.departureCode}</div>
-            <div className="text-[11px] text-stone-500">{flight.departureDate}</div>
-            <div className="truncate text-[11px] text-stone-500">{flight.departureCity}</div>
+            <div className="text-base font-bold text-on-surface">{flight.departureTime}</div>
+            <div className="mt-0.5 font-semibold text-on-surface">{flight.departureCode}</div>
+            <div className="text-[11px] text-on-surface-variant">{flight.departureDate}</div>
+            <div className="truncate text-[11px] text-on-surface-variant">{flight.departureCity}</div>
             {flight.departureTerminal ? (
-              <div className="mt-0.5 text-[11px] font-medium text-stone-500">
-                Sân bay {flight.departureTerminal}
+              <div className="mt-0.5 text-[11px] font-medium text-on-surface-variant">
+                Terminal {flight.departureTerminal}
               </div>
             ) : null}
           </div>
 
           <div className="flex flex-col items-center justify-center px-2 text-center">
-            <Plane className="mb-1 h-5 w-5 shrink-0 text-stone-400" />
-            <span className="whitespace-nowrap text-[11px] text-stone-500">
+            <Plane className="mb-1 h-5 w-5 shrink-0 text-luxury-gold" />
+            <span className="whitespace-nowrap text-[11px] text-on-surface-variant">
               {flight.durationLabel}
             </span>
           </div>
 
           <div className="flex flex-col text-sm">
-            <div className="text-base font-bold text-stone-950">{flight.arrivalTime}</div>
-            <div className="mt-0.5 font-semibold text-stone-900">{flight.arrivalCode}</div>
-            <div className="text-[11px] text-stone-500">{flight.arrivalDate}</div>
-            <div className="truncate text-[11px] text-stone-500">{flight.arrivalCity}</div>
+            <div className="text-base font-bold text-on-surface">{flight.arrivalTime}</div>
+            <div className="mt-0.5 font-semibold text-on-surface">{flight.arrivalCode}</div>
+            <div className="text-[11px] text-on-surface-variant">{flight.arrivalDate}</div>
+            <div className="truncate text-[11px] text-on-surface-variant">{flight.arrivalCity}</div>
             {flight.arrivalTerminal ? (
-              <div className="mt-0.5 text-[11px] font-medium text-stone-500">
-                Sân bay {flight.arrivalTerminal}
+              <div className="mt-0.5 text-[11px] font-medium text-on-surface-variant">
+                Terminal {flight.arrivalTerminal}
               </div>
             ) : null}
           </div>
 
           <div className="flex flex-col text-sm">
-            <div className="mb-1 text-[11px] text-stone-500">Hạng vé</div>
-            <div className="text-[11px] font-semibold text-stone-950">{flight.fareName}</div>
-            <div className="mb-1 mt-2 text-[11px] text-stone-500">Phí đổi</div>
-            <div className="text-[11px] font-semibold text-stone-900">
-              {flight.changeable ? formatMoney(flight.changeFee, flight.currency) : 'Không áp dụng'}
+            <div className="mb-1 text-[11px] text-on-surface-variant">Fare</div>
+            <div className="text-[11px] font-semibold text-on-surface">{flight.fareName}</div>
+            <div className="mb-1 mt-2 text-[11px] text-on-surface-variant">Change fee</div>
+            <div className="text-[11px] font-semibold text-on-surface">
+              {flight.changeable ? formatMoney(flight.changeFee, flight.currency) : 'N/A'}
             </div>
           </div>
         </div>
@@ -488,23 +505,23 @@ function ChooseFlightStep({
 }) {
   return (
     <section className="pb-6">
-      <h2 className="mb-6 text-2xl font-bold tracking-tight text-stone-950">
-        Quy trình thay đổi chuyến bay
+      <h2 className="mb-6 font-headline text-2xl font-black tracking-tight text-on-surface">
+        Change flight flow
       </h2>
       <ChangeFlightStepper currentStepId={1} />
 
-      <div className="rounded-[16px] border border-stone-200 bg-white">
-        <div className="border-b border-stone-100 p-5">
-          <h3 className="text-lg font-semibold text-stone-950">1. Chọn chuyến bay cần thay đổi</h3>
-          <p className="mt-1 text-sm text-stone-500">
-            Chọn chuyến bay bạn muốn thay đổi trong hành trình của mình.
+      <div className="glass-panel overflow-hidden rounded-[1.75rem] border border-luxury-gold/15 bg-white/95 shadow-[0_18px_50px_rgba(62,16,30,0.08)]">
+        <div className="border-b border-luxury-gold/10 p-5">
+          <h3 className="font-headline text-lg font-black text-midnight-burgundy">1. Select the flight to change</h3>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            Choose which flight in your itinerary you want to change.
           </p>
         </div>
 
-        <div className="space-y-4 bg-stone-50/50 p-5">
+        <div className="space-y-4 bg-[linear-gradient(180deg,rgba(249,246,241,0.8),rgba(255,255,255,0.6))] p-5">
           {flights.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-stone-200 bg-white px-5 py-10 text-center text-sm text-stone-500">
-              Không tìm thấy chuyến bay nào trong đặt chỗ này.
+            <div className="rounded-xl border border-dashed border-luxury-gold/20 bg-white px-5 py-10 text-center text-sm text-on-surface-variant">
+              No flights found for this booking.
             </div>
           ) : (
             flights.map((flight, index) => (
@@ -519,29 +536,29 @@ function ChooseFlightStep({
           )}
         </div>
 
-        <div className="flex items-start gap-2 border-t border-stone-100 bg-sky-50/60 px-5 py-3 text-xs text-sky-900">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-700" />
+        <div className="flex items-start gap-2 border-t border-luxury-gold/10 bg-luxury-gold/8 px-5 py-3 text-xs text-on-surface">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
           <p>
-            Lưu ý: Phí thay đổi và chênh lệch giá vé (nếu có) sẽ được hiển thị ở bước tiếp theo.
+            Note: Change fees and any fare difference (if applicable) will be shown in the next step.
           </p>
         </div>
 
-        <div className="flex items-center justify-between border-t border-stone-100 p-5">
+        <div className="flex items-center justify-between border-t border-luxury-gold/10 p-5">
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-stone-200 px-5 py-2.5 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-midnight-burgundy/20 bg-white px-5 py-2.5 text-sm font-semibold text-midnight-burgundy transition hover:bg-midnight-burgundy/5"
           >
             <ArrowLeft className="h-4 w-4" />
-            Quay lại
+            Back
           </button>
           <button
             type="button"
             disabled={!selectedFlightId}
             onClick={onContinue}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-midnight-burgundy px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Tiếp tục
+            Continue
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
@@ -589,73 +606,75 @@ function ChooseNewFlightStep({
     null;
   return (
     <section className="pb-6">
-      <h2 className="mb-6 text-2xl font-bold tracking-tight text-stone-950">
-        Quy trình thay đổi chuyến bay
+      <h2 className="mb-6 font-headline text-2xl font-black tracking-tight text-on-surface">
+        Change flight flow
       </h2>
       <ChangeFlightStepper currentStepId={2} />
 
-      <div className="overflow-hidden rounded-[16px] border border-stone-200 bg-white">
-        <div className="border-b border-stone-100 p-5">
+      <div className="glass-panel overflow-hidden rounded-[28px] border border-luxury-gold/18 bg-white/96 shadow-[0_18px_44px_rgba(125,6,51,0.08)]">
+        <div className="border-b border-luxury-gold/12 px-5 py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-lg font-semibold text-stone-950">2. Chọn chuyến bay mới</h3>
-              <p className="mt-1 text-sm text-stone-500">
-                Chọn chuyến bay thay thế phù hợp cho hành trình bạn muốn thay đổi.
+              <h3 className="font-headline text-[1.55rem] font-black text-on-surface">
+                2. Select a new flight
+              </h3>
+              <p className="mt-1 text-sm text-on-surface-variant">
+                Choose the best replacement option for the flight you want to change.
               </p>
             </div>
             <button
               type="button"
               onClick={onRefresh}
-              className="inline-flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs font-semibold text-stone-700 transition hover:bg-stone-50"
+              className="inline-flex items-center gap-2 rounded-full border border-luxury-gold/18 bg-white px-3 py-2 text-xs font-semibold text-midnight-burgundy transition hover:border-luxury-gold/28 hover:bg-midnight-burgundy/5"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              Tải lại
+              Refresh
             </button>
           </div>
 
           <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_220px]">
-            <div className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-                Chuyến bay cần thay đổi
+            <div className="rounded-[24px] border border-luxury-gold/14 bg-surface-lowest p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-midnight-burgundy/55">
+                Current flight
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-4">
                 <div className="min-w-[92px]">
-                  <div className="text-2xl font-bold tracking-tight text-stone-950">
+                  <div className="text-[1.75rem] font-black tracking-tight text-on-surface">
                     {currentFlight.departureCode}
                   </div>
-                  <div className="mt-1 text-sm font-medium text-stone-700">
+                  <div className="mt-1 text-sm font-medium text-on-surface">
                     {currentFlight.departureTime}
                   </div>
                 </div>
-                <div className="flex flex-1 items-center gap-3 text-stone-400">
-                  <div className="h-px flex-1 bg-stone-200" />
-                  <Plane className="h-4 w-4 shrink-0" />
-                  <div className="h-px flex-1 bg-stone-200" />
+                <div className="flex flex-1 items-center gap-3 text-midnight-burgundy/40">
+                  <div className="h-px flex-1 bg-luxury-gold/35" />
+                  <Plane className="h-4 w-4 shrink-0 stroke-midnight-burgundy" />
+                  <div className="h-px flex-1 bg-luxury-gold/35" />
                 </div>
                 <div className="min-w-[92px] text-left lg:text-right">
-                  <div className="text-2xl font-bold tracking-tight text-stone-950">
+                  <div className="text-[1.75rem] font-black tracking-tight text-on-surface">
                     {currentFlight.arrivalCode}
                   </div>
-                  <div className="mt-1 text-sm font-medium text-stone-700">
+                  <div className="mt-1 text-sm font-medium text-on-surface">
                     {currentFlight.arrivalTime}
                   </div>
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-stone-500">
-                <span className="font-semibold text-stone-700">{currentFlight.flightNumber}</span>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-on-surface-variant">
+                <span className="font-semibold text-midnight-burgundy">{currentFlight.flightNumber}</span>
                 <span>{currentFlight.departureDate}</span>
-                <span>Hạng vé {currentFlight.fareName}</span>
+                <span>Fare {currentFlight.fareName}</span>
                 <span>{currentFlight.durationLabel}</span>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-stone-200 bg-white p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-                Hành khách
+            <div className="rounded-[24px] border border-luxury-gold/14 bg-white p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-midnight-burgundy/55">
+                Passengers
               </div>
-              <div className="mt-3 text-sm font-semibold text-stone-950">{passengerSummary}</div>
-              <div className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">
-                Kết quả đang hiển thị theo dữ liệu gần nhất của hành trình hiện tại.
+              <div className="mt-3 text-sm font-semibold text-on-surface">{passengerSummary}</div>
+              <div className="mt-4 rounded-2xl border border-luxury-gold/14 bg-midnight-burgundy/5 px-3 py-2 text-xs text-midnight-burgundy">
+                Results are based on the latest data for your current itinerary.
               </div>
             </div>
           </div>
@@ -665,7 +684,7 @@ function ChooseNewFlightStep({
               type="button"
               onClick={() => onShiftWindow(-1)}
               disabled={loading}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-stone-200 bg-white text-stone-500 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-luxury-gold/16 bg-white text-midnight-burgundy transition hover:bg-midnight-burgundy/5 disabled:cursor-not-allowed disabled:text-midnight-burgundy/30"
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
@@ -676,29 +695,29 @@ function ChooseNewFlightStep({
                   key={day.date}
                   type="button"
                   onClick={() => onSelectDate(day.date)}
-                  className={`min-w-[132px] rounded-xl border px-4 py-3 text-left transition ${
+                  className={`min-w-[132px] rounded-[20px] border px-4 py-3 text-left transition ${
                     selected
-                      ? 'border-red-300 bg-red-50 shadow-[inset_0_0_0_1px_rgba(220,38,38,0.08)]'
-                      : 'border-stone-200 bg-white hover:border-stone-300'
+                      ? 'border-luxury-gold/45 bg-midnight-burgundy/6 shadow-[0_12px_26px_rgba(125,6,51,0.08)]'
+                      : 'border-luxury-gold/14 bg-white hover:border-luxury-gold/28 hover:bg-surface-lowest'
                   }`}
                 >
                   <div
                     className={`text-xs font-semibold ${
-                      selected ? 'text-red-700' : 'text-stone-600'
+                      selected ? 'text-midnight-burgundy' : 'text-on-surface-variant'
                     }`}
                   >
                     {formatWeekday(day.date)}
                   </div>
                   <div
                     className={`mt-1 text-sm font-bold ${
-                      selected ? 'text-red-700' : 'text-stone-900'
+                      selected ? 'text-midnight-burgundy' : 'text-on-surface'
                     }`}
                   >
                     {formatDayMonth(day.date)}
                   </div>
-                  <div className="mt-1 text-xs text-stone-600">
+                  <div className="mt-1 text-xs text-on-surface-variant">
                     {day.lowestPrice == null
-                      ? 'Chưa có giá'
+                      ? 'No price yet'
                       : formatMoney(day.lowestPrice, day.currency ?? 'VND')}
                   </div>
                 </button>
@@ -708,41 +727,37 @@ function ChooseNewFlightStep({
               type="button"
               onClick={() => onShiftWindow(1)}
               disabled={loading}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-stone-200 bg-white text-stone-500 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-luxury-gold/16 bg-white text-midnight-burgundy transition hover:bg-midnight-burgundy/5 disabled:cursor-not-allowed disabled:text-midnight-burgundy/30"
             >
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        <div className="border-b border-stone-100 bg-stone-50/60 px-5 py-3">
+        <div className="border-b border-luxury-gold/12 bg-surface-lowest px-5 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <div className="font-medium text-stone-600">
+            <div className="font-medium text-on-surface-variant">
               {loading
-                ? 'Đang tìm chuyến bay phù hợp...'
-                : `${selectedCalendarDay?.flightCount ?? options.length} lựa chọn phù hợp`}
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700">
-              Sắp xếp: Giá thấp nhất
+                ? 'Searching for available flights...'
+                : `${selectedCalendarDay?.flightCount ?? options.length} matching options`}
             </div>
           </div>
         </div>
 
-        <div className="space-y-3 bg-stone-50/50 p-5">
+        <div className="space-y-3 bg-surface-lowest/70 p-5">
           {loading ? (
-            <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-stone-200 bg-white px-5 py-10 text-sm text-stone-500">
+            <div className="flex items-center justify-center gap-2 rounded-[22px] border border-dashed border-luxury-gold/18 bg-white px-5 py-10 text-sm text-on-surface-variant">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Đang tải các chuyến bay phù hợp...
+              Loading available flights...
             </div>
           ) : errorMessage ? (
-            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="flex items-start gap-2 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               <p>{errorMessage}</p>
             </div>
           ) : options.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-stone-200 bg-white px-5 py-10 text-center text-sm text-stone-500">
-              Không có chuyến bay thay thế nào cho hành trình này. Vui lòng chọn ngày khác hoặc liên
-              hệ tổng đài.
+            <div className="rounded-[22px] border border-dashed border-luxury-gold/18 bg-white px-5 py-10 text-center text-sm text-on-surface-variant">
+              No replacement flights available for this itinerary. Please choose another date or contact support.
             </div>
           ) : (
             options.map((option) => {
@@ -752,73 +767,73 @@ function ChooseNewFlightStep({
                   key={option.id}
                   type="button"
                   onClick={() => onSelect(option.id)}
-                  className={`w-full rounded-2xl border bg-white p-4 text-left transition-all ${
+                  className={`w-full rounded-[24px] border bg-white p-4 text-left transition-all ${
                     selected
-                      ? 'border-red-300 bg-red-50/40 shadow-[0_10px_30px_rgba(220,38,38,0.08)]'
-                      : 'border-stone-200 hover:border-stone-300'
+                      ? 'border-luxury-gold/40 bg-midnight-burgundy/4 shadow-[0_14px_32px_rgba(125,6,51,0.08)]'
+                      : 'border-luxury-gold/14 hover:border-luxury-gold/26 hover:bg-white'
                   }`}
                 >
                   <div className="grid gap-4 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
                     <div className="flex items-center justify-center md:self-start">
                       <span
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
                           selected
-                            ? 'border-red-600 bg-red-600 text-white'
-                            : 'border-stone-300 bg-white'
+                            ? 'border-midnight-burgundy bg-midnight-burgundy text-luxury-gold'
+                            : 'border-luxury-gold/24 bg-white text-transparent'
                         }`}
                       >
-                        {selected ? <span className="block h-2 w-2 rounded-full bg-white" /> : null}
+                        {selected ? <Check className="h-3.5 w-3.5" /> : null}
                       </span>
                     </div>
 
                     <div className="min-w-0">
                       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                        <span className="font-semibold text-stone-500">{option.flightNumber}</span>
-                        <span className="rounded-full bg-stone-100 px-2 py-0.5 font-medium text-stone-600">
+                        <span className="font-semibold text-midnight-burgundy">{option.flightNumber}</span>
+                        <span className="rounded-full border border-luxury-gold/14 bg-surface-lowest px-2 py-0.5 font-medium text-on-surface-variant">
                           {option.aircraft}
                         </span>
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
+                        <span className="rounded-full border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
                           {option.fareName}
                         </span>
                       </div>
 
                       <div className="grid gap-3 sm:grid-cols-[auto_minmax(84px,1fr)_auto] sm:items-center">
                         <div>
-                          <div className="text-2xl font-bold tracking-tight text-stone-950">
+                          <div className="text-[1.45rem] font-black tracking-tight text-on-surface sm:text-[1.55rem]">
                             {option.departureTime}
                           </div>
-                          <div className="mt-1 text-sm font-semibold text-stone-900">
+                          <div className="mt-1 text-sm font-semibold text-on-surface">
                             {option.departureCode}
                           </div>
                         </div>
 
-                        <div className="flex min-w-[84px] flex-col items-center justify-center text-stone-500">
+                        <div className="flex min-w-[84px] flex-col items-center justify-center text-on-surface-variant">
                           <div className="flex w-full items-center gap-2">
-                            <div className="h-px flex-1 bg-stone-200" />
-                            <Plane className="h-4 w-4 shrink-0" />
-                            <div className="h-px flex-1 bg-stone-200" />
+                            <div className="h-px flex-1 bg-luxury-gold/35" />
+                            <Plane className="h-4 w-4 shrink-0 stroke-midnight-burgundy" />
+                            <div className="h-px flex-1 bg-luxury-gold/35" />
                           </div>
                           <span className="mt-1 text-xs">{option.durationLabel}</span>
                         </div>
 
                         <div className="sm:text-right">
-                          <div className="text-2xl font-bold tracking-tight text-stone-950">
+                          <div className="text-[1.45rem] font-black tracking-tight text-on-surface sm:text-[1.55rem]">
                             {option.arrivalTime}
                           </div>
-                          <div className="mt-1 text-sm font-semibold text-stone-900">
+                          <div className="mt-1 text-sm font-semibold text-on-surface">
                             {option.arrivalCode}
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="border-t border-stone-100 pt-3 md:border-l md:border-t-0 md:pl-5 md:pt-0">
-                      <div className="text-xs font-medium uppercase tracking-wide text-stone-500">
+                    <div className="border-t border-luxury-gold/12 pt-3 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+                      <div className="text-xs font-medium uppercase tracking-wide text-midnight-burgundy/55">
                         {option.cabin}
                       </div>
-                      <div className="mt-1 text-lg font-bold text-red-600">{option.priceLabel}</div>
-                      <div className="mt-1 text-xs text-stone-500">
-                        Giá áp dụng cho hành khách đã chọn
+                      <div className="mt-1 text-lg font-bold text-midnight-burgundy">{option.priceLabel}</div>
+                      <div className="mt-1 text-xs text-on-surface-variant">
+                        Price applies to the selected passengers
                       </div>
                     </div>
                   </div>
@@ -828,23 +843,23 @@ function ChooseNewFlightStep({
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-stone-100 p-5">
+        <div className="flex items-center justify-between border-t border-luxury-gold/12 p-5">
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-stone-200 px-5 py-2.5 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-luxury-gold/16 bg-white px-5 py-2.5 text-sm font-semibold text-midnight-burgundy transition hover:bg-midnight-burgundy/5"
           >
             <ArrowLeft className="h-4 w-4" />
-            Quay lại
+            Back
           </button>
           <button
             type="button"
             disabled={!selectedOptionId || continuing}
             onClick={onContinue}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-midnight-burgundy px-6 py-3 text-sm font-semibold text-luxury-gold shadow-[0_14px_30px_rgba(125,6,51,0.18)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {continuing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Tiếp tục
+            Continue
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
@@ -878,141 +893,143 @@ function ConfirmChangeStep({
 }) {
   const amountTone =
     settlement.mode === 'COLLECT_PAYMENT'
-      ? 'text-red-600'
+      ? 'text-midnight-burgundy'
       : settlement.mode === 'REFUND'
-        ? 'text-emerald-600'
-        : 'text-stone-700';
+        ? 'text-emerald-700'
+        : 'text-on-surface';
   const fareDifferenceTone =
     settlement.fareDifference > 0
-      ? 'text-red-600'
+      ? 'text-midnight-burgundy'
       : settlement.fareDifference < 0
-        ? 'text-emerald-600'
-        : 'text-stone-900';
+        ? 'text-emerald-700'
+        : 'text-on-surface';
   const changeFeeAmount = Math.max(settlement.changeFee, 0);
   const settlementLabel =
     settlement.mode === 'COLLECT_PAYMENT'
-      ? 'Cần thanh toán thêm'
+      ? 'Additional payment required'
       : settlement.mode === 'REFUND'
-        ? 'Hoàn tiền'
-        : 'Không thay đổi';
+        ? 'Refund'
+        : 'No change';
   const settlementCaption =
     settlement.mode === 'COLLECT_PAYMENT'
-      ? 'Phát sinh thêm cho thay đổi chuyến bay'
+      ? 'Additional charges for changing your flight'
       : settlement.mode === 'REFUND'
-        ? 'Khoản hoàn sẽ được xử lý sau khi xác nhận'
+        ? 'Refund will be processed after confirmation'
         : extrasSummary;
   const totalLabel =
     settlement.mode === 'COLLECT_PAYMENT'
-      ? 'Tổng cần thanh toán'
+      ? 'Total due'
       : settlement.mode === 'REFUND'
-        ? 'Tổng hoàn tiền'
-        : 'Không phát sinh thanh toán';
+        ? 'Total refund'
+        : 'No payment due';
   const continueLabel =
     settlement.mode === 'COLLECT_PAYMENT'
-      ? 'Tiếp tục: Thanh toán'
+      ? 'Continue: Payment'
       : settlement.mode === 'REFUND'
-        ? 'Tiếp tục: Hoàn tiền'
-        : 'Xác nhận thay đổi';
+        ? 'Continue: Refund'
+        : 'Confirm changes';
 
   return (
     <section className="pb-6">
-      <h2 className="mb-6 text-2xl font-bold tracking-tight text-stone-950">
-        Quy trình thay đổi chuyến bay
+      <h2 className="mb-6 font-headline text-2xl font-black tracking-tight text-on-surface">
+        Change flight flow
       </h2>
       <ChangeFlightStepper currentStepId={3} />
 
-      <div className="rounded-[16px] border border-stone-200 bg-white">
-        <div className="border-b border-stone-100 p-5">
-          <h3 className="text-lg font-semibold text-stone-950">3. Xác nhận thay đổi</h3>
-          <p className="mt-1 text-sm text-stone-500">
-            Vui lòng kiểm tra lại thông tin trước khi tiếp tục.
+      <div className="glass-panel rounded-[28px] border border-luxury-gold/18 bg-white/96 shadow-[0_18px_44px_rgba(125,6,51,0.08)]">
+        <div className="border-b border-luxury-gold/12 p-5">
+          <h3 className="font-headline text-[1.55rem] font-black text-on-surface">
+            3. Confirm changes
+          </h3>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            Please review the details before continuing.
           </p>
         </div>
 
         <div className="space-y-4 p-5">
-          <div className="rounded-2xl border border-stone-200 p-4">
-            <div className="text-sm font-semibold text-stone-950">Chuyến bay sẽ thay đổi</div>
+          <div className="rounded-[24px] border border-luxury-gold/14 bg-white p-4">
+            <div className="text-sm font-semibold text-on-surface">Flight to be changed</div>
             <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center">
-              <article className="rounded-xl border border-stone-200 bg-stone-50/60 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-                  Cũ
+              <article className="rounded-[22px] border border-luxury-gold/14 bg-surface-lowest p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-midnight-burgundy/55">
+                  Current
                 </div>
-                <div className="mt-2 text-base font-bold text-stone-950">
+                <div className="mt-2 text-base font-bold text-on-surface">
                   {currentFlight.flightNumber}
                 </div>
-                <div className="mt-1 text-sm font-semibold text-stone-900">
+                <div className="mt-1 text-sm font-semibold text-on-surface">
                   {currentFlight.departureCode} → {currentFlight.arrivalCode}
                 </div>
-                <div className="mt-1 text-xs text-stone-500">
+                <div className="mt-1 text-xs text-on-surface-variant">
                   {currentFlight.departureTime} - {currentFlight.arrivalTime} |{' '}
                   {currentFlight.departureDate}
                 </div>
-                <div className="mt-3 inline-flex rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-700">
+                <div className="mt-3 inline-flex rounded-full border border-luxury-gold/16 bg-white px-2.5 py-1 text-xs font-semibold text-midnight-burgundy">
                   {currentFlight.fareName}
                 </div>
               </article>
 
-              <div className="flex items-center justify-center text-stone-400">
+              <div className="flex items-center justify-center text-midnight-burgundy/45">
                 <ArrowRight className="h-5 w-5" />
               </div>
 
-              <article className="rounded-xl border border-red-200 bg-red-50/40 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-red-700">
-                  Mới
+              <article className="rounded-[22px] border border-luxury-gold/24 bg-midnight-burgundy/5 p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-midnight-burgundy">
+                  New
                 </div>
-                <div className="mt-2 text-base font-bold text-stone-950">
+                <div className="mt-2 text-base font-bold text-on-surface">
                   {newFlight.flightNumber}
                 </div>
-                <div className="mt-1 text-sm font-semibold text-stone-900">
+                <div className="mt-1 text-sm font-semibold text-on-surface">
                   {newFlight.departureCode} → {newFlight.arrivalCode}
                 </div>
-                <div className="mt-1 text-xs text-stone-500">
+                <div className="mt-1 text-xs text-on-surface-variant">
                   {newFlight.departureTime} - {newFlight.arrivalTime}
                 </div>
-                <div className="mt-3 inline-flex rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+                <div className="mt-3 inline-flex rounded-full border border-luxury-gold/22 bg-luxury-gold/16 px-2.5 py-1 text-xs font-semibold text-midnight-burgundy">
                   {newFlight.fareName}
                 </div>
               </article>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-stone-200 p-4">
-            <div className="text-sm font-semibold text-stone-950">Thông tin hành khách</div>
+          <div className="rounded-[24px] border border-luxury-gold/14 bg-white p-4">
+            <div className="text-sm font-semibold text-on-surface">Passenger details</div>
             <div className="mt-4 space-y-3">
               {passengers.map((passenger, index) => (
                 <div
                   key={passenger.id}
-                  className="flex items-start gap-3 rounded-xl border border-stone-100 bg-stone-50/50 px-4 py-3"
+                  className="flex items-start gap-3 rounded-[20px] border border-luxury-gold/12 bg-surface-lowest px-4 py-3"
                 >
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-stone-500">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-luxury-gold/12 bg-white text-xs font-semibold text-midnight-burgundy">
                     {index + 1}
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-stone-950">{passenger.fullName}</div>
-                    <div className="text-xs text-stone-500">{passenger.typeLabel}</div>
+                    <div className="text-sm font-semibold text-on-surface">{passenger.fullName}</div>
+                    <div className="text-xs text-on-surface-variant">{passenger.typeLabel}</div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-stone-200 p-4">
-            <div className="text-sm font-semibold text-stone-950">Chi tiết thanh toán</div>
+          <div className="rounded-[24px] border border-luxury-gold/14 bg-white p-4">
+            <div className="text-sm font-semibold text-on-surface">Payment breakdown</div>
             <div className="mt-4 space-y-2 text-sm">
-              <div className="flex items-center justify-between text-stone-600">
-                <span>Giá vé gốc</span>
-                <span className="font-semibold text-stone-900">
+              <div className="flex items-center justify-between text-on-surface-variant">
+                <span>Original fare</span>
+                <span className="font-semibold text-on-surface">
                   {formatMoney(settlement.originalFareAmount, currency)}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-stone-600">
-                <span>Giá vé mới</span>
-                <span className="font-semibold text-stone-900">
+              <div className="flex items-center justify-between text-on-surface-variant">
+                <span>New fare</span>
+                <span className="font-semibold text-on-surface">
                   {formatMoney(settlement.newFareAmount, currency)}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-stone-600">
-                <span>Chênh lệch giá vé</span>
+              <div className="flex items-center justify-between text-on-surface-variant">
+                <span>Fare difference</span>
                 <span className={`font-semibold ${fareDifferenceTone}`}>
                   {settlement.fareDifference === 0
                     ? formatMoney(0, currency)
@@ -1022,21 +1039,21 @@ function ConfirmChangeStep({
                       )}`}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-stone-600">
-                <span>Phí thay đổi</span>
-                <span className="font-semibold text-stone-900">
+              <div className="flex items-center justify-between text-on-surface-variant">
+                <span>Change fee</span>
+                <span className="font-semibold text-on-surface">
                   {formatMoney(changeFeeAmount, currency)}
                 </span>
               </div>
             </div>
 
-            <div className="mt-4 rounded-2xl bg-stone-50 px-4 py-4">
+            <div className="mt-4 rounded-[22px] border border-luxury-gold/14 bg-surface-lowest px-4 py-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-xs font-bold uppercase tracking-[0.24em] text-red-700">
+                  <div className="text-xs font-bold uppercase tracking-[0.24em] text-midnight-burgundy">
                     {settlementLabel}
                   </div>
-                  <div className="mt-1 text-sm text-stone-500">{settlementCaption}</div>
+                  <div className="mt-1 text-sm text-on-surface-variant">{settlementCaption}</div>
                 </div>
                 <div className={`text-xl font-bold ${amountTone}`}>
                   {settlement.mode === 'NO_CHANGE'
@@ -1046,7 +1063,7 @@ function ConfirmChangeStep({
               </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-between border-t border-stone-100 pt-4 text-base font-bold text-stone-950">
+            <div className="mt-4 flex items-center justify-between border-t border-luxury-gold/12 pt-4 text-base font-bold text-on-surface">
               <span>{totalLabel}</span>
               <span className={amountTone}>
                 {settlement.mode === 'NO_CHANGE'
@@ -1056,35 +1073,34 @@ function ConfirmChangeStep({
             </div>
           </div>
 
-          <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm text-sky-900">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-700" />
+          <div className="flex items-start gap-2 rounded-[22px] border border-luxury-gold/14 bg-midnight-burgundy/5 px-4 py-3 text-sm text-midnight-burgundy">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-midnight-burgundy" />
             <p>
-              Nếu tiếp tục, ghế và các dịch vụ đi kèm hiện có sẽ được rà soát lại theo điều kiện vé
-              của chuyến bay mới.
+              If you continue, your current seats and add-ons will be re-evaluated based on the fare rules of the new flight.
             </p>
           </div>
           {errorMessage ? (
-            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="flex items-start gap-2 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               <p>{errorMessage}</p>
             </div>
           ) : null}
         </div>
 
-        <div className="flex items-center justify-between border-t border-stone-100 p-5">
+        <div className="flex items-center justify-between border-t border-luxury-gold/12 p-5">
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-stone-200 px-5 py-2.5 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-luxury-gold/16 bg-white px-5 py-2.5 text-sm font-semibold text-midnight-burgundy transition hover:bg-midnight-burgundy/5"
           >
             <ArrowLeft className="h-4 w-4" />
-            Quay lại
+            Back
           </button>
           <button
             type="button"
             disabled={continuing}
             onClick={onContinue}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-midnight-burgundy px-6 py-3 text-sm font-semibold text-luxury-gold shadow-[0_14px_30px_rgba(125,6,51,0.18)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {continuing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {continueLabel}
@@ -1135,6 +1151,22 @@ function PaymentMethodOption({
   );
 }
 
+function resolvePaymentMethodDisplay(method: PaymentMethod): {
+  title: string;
+  subtitle: string | null;
+} {
+  switch (method.code) {
+    case 'STRIPE_CARD':
+      return { title: 'Credit / Debit card', subtitle: method.provider ?? null };
+    case 'VIETQR':
+      return { title: 'Bank transfer', subtitle: method.provider ?? null };
+    case 'PAY_LATER':
+      return { title: 'Hold booking, pay later', subtitle: method.provider ?? null };
+    default:
+      return { title: method.label, subtitle: method.provider ?? null };
+  }
+}
+
 function PaymentStep({
   settlement,
   currency,
@@ -1164,179 +1196,185 @@ function PaymentStep({
   const paymentMethodLabel = 'VISA •••• 1234';
   const fareDifferenceAmount = settlement.fareDifference;
   const changeFeeAmount = Math.max(settlement.changeFee, 0);
-  const hasPaymentMethods = paymentMethods.length > 0;
+  const visiblePaymentMethods = useMemo(
+    () => paymentMethods.filter((method) => method.code !== 'PAYOS_QR'),
+    [paymentMethods]
+  );
+  const hasPaymentMethods = visiblePaymentMethods.length > 0;
 
   useEffect(() => {
     if (isRefund || !hasPaymentMethods) return;
     setSelectedPaymentMethod((current) =>
-      current && paymentMethods.some((method) => method.code === current)
+      current && visiblePaymentMethods.some((method) => method.code === current)
         ? current
-        : paymentMethods[0]?.code || ''
+        : visiblePaymentMethods[0]?.code || ''
     );
-  }, [hasPaymentMethods, isRefund, paymentMethods]);
+  }, [hasPaymentMethods, isRefund, visiblePaymentMethods]);
 
-  const primaryMethod = paymentMethods[0] ?? null;
-  const secondaryMethod = paymentMethods[1] ?? null;
-  const tertiaryMethod = paymentMethods[2] ?? null;
-  const quaternaryMethod = paymentMethods[3] ?? null;
+  const primaryMethod = visiblePaymentMethods[0] ?? null;
+  const secondaryMethod = visiblePaymentMethods[1] ?? null;
+  const tertiaryMethod = visiblePaymentMethods[2] ?? null;
+  const quaternaryMethod = visiblePaymentMethods[3] ?? null;
 
   return (
     <section className="pb-6">
       <h2 className="mb-6 text-2xl font-bold tracking-tight text-stone-950">
-        Quy trình thay đổi chuyến bay
+        Change flight flow
       </h2>
       <ChangeFlightStepper currentStepId={4} />
 
-      <div className="rounded-[16px] border border-stone-200 bg-white">
-        <div className="border-b border-stone-100 p-5">
-          <h3 className="text-lg font-semibold text-stone-950">
-            {isRefund ? '4. Hoàn tiền' : '4. Thanh toán bổ sung'}
+      <div className="glass-panel rounded-[28px] border border-luxury-gold/18 bg-white/96 shadow-[0_18px_44px_rgba(125,6,51,0.08)]">
+        <div className="border-b border-luxury-gold/12 p-5">
+          <h3 className="font-headline text-[1.55rem] font-black text-on-surface">
+            {isRefund ? '4. Refund' : '4. Additional payment'}
           </h3>
-          <p className="mt-1 text-sm text-stone-500">
+          <p className="mt-1 text-sm text-on-surface-variant">
             {isRefund
-              ? 'Khoản chênh lệch giá vé sẽ được hoàn về phương thức thanh toán bạn đã sử dụng khi đặt vé.'
-              : 'Thanh toán khoản chênh lệch giá vé và phí đổi vé để xác nhận chuyến bay mới của bạn.'}
+              ? 'Any fare difference will be refunded to the original payment method used for this booking.'
+              : 'Pay the fare difference and change fee to confirm your new flight.'}
           </p>
         </div>
 
         {isRefund ? (
           <div className="space-y-4 p-5">
-            <div className="flex items-start gap-4 rounded-2xl border border-stone-200 bg-white p-5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+            <div className="flex items-start gap-4 rounded-[24px] border border-luxury-gold/14 bg-white p-5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-emerald-100 text-emerald-700">
                 <Wallet className="h-6 w-6" />
               </div>
               <div className="space-y-1.5">
-                <div className="text-lg font-bold text-stone-950">Hoàn tiền tự động</div>
-                <p className="text-sm leading-6 text-stone-600">
-                  Thay đổi chuyến bay đã được xác nhận. Chúng tôi sẽ tự động xử lý hoàn tiền về
-                  phương thức thanh toán gốc — bạn không cần thao tác thêm.
+                <div className="text-lg font-bold text-on-surface">Automatic refund</div>
+                <p className="text-sm leading-6 text-on-surface-variant">
+                  Your flight change has been confirmed. We’ll automatically process the refund to your original payment method — no further action is needed.
                 </p>
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-50">
+            <div className="overflow-hidden rounded-[24px] border border-luxury-gold/14 bg-surface-lowest">
               <div className="flex items-center justify-between px-5 py-4">
-                <span className="text-sm font-medium text-stone-500">Số tiền hoàn lại</span>
-                <span className="text-xl font-bold text-emerald-600">
+                <span className="text-sm font-medium text-on-surface-variant">Refund amount</span>
+                <span className="text-xl font-bold text-emerald-700">
                   {formatMoney(amount, currency)}
                 </span>
               </div>
-              <div className="border-t border-stone-200" />
+              <div className="border-t border-luxury-gold/12" />
               <div className="flex items-center justify-between px-5 py-4">
-                <span className="text-sm font-medium text-stone-500">Phương thức</span>
-                <span className="text-sm font-bold text-stone-900">{paymentMethodLabel}</span>
+                <span className="text-sm font-medium text-on-surface-variant">Method</span>
+                <span className="text-sm font-bold text-on-surface">{paymentMethodLabel}</span>
               </div>
-              <div className="border-t border-stone-200" />
+              <div className="border-t border-luxury-gold/12" />
               <div className="flex items-center justify-between px-5 py-4">
-                <span className="text-sm font-medium text-stone-500">Người nhận</span>
+                <span className="text-sm font-medium text-on-surface-variant">Recipient</span>
                 <span className="text-sm font-semibold text-stone-900">{passengerName || '—'}</span>
               </div>
-              <div className="border-t border-stone-200" />
+              <div className="border-t border-luxury-gold/12" />
               <div className="flex items-center justify-between px-5 py-4">
-                <span className="text-sm font-medium text-stone-500">Thời gian xử lý</span>
-                <span className="text-sm font-semibold text-stone-900">7 – 14 ngày làm việc</span>
+                <span className="text-sm font-medium text-on-surface-variant">Processing time</span>
+                <span className="text-sm font-semibold text-stone-900">7–14 business days</span>
               </div>
             </div>
 
-            <div className="flex items-start gap-2.5 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-xs text-sky-900">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-700" />
+            <div className="flex items-start gap-2.5 rounded-[22px] border border-luxury-gold/14 bg-midnight-burgundy/5 px-4 py-3 text-xs text-midnight-burgundy">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-midnight-burgundy" />
               <p className="leading-5">
-                Tiến trình hoàn tiền có thể xem trong phần Quản lý đặt chỗ. Nếu chưa nhận được sau
-                thời hạn, vui lòng gọi 1900 1234.
+                You can track the refund status in Manage booking. If you haven’t received it after the stated timeframe, please call 1900 1234.
               </p>
             </div>
 
-            <label className="flex items-start gap-2.5 pt-1 text-sm text-stone-700">
+            <label className="flex items-start gap-2.5 pt-1 text-sm text-on-surface">
               <input
                 type="checkbox"
                 checked={agreedTerms}
                 onChange={(event) => setAgreedTerms(event.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-emerald-600"
+                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-midnight-burgundy"
               />
               <span className="leading-5">
-                Tôi đã đọc và đồng ý với chính sách hoàn tiền cùng các điều khoản đổi vé của
-                SOVEREIGN.
+                I have read and agree to SOVEREIGN’s refund policy and change rules.
               </span>
             </label>
+            {!agreedTerms ? (
+              <p className="text-xs text-amber-700">
+                Please check the box to confirm you agree before continuing.
+              </p>
+            ) : null}
           </div>
         ) : (
           <div className="space-y-5 p-5">
-            <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50/70 px-4 py-3">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+            <div className="flex items-start gap-3 rounded-[22px] border border-luxury-gold/14 bg-midnight-burgundy/5 px-4 py-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-midnight-burgundy" />
               <div className="space-y-0.5">
-                <div className="text-sm font-bold text-red-700">Bạn cần thanh toán thêm</div>
-                <p className="text-sm text-stone-700">
-                  Vui lòng thanh toán để xác nhận thay đổi chuyến bay.
+                <div className="text-sm font-bold text-midnight-burgundy">Additional payment required</div>
+                <p className="text-sm text-on-surface-variant">
+                  Please complete payment to confirm the flight change.
                 </p>
               </div>
             </div>
 
             <div className="space-y-3.5">
-              <h4 className="text-base font-bold text-stone-950">Chi tiết thanh toán</h4>
+              <h4 className="text-base font-bold text-on-surface">Payment breakdown</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-stone-600">Giá vé gốc</span>
-                  <span className="font-semibold text-stone-900">
+                  <span className="font-medium text-on-surface-variant">Original fare</span>
+                  <span className="font-semibold text-on-surface">
                     {formatMoney(settlement.originalFareAmount, currency)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-stone-600">Giá vé mới</span>
-                  <span className="font-semibold text-stone-900">
+                  <span className="font-medium text-on-surface-variant">New fare</span>
+                  <span className="font-semibold text-on-surface">
                     {formatMoney(settlement.newFareAmount, currency)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-stone-600">Chênh lệch giá vé</span>
-                  <span className="font-semibold text-stone-900">
+                  <span className="font-medium text-on-surface-variant">Fare difference</span>
+                  <span className="font-semibold text-on-surface">
                     {formatMoney(fareDifferenceAmount, currency)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-stone-600">Phí thay đổi</span>
-                  <span className="font-semibold text-stone-900">
+                  <span className="font-medium text-on-surface-variant">Change fee</span>
+                  <span className="font-semibold text-on-surface">
                     {formatMoney(changeFeeAmount, currency)}
                   </span>
                 </div>
               </div>
-              <div className="border-t border-stone-200" />
+              <div className="border-t border-luxury-gold/12" />
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="text-base font-bold text-stone-950">Cần thanh toán thêm</span>
-                  <span className="text-xl font-bold tracking-tight text-red-600">
+                  <span className="text-base font-bold text-on-surface">Total due</span>
+                  <span className="text-xl font-bold tracking-tight text-midnight-burgundy">
                     {formatMoney(amount, currency)}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-stone-500">
-                  Vui lòng thanh toán để xác nhận thay đổi.
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  Please pay to confirm the change.
                 </p>
               </div>
             </div>
 
-            <div className="border-t border-stone-200" />
+            <div className="border-t border-luxury-gold/12" />
 
-            <div className="space-y-3">
-              <h4 className="text-base font-bold text-stone-950">Chọn phương thức thanh toán</h4>
+            <div className="hidden">
+              <h4 className="text-base font-bold text-stone-950">Choose a payment method</h4>
               <div className="space-y-2.5">
                 <PaymentMethodOption
                   selected={selectedPaymentMethod === (primaryMethod?.code ?? '')}
                   onClick={() => primaryMethod && setSelectedPaymentMethod(primaryMethod.code)}
                   subtitle={primaryMethod?.provider ?? null}
-                  title="Thẻ tín dụng / Thẻ ghi nợ"
+                  title="Credit / Debit card"
                   trailing={null}
                 />
                 <PaymentMethodOption
                   selected={selectedPaymentMethod === (secondaryMethod?.code ?? '')}
                   onClick={() => secondaryMethod && setSelectedPaymentMethod(secondaryMethod.code)}
                   subtitle={secondaryMethod?.provider ?? null}
-                  title="Ví điện tử"
+                  title="E-wallet"
                   trailing={null}
                 />
                 <PaymentMethodOption
                   selected={selectedPaymentMethod === (tertiaryMethod?.code ?? '')}
                   onClick={() => tertiaryMethod && setSelectedPaymentMethod(tertiaryMethod.code)}
                   subtitle={tertiaryMethod?.provider ?? null}
-                  title="Chuyển khoản ngân hàng"
+                  title="Bank transfer"
                   trailing={null}
                 />
                 {quaternaryMethod ? (
@@ -1351,44 +1389,63 @@ function PaymentStep({
               </div>
             </div>
 
-            <label className="flex items-start gap-2.5 pt-1 text-sm text-stone-700">
+            <div className="space-y-3">
+              <h4 className="text-base font-bold text-on-surface">Payment method</h4>
+              <div className="space-y-2.5">
+                {visiblePaymentMethods.map((method) => {
+                  const display = resolvePaymentMethodDisplay(method);
+                  return (
+                    <PaymentMethodOption
+                      key={method.code}
+                      selected={selectedPaymentMethod === method.code}
+                      onClick={() => setSelectedPaymentMethod(method.code)}
+                      subtitle={display.subtitle}
+                      title={display.title}
+                      trailing={null}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
+            <label className="flex items-start gap-2.5 pt-1 text-sm text-on-surface">
               <input
                 type="checkbox"
                 checked={agreedTerms}
                 onChange={(event) => setAgreedTerms(event.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-red-600"
+                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-midnight-burgundy"
               />
               <span className="leading-5">
-                Tôi đồng ý với Điều khoản giao dịch và Chính sách đổi vé của SOVEREIGN.
+                I agree to SOVEREIGN’s transaction terms and change policy.
               </span>
             </label>
           </div>
         )}
 
         {errorMessage ? (
-          <div className="border-t border-stone-100 px-5 py-3">
-            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="border-t border-luxury-gold/12 px-5 py-3">
+            <div className="flex items-start gap-2 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               <p>{errorMessage}</p>
             </div>
           </div>
         ) : null}
 
-        <div className="flex items-center justify-between gap-4 border-t border-stone-100 p-5">
+        <div className="flex items-center justify-between gap-4 border-t border-luxury-gold/12 p-5">
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-stone-200 px-5 py-2.5 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-luxury-gold/16 bg-white px-5 py-2.5 text-sm font-semibold text-midnight-burgundy transition hover:bg-midnight-burgundy/5"
           >
             <ArrowLeft className="h-4 w-4" />
-            Quay lại
+            Back
           </button>
           <button
             type="button"
             disabled={paying || !agreedTerms || (!isRefund && !selectedPaymentMethod)}
             onClick={() => onConfirm(selectedPaymentMethod)}
-            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none ${
-              isRefund ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
+            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-luxury-gold shadow-[0_14px_30px_rgba(125,6,51,0.18)] transition disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none ${
+              isRefund ? 'bg-midnight-burgundy hover:brightness-110' : 'bg-midnight-burgundy hover:brightness-110'
             }`}
           >
             {paying ? (
@@ -1399,8 +1456,8 @@ function PaymentStep({
               <CreditCard className="h-4 w-4" />
             )}
             {isRefund
-              ? `Xác nhận hoàn tiền ${formatMoney(amount, currency)}`
-              : `Thanh toán ${formatMoney(amount, currency)}`}
+              ? `Confirm refund ${formatMoney(amount, currency)}`
+              : `Pay ${formatMoney(amount, currency)}`}
           </button>
         </div>
       </div>
@@ -1422,46 +1479,45 @@ function CompleteStep({
   return (
     <section className="pb-6">
       <h2 className="mb-6 text-2xl font-bold tracking-tight text-stone-950">
-        Quy trình thay đổi chuyến bay
+        Change flight flow
       </h2>
       <ChangeFlightStepper currentStepId={5} />
 
-      <div className="rounded-[20px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white p-6 shadow-sm">
+      <div className="glass-panel rounded-[28px] border border-luxury-gold/18 bg-white/96 p-6 shadow-[0_18px_44px_rgba(125,6,51,0.08)]">
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
           <CheckCircle2 className="h-7 w-7" />
         </div>
-        <h3 className="mt-4 text-2xl font-bold text-emerald-800">Thay đổi chuyến bay thành công</h3>
-        <p className="mt-2 text-sm leading-6 text-stone-600">
-          Mã đặt chỗ <span className="font-semibold text-stone-950">{pnr}</span> đã được cập nhật
-          với chuyến bay mới.
+        <h3 className="mt-4 font-headline text-2xl font-black text-on-surface">Flight change successful</h3>
+        <p className="mt-2 text-sm leading-6 text-on-surface-variant">
+          Booking reference <span className="font-semibold text-on-surface">{pnr}</span> has been updated with your new flight.
         </p>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <article className="rounded-xl border border-stone-200 bg-white p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-              Chuyến cũ
+          <article className="rounded-[24px] border border-luxury-gold/14 bg-surface-lowest p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-midnight-burgundy/55">
+              Previous flight
             </div>
-            <div className="mt-2 text-base font-bold text-stone-950">
+            <div className="mt-2 text-base font-bold text-on-surface">
               {currentFlight.flightNumber}
             </div>
-            <div className="mt-1 text-sm text-stone-700">
+            <div className="mt-1 text-sm text-on-surface">
               {currentFlight.departureCode} → {currentFlight.arrivalCode}
             </div>
-            <div className="mt-1 text-xs text-stone-500">
+            <div className="mt-1 text-xs text-on-surface-variant">
               {currentFlight.departureTime} - {currentFlight.arrivalTime} •{' '}
               {currentFlight.departureDate}
             </div>
           </article>
 
-          <article className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-              Chuyến mới
+          <article className="rounded-[24px] border border-luxury-gold/24 bg-midnight-burgundy/5 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-midnight-burgundy">
+              New flight
             </div>
-            <div className="mt-2 text-base font-bold text-stone-950">{newFlight.flightNumber}</div>
-            <div className="mt-1 text-sm text-stone-700">
+            <div className="mt-2 text-base font-bold text-on-surface">{newFlight.flightNumber}</div>
+            <div className="mt-1 text-sm text-on-surface">
               {newFlight.departureCode} → {newFlight.arrivalCode}
             </div>
-            <div className="mt-1 text-xs text-stone-500">
+            <div className="mt-1 text-xs text-on-surface-variant">
               {newFlight.departureTime} - {newFlight.arrivalTime}
             </div>
           </article>
@@ -1471,17 +1527,17 @@ function CompleteStep({
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+            className="inline-flex items-center gap-2 rounded-full border border-luxury-gold/16 bg-white px-5 py-2.5 text-sm font-semibold text-midnight-burgundy transition hover:bg-midnight-burgundy/5"
           >
             <Home className="h-4 w-4" />
-            Về trang chủ
+            Go to Home
           </button>
           <button
             type="button"
             onClick={() => navigate('/manage-booking')}
-            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
+            className="inline-flex items-center gap-2 rounded-full bg-midnight-burgundy px-5 py-2.5 text-sm font-semibold text-luxury-gold shadow-[0_14px_30px_rgba(125,6,51,0.18)] transition hover:brightness-110"
           >
-            Quản lý đặt chỗ
+            Manage booking
           </button>
         </div>
       </div>
@@ -1545,7 +1601,7 @@ export default function ChangeFlight() {
         setManageOptions(options);
       } catch (error) {
         setBootstrapError(
-          error instanceof Error ? error.message : 'Không thể tải dữ liệu đặt chỗ mẫu.'
+          error instanceof Error ? error.message : 'Unable to load sample booking data.'
         );
       } finally {
         setBootstrapping(false);
@@ -1612,12 +1668,12 @@ export default function ChangeFlight() {
     0;
   const passengerSummary =
     [
-      adultCount > 0 ? `${adultCount} người lớn` : null,
-      childCount > 0 ? `${childCount} trẻ em` : null,
-      infantCount > 0 ? `${infantCount} em bé` : null,
+      adultCount > 0 ? `${adultCount} adult${adultCount > 1 ? 's' : ''}` : null,
+      childCount > 0 ? `${childCount} child${childCount > 1 ? 'ren' : ''}` : null,
+      infantCount > 0 ? `${infantCount} infant${infantCount > 1 ? 's' : ''}` : null,
     ]
       .filter(Boolean)
-      .join(', ') || '1 người lớn';
+      .join(', ') || '1 adult';
   const passengerItems = useMemo<PassengerDisplayItem[]>(
     () =>
       (bookingLookup?.passengers ?? []).map((passenger) => ({
@@ -1628,7 +1684,7 @@ export default function ChangeFlight() {
     [bookingLookup]
   );
   const extrasSummary = useMemo(() => {
-    if (!bookingLookup) return 'Không có tiện ích đi kèm';
+    if (!bookingLookup) return 'No add-ons';
 
     const extrasCount = bookingLookup.passengers.reduce((sum, passenger) => {
       const seatCount =
@@ -1643,11 +1699,13 @@ export default function ChangeFlight() {
     const passengerCount = bookingLookup.passengers.length;
     if (extrasCount === 0) {
       return passengerCount > 0
-        ? `Không có tiện ích đi kèm cho ${passengerCount} hành khách`
-        : 'Không có tiện ích đi kèm';
+        ? `No add-ons for ${passengerCount} passenger${passengerCount > 1 ? 's' : ''}`
+        : 'No add-ons';
     }
 
-    return `${extrasCount} tiện ích trên ${passengerCount} hành khách`;
+    return `${extrasCount} add-on${extrasCount > 1 ? 's' : ''} across ${passengerCount} passenger${
+      passengerCount > 1 ? 's' : ''
+    }`;
   }, [bookingLookup]);
 
   const newFlightsQuery = useQuery({
@@ -1712,10 +1770,20 @@ export default function ChangeFlight() {
   const newFlightOptions = useMemo<NewFlightOption[]>(() => {
     if (!activeCalendarDay) return [];
     return (activeCalendarDay.flights ?? [])
-      .map(mapFlightLegToOption)
-      .filter((option): option is NewFlightOption => option != null)
-      .filter((option) => option.flightNumber !== selectedFlight?.flightNumber);
-  }, [activeCalendarDay, selectedFlight?.flightNumber]);
+      .flatMap(mapFlightLegToOptions)
+      .filter(
+        (option) =>
+          option.flightNumber !== selectedFlight?.flightNumber &&
+          option.departureCode === selectedFlight?.departureCode &&
+          option.arrivalCode === selectedFlight?.arrivalCode
+      )
+      .sort((a, b) => a.priceAmount - b.priceAmount);
+  }, [
+    activeCalendarDay,
+    selectedFlight?.arrivalCode,
+    selectedFlight?.departureCode,
+    selectedFlight?.flightNumber,
+  ]);
 
   const selectedNewOption = useMemo(
     () => newFlightOptions.find((option) => option.id === selectedNewOptionId) ?? null,
@@ -1804,7 +1872,7 @@ export default function ChangeFlight() {
     try {
       const tickets = await bookingService.getBookingTickets(bookingLookup.booking.bookingId);
       if (!tickets.tickets.length) {
-        throw new Error('Khong tim thay ticket hop le de bao gia doi chuyen.');
+        throw new Error('No valid ticket found to create a change quote.');
       }
       const quote = await bookingService.quoteFlightChange(bookingLookup.booking.bookingId, {
         ticketIds: tickets.tickets.map((ticket) => ticket.id),
@@ -1816,7 +1884,7 @@ export default function ChangeFlight() {
       setFlightChangeConfirm(null);
       setStep(3);
     } catch (error) {
-      setQuoteError(error instanceof Error ? error.message : 'Khong the bao gia doi chuyen bay.');
+      setQuoteError(error instanceof Error ? error.message : 'Unable to create a flight change quote.');
     } finally {
       setQuoting(false);
     }
@@ -1836,7 +1904,7 @@ export default function ChangeFlight() {
       });
       setFlightChangeConfirm(confirm);
       if (confirm.status === 'REFUND_FAILED') {
-        throw new Error(confirm.errorMessage ?? 'Khong the xac nhan doi chuyen bay.');
+        throw new Error(confirm.errorMessage ?? 'Unable to confirm the flight change.');
       }
 
       if (confirm.status === 'PAYMENT_REQUIRED') {
@@ -1851,7 +1919,7 @@ export default function ChangeFlight() {
 
       setStep(5);
     } catch (error) {
-      setQuoteError(error instanceof Error ? error.message : 'Khong the xac nhan doi chuyen bay.');
+      setQuoteError(error instanceof Error ? error.message : 'Unable to confirm the flight change.');
     } finally {
       setConfirmingChange(false);
     }
@@ -1941,7 +2009,7 @@ export default function ChangeFlight() {
       availableMethods.find((method) => method.code === methodCode) ?? availableMethods[0];
 
     if (!resolvedMethod?.code) {
-      setPaymentError('Khong tim thay phuong thuc thanh toan hop le cho doi chuyen bay.');
+      setPaymentError('No valid payment method found for this flight change.');
       return;
     }
 
@@ -1983,7 +2051,7 @@ export default function ChangeFlight() {
       setActivePayment(response);
     } catch (error) {
       setPaymentError(
-        error instanceof Error ? error.message : 'Khong the tao lien ket thanh toan.'
+        error instanceof Error ? error.message : 'Unable to create a payment link.'
       );
     } finally {
       if (mode === 'create') {
@@ -2017,7 +2085,7 @@ export default function ChangeFlight() {
       setPaymentError(
         error instanceof Error
           ? error.message
-          : 'Khong the kiem tra trang thai thanh toan. Vui long thu lai.'
+          : 'Unable to check payment status. Please try again.'
       );
     } finally {
       setCheckingPaymentStatus(false);
@@ -2037,7 +2105,7 @@ export default function ChangeFlight() {
       setPaymentStatusOverride('CANCELLED');
     } catch (error) {
       setPaymentError(
-        error instanceof Error ? error.message : 'Khong the huy giao dich thanh toan.'
+        error instanceof Error ? error.message : 'Unable to cancel the payment transaction.'
       );
     } finally {
       setCancelingPayment(false);
@@ -2161,12 +2229,12 @@ export default function ChangeFlight() {
 
   if (bootstrapping) {
     return (
-      <div className="min-h-screen bg-[#faf8f4] text-stone-900 antialiased">
+      <div className="min-h-screen bg-surface text-on-surface antialiased">
         <SiteHeader />
         <main className="mx-auto flex min-h-svh max-w-4xl items-center justify-center px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
           <div className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white px-6 py-4 text-stone-700 shadow-sm">
             <Loader2 className="h-5 w-5 animate-spin" />
-            Đang tải dữ liệu đặt chỗ...
+            Loading booking data...
           </div>
         </main>
         <SiteFooter />
@@ -2176,7 +2244,7 @@ export default function ChangeFlight() {
 
   if (!bookingLookup || flights.length === 0) {
     return (
-      <div className="min-h-screen bg-[#faf8f4] text-stone-900 antialiased">
+      <div className="min-h-screen bg-surface text-on-surface antialiased">
         <SiteHeader />
         <main className="mx-auto flex min-h-svh max-w-4xl items-center justify-center px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
           <div className="w-full rounded-[28px] border border-stone-200 bg-white p-8 text-center shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
@@ -2184,18 +2252,19 @@ export default function ChangeFlight() {
               <PlaneTakeoff className="h-8 w-8 text-primary" />
             </div>
             <h1 className="mt-4 text-2xl font-bold tracking-tight text-stone-950">
-              Chưa có thông tin đặt chỗ
+              No booking information
             </h1>
             <p className="mt-3 text-base leading-7 text-stone-600">
-              {bootstrapError ?? 'Quay lại Quản lý đặt chỗ và tìm đặt chỗ trước khi đổi chuyến.'}
+              {bootstrapError ??
+                'Go back to Manage booking and look up your booking before changing flights.'}
             </p>
             <button
               type="button"
               onClick={() => navigate('/manage-booking')}
-              className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
+              className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-midnight-burgundy px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
             >
               <ArrowLeft className="h-4 w-4" />
-              Quay lại Quản lý đặt chỗ
+              Back to Manage booking
             </button>
           </div>
         </main>
@@ -2205,21 +2274,35 @@ export default function ChangeFlight() {
   }
 
   const pnr = bookingLookup.booking.pnrCode;
-  const statusLabel = bookingLookup.booking.statusLabel || 'Đã xác nhận';
+  const statusLabel = bookingLookup.booking.statusLabel || 'Confirmed';
   const newFlightsError =
     newFlightsQuery.error instanceof Error
       ? newFlightsQuery.error.message
       : newFlightsQuery.isError
-        ? 'Không thể tải danh sách chuyến bay.'
+        ? 'Unable to load flights.'
         : null;
 
   return (
-    <div className="min-h-screen bg-[#faf8f4] text-stone-900 antialiased">
+    <div className="min-h-screen bg-surface text-on-surface antialiased">
       <SiteHeader />
       <main className="mx-auto min-h-svh w-full max-w-400 px-6 pb-16 pt-24 sm:pt-28 md:px-8">
-        <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-stone-600">
-          <span className="font-medium text-stone-500">Mã đặt chỗ:</span>
-          <span className="font-bold text-stone-900">{pnr}</span>
+        <div className="mb-8">
+          <div className="mb-2 text-[0.72rem] font-black uppercase tracking-[0.22em] text-midnight-burgundy">
+            Booking change
+          </div>
+          <h1 className="font-headline text-3xl font-black tracking-tight text-on-surface md:text-4xl">
+            Change your flight
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-on-surface-variant">
+            Review your itinerary, choose a replacement flight, and complete the booking update with the existing content and flow unchanged.
+          </p>
+        </div>
+
+        <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-on-surface-variant">
+          <span className="font-medium">Booking reference:</span>
+          <span className="rounded-full border border-luxury-gold/20 bg-white px-3 py-1 font-black tracking-[0.16em] text-midnight-burgundy">
+            {pnr}
+          </span>
           <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
             {statusLabel}
           </span>

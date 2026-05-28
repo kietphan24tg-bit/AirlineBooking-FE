@@ -644,7 +644,7 @@ function CheckinStepper({ currentStepId }: { currentStepId: number }) {
 
   return (
     <div className="mb-8 overflow-x-auto pb-2">
-      <div className="flex min-w-max items-center gap-4 border-b border-stone-200 pb-4">
+      <div className="flex min-w-max items-center gap-4 border-b border-luxury-gold/15 pb-4">
         {steps.map((step, index) => {
           const status =
             step.id < currentStepId
@@ -656,25 +656,27 @@ function CheckinStepper({ currentStepId }: { currentStepId: number }) {
             <div key={step.id} className="flex items-center gap-4">
               <div className="flex items-center gap-2.5">
                 <div
-                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-black ${
                     status === 'completed'
-                      ? 'bg-emerald-500 text-white'
+                      ? 'bg-luxury-gold text-midnight-burgundy'
                       : status === 'active'
-                        ? 'bg-red-600 text-white'
-                        : 'bg-stone-100 text-stone-700'
+                        ? 'bg-midnight-burgundy text-white'
+                        : 'border border-luxury-gold/20 bg-white text-on-surface-variant'
                   }`}
                 >
                   {status === 'completed' ? <Check className="h-3.5 w-3.5" /> : step.id}
                 </div>
                 <span
                   className={`whitespace-nowrap text-sm ${
-                    status === 'active' ? 'font-bold text-red-700' : 'font-medium text-stone-700'
+                    status === 'active'
+                      ? 'font-semibold text-midnight-burgundy'
+                      : 'font-medium text-on-surface-variant'
                   }`}
                 >
                   {step.label}
                 </span>
               </div>
-              {index < steps.length - 1 ? <div className="h-px w-10 bg-stone-200 md:w-16" /> : null}
+              {index < steps.length - 1 ? <div className="h-px w-10 bg-luxury-gold/20 md:w-16" /> : null}
             </div>
           );
         })}
@@ -688,49 +690,70 @@ function FlightSelectionList({
   selectedFlights,
   onToggleFlight,
   onContinue,
+  onBack,
 }: {
   flights: DerivedFlight[];
   selectedFlights: Set<string>;
   onToggleFlight: (id: string) => void;
   onContinue: () => void;
+  onBack: () => void;
 }) {
   return (
     <section className="pb-6">
-      <h2 className="mb-6 text-2xl font-bold tracking-tight text-stone-950">Online Check-in</h2>
+      <h2 className="mb-6 font-headline text-2xl font-black tracking-tight text-on-surface">Online Check-in</h2>
       <CheckinStepper currentStepId={1} />
 
-      <div className="rounded-[16px] border border-stone-200 bg-white">
-        <div className="border-b border-stone-100 p-5">
-          <h3 className="text-lg font-semibold text-stone-950">1. Choose flight to check-in</h3>
+      <div className="glass-panel overflow-hidden rounded-[1.75rem] border border-luxury-gold/15 bg-white/95 shadow-[0_18px_50px_rgba(62,16,30,0.08)]">
+        <div className="border-b border-luxury-gold/10 p-5">
+          <h3 className="font-headline text-lg font-black text-midnight-burgundy">1. Choose flight to check-in</h3>
         </div>
 
-        <div className="space-y-4 bg-stone-50/50 p-5">
+        <div className="space-y-4 bg-surface-container-low/45 p-5">
           {flights.map((flight) => {
             const isSelected = selectedFlights.has(flight.id);
             const isCheckinOpen = flight.checkInWindow.status === 'OPEN';
             return (
               <article
                 key={flight.id}
-                className={`rounded-xl border bg-white transition-colors ${
-                  isSelected ? 'border-amber-400 bg-amber-50/10' : 'border-stone-200'
-                }`}
+                role="button"
+                tabIndex={isCheckinOpen ? 0 : -1}
+                onClick={() => {
+                  if (isCheckinOpen) onToggleFlight(flight.id);
+                }}
+                onKeyDown={(event) => {
+                  if (!isCheckinOpen) return;
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onToggleFlight(flight.id);
+                  }
+                }}
+                className={`overflow-hidden rounded-[1.35rem] border bg-white transition-all ${
+                  isSelected
+                    ? 'border-luxury-gold/70 bg-[linear-gradient(180deg,rgba(212,175,55,0.06),rgba(255,255,255,0.98))] shadow-[0_16px_40px_rgba(125,6,51,0.08)]'
+                    : 'border-outline-variant/25 hover:border-luxury-gold/35 hover:shadow-sm'
+                } ${isCheckinOpen ? 'cursor-pointer' : 'cursor-default'} `}
               >
                 <div className="flex flex-col md:flex-row">
                   <div
-                    className={`flex w-full items-start gap-3 border-b border-stone-100 p-4 md:w-56 md:shrink-0 md:border-b-0 md:border-r ${
-                      isSelected ? 'bg-amber-50/30' : ''
+                    className={`flex w-full items-start gap-3 border-b p-4 md:w-56 md:shrink-0 md:border-b-0 md:border-r ${
+                      isSelected
+                        ? 'border-luxury-gold/15 bg-[linear-gradient(180deg,rgba(125,6,51,0.04),rgba(212,175,55,0.08))]'
+                        : 'border-outline-variant/15 bg-white'
                     }`}
                   >
                     <button
                       type="button"
-                      onClick={() => onToggleFlight(flight.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onToggleFlight(flight.id);
+                      }}
                       disabled={!isCheckinOpen}
                       className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
                         isSelected
-                          ? 'border-red-600 bg-red-600 text-white'
+                          ? 'border-midnight-burgundy bg-midnight-burgundy text-luxury-gold'
                           : !isCheckinOpen
-                            ? 'cursor-not-allowed border-stone-200 bg-stone-100'
-                            : 'border-stone-300 bg-white hover:border-red-400'
+                            ? 'cursor-not-allowed border-outline-variant/20 bg-surface-container-high text-on-surface-variant/45'
+                            : 'border-outline-variant/50 bg-white text-transparent hover:border-midnight-burgundy/45'
                       }`}
                     >
                       {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
@@ -747,15 +770,15 @@ function FlightSelectionList({
                       >
                         {formatWindowStatusLabel(flight.checkInWindow.status)}
                       </span>
-                      <div className="text-base font-bold text-stone-950">
+                      <div className="font-headline text-[1.15rem] font-black text-on-surface">
                         {flight.flightNumber}
                       </div>
-                      <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-stone-900">
+                      <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-on-surface">
                         {flight.departureCode}
-                        <ArrowRight className="h-3 w-3 text-stone-400" />
+                        <ArrowRight className="h-3 w-3 text-on-surface-variant/60" />
                         {flight.arrivalCode}
                       </div>
-                      <div className="mt-1.5 text-xs text-stone-500">
+                      <div className="mt-1.5 text-xs text-on-surface-variant">
                         {flight.departureTime} - {flight.arrivalTime}
                         {flight.shortDate ? ` • ${flight.shortDate}` : ''}
                       </div>
@@ -764,60 +787,60 @@ function FlightSelectionList({
 
                   <div className="grid flex-1 grid-cols-2 gap-4 p-4 md:grid-cols-4">
                     <div className="flex flex-col text-sm">
-                      <div className="mb-1 text-[11px] text-stone-500">Departure</div>
-                      <div className="text-base font-bold text-stone-950">
+                      <div className="mb-1 text-[11px] text-on-surface-variant">Departure</div>
+                      <div className="text-base font-bold text-on-surface">
                         {flight.departureTime}
                       </div>
-                      <div className="mt-0.5 font-semibold text-stone-900">
+                      <div className="mt-0.5 font-semibold text-on-surface">
                         {flight.departureCode}
                       </div>
-                      <div className="truncate text-[11px] text-stone-500">
+                      <div className="truncate text-[11px] text-on-surface-variant">
                         {flight.departureCity}
                       </div>
                       {formatTerminalLabel(flight.departureTerminal) ? (
-                        <div className="mt-0.5 text-[11px] font-medium text-stone-500">
+                        <div className="mt-0.5 text-[11px] font-medium text-on-surface-variant">
                           {formatTerminalLabel(flight.departureTerminal)}
                         </div>
                       ) : null}
                     </div>
 
                     <div className="flex flex-col items-center justify-center px-2 text-center">
-                      <Plane className="mb-1 h-5 w-5 shrink-0 text-stone-400" />
+                      <Plane className="mb-1 h-5 w-5 shrink-0 text-luxury-gold" />
                       {flight.durationLabel ? (
-                        <span className="whitespace-nowrap text-[11px] text-stone-500">
+                        <span className="whitespace-nowrap text-[11px] text-on-surface-variant">
                           {flight.durationLabel}
                         </span>
                       ) : null}
-                      <span className="mt-1 text-[11px] text-stone-400">{flight.journeyType}</span>
+                      <span className="mt-1 text-[11px] text-on-surface-variant/70">{flight.journeyType}</span>
                     </div>
 
                     <div className="flex flex-col text-sm">
-                      <div className="mb-1 text-[11px] text-stone-500">Arrival</div>
-                      <div className="text-base font-bold text-stone-950">{flight.arrivalTime}</div>
-                      <div className="mt-0.5 font-semibold text-stone-900">
+                      <div className="mb-1 text-[11px] text-on-surface-variant">Arrival</div>
+                      <div className="text-base font-bold text-on-surface">{flight.arrivalTime}</div>
+                      <div className="mt-0.5 font-semibold text-on-surface">
                         {flight.arrivalCode}
                       </div>
-                      <div className="truncate text-[11px] text-stone-500">
+                      <div className="truncate text-[11px] text-on-surface-variant">
                         {flight.arrivalCity}
                       </div>
                       {formatTerminalLabel(flight.arrivalTerminal) ? (
-                        <div className="mt-0.5 text-[11px] font-medium text-stone-500">
+                        <div className="mt-0.5 text-[11px] font-medium text-on-surface-variant">
                           {formatTerminalLabel(flight.arrivalTerminal)}
                         </div>
                       ) : null}
                     </div>
 
                     <div className="flex flex-col text-sm">
-                      <div className="mb-1 text-[11px] text-stone-500">Ticket class</div>
-                      <div className="text-[11px] font-semibold text-stone-950">{flight.cabin}</div>
-                      <div className="mb-1 mt-2 text-[11px] text-stone-500">Status</div>
+                      <div className="mb-1 text-[11px] text-on-surface-variant">Ticket class</div>
+                      <div className="text-[11px] font-semibold text-on-surface">{flight.cabin}</div>
+                      <div className="mb-1 mt-2 text-[11px] text-on-surface-variant">Status</div>
                       <div
                         className={`text-[11px] font-semibold ${
                           flight.segmentStatus === 'READY'
                             ? 'text-emerald-600'
                             : flight.segmentStatus === 'SEAT_SELECTION_REQUIRED'
                               ? 'text-amber-600'
-                              : 'text-stone-500'
+                              : 'text-on-surface-variant'
                         }`}
                       >
                         {formatWindowMessage(flight)}
@@ -830,12 +853,19 @@ function FlightSelectionList({
           })}
         </div>
 
-        <div className="flex flex-col items-end border-t border-stone-100 p-5">
+        <div className="flex items-center justify-between border-t border-luxury-gold/10 p-5">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-midnight-burgundy/20 bg-white px-5 py-2.5 text-sm font-semibold text-midnight-burgundy transition hover:bg-midnight-burgundy/5"
+          >
+            Back
+          </button>
           <button
             type="button"
             disabled={selectedFlights.size === 0}
             onClick={onContinue}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-midnight-burgundy px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Continue: Choose passengers ({selectedFlights.size} flights)
             <ArrowRight className="h-4 w-4" />
@@ -927,10 +957,10 @@ function _PassengerSelectionPanel({
                           disabled={disabled}
                           className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
                             isSelected
-                              ? 'border-red-600 bg-red-600 text-white'
+                              ? 'border-midnight-burgundy bg-midnight-burgundy text-luxury-gold'
                               : disabled
                                 ? 'cursor-not-allowed border-stone-200 bg-stone-100'
-                                : 'border-stone-300 bg-white'
+                                : 'border-outline-variant/50 bg-white text-transparent hover:border-midnight-burgundy/45'
                           }`}
                         >
                           {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
@@ -1038,17 +1068,19 @@ function EnhancedPassengerSelectionPanel({
 
   return (
     <section className="pb-6">
-      <h2 className="mb-6 text-2xl font-bold tracking-tight text-stone-950">Online Check-in</h2>
+      <h2 className="mb-6 font-headline text-2xl font-black tracking-tight text-on-surface">Online Check-in</h2>
       <CheckinStepper currentStepId={2} />
 
       <div className="space-y-4">
-        <div className="rounded-[20px] border border-stone-200 bg-white p-5 shadow-sm md:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-stone-200 pb-5">
+        <div className="glass-panel rounded-[1.75rem] border border-luxury-gold/15 bg-white/95 p-5 shadow-[0_18px_50px_rgba(62,16,30,0.08)] md:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-luxury-gold/10 pb-5">
             <div className="flex-1">
-              <h3 className="text-2xl font-semibold text-stone-950">2. Choose passengers</h3>
-              <p className="mt-2 text-sm leading-6 text-stone-600">
+              <h3 className="font-headline text-[2rem] font-black tracking-tight text-on-surface">
+                2. Choose passengers
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-on-surface-variant">
                 Choose passengers you want to check in for flight:{' '}
-                <span className="font-semibold text-stone-900">
+                <span className="font-semibold text-on-surface">
                   {flight.flightNumber} ({flight.departureCode} → {flight.arrivalCode})
                 </span>
               </p>
@@ -1056,7 +1088,7 @@ function EnhancedPassengerSelectionPanel({
             <button
               type="button"
               onClick={onToggleAll}
-              className="text-sm font-semibold text-sky-600 transition hover:text-sky-700"
+              className="inline-flex items-center rounded-full bg-midnight-burgundy/8 px-3 py-1.5 text-sm font-semibold text-midnight-burgundy transition hover:bg-midnight-burgundy/12"
             >
               {isAllSelected ? 'Reselect' : 'Select all'}
             </button>
@@ -1065,7 +1097,7 @@ function EnhancedPassengerSelectionPanel({
           <div className="mt-5 overflow-x-hidden">
             <table className="w-full table-fixed text-left text-[13px] md:text-sm">
               <thead>
-                <tr className="border-b border-stone-100 text-stone-500">
+                <tr className="border-b border-luxury-gold/10 text-on-surface-variant">
                   <th className="w-10 py-3 pr-2 font-medium" />
                   <th className="w-[30%] py-3 pr-3 font-medium">Passenger</th>
                   <th className="w-[18%] py-3 pr-3 font-medium">Passenger type</th>
@@ -1081,7 +1113,14 @@ function EnhancedPassengerSelectionPanel({
                   const disabled = !segment?.eligible;
 
                   return (
-                    <tr key={passenger.id} className="border-b border-stone-100 last:border-0">
+                    <tr
+                      key={passenger.id}
+                      className={`border-b last:border-0 ${
+                        isSelected
+                          ? 'border-luxury-gold/12 bg-[linear-gradient(90deg,rgba(125,6,51,0.03),rgba(212,175,55,0.04),rgba(255,255,255,0.7))]'
+                          : 'border-outline-variant/12'
+                      }`}
+                    >
                       <td className="py-4 pr-2 align-top">
                         <button
                           type="button"
@@ -1089,10 +1128,10 @@ function EnhancedPassengerSelectionPanel({
                           disabled={disabled}
                           className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
                             isSelected
-                              ? 'border-red-600 bg-red-600 text-white'
+                              ? 'border-midnight-burgundy bg-midnight-burgundy text-luxury-gold'
                               : disabled
-                                ? 'cursor-not-allowed border-stone-200 bg-stone-100'
-                                : 'border-stone-300 bg-white'
+                                ? 'cursor-not-allowed border-outline-variant/20 bg-surface-container-high text-on-surface-variant/45'
+                                : 'border-outline-variant/50 bg-white text-transparent hover:border-midnight-burgundy/45'
                           }`}
                         >
                           {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
@@ -1100,29 +1139,29 @@ function EnhancedPassengerSelectionPanel({
                       </td>
                       <td className="py-4 pr-3 align-top">
                         <div className="flex items-start gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,rgba(125,6,51,0.05),rgba(212,175,55,0.12))] text-midnight-burgundy">
                             <User className="h-5 w-5" />
                           </div>
                           <div className="min-w-0">
-                            <p className="break-words text-sm font-bold text-stone-950 md:text-base">
+                            <p className="break-words font-headline text-sm font-black text-on-surface md:text-[1.05rem]">
                               {passenger.name.toUpperCase()}
                             </p>
-                            <p className="mt-0.5 break-words text-xs leading-5 text-stone-500">
+                            <p className="mt-0.5 break-words text-xs leading-5 text-on-surface-variant">
                               {formatShortDate(passenger.dob)} |{' '}
                               {formatPassengerTypeLabel(passenger.type)}
                             </p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 pr-3 align-top text-stone-700">
+                      <td className="py-4 pr-3 align-top text-on-surface-variant">
                         {formatPassengerTypeLabel(passenger.type)}
                       </td>
-                      <td className="py-4 pr-3 align-top text-stone-700">
+                      <td className="py-4 pr-3 align-top text-on-surface-variant">
                         {formatShortDate(passenger.dob)}
                       </td>
-                      <td className="py-4 pr-3 align-top text-stone-700">
+                      <td className="py-4 pr-3 align-top text-on-surface-variant">
                         <div className="flex items-center gap-2">
-                          <Briefcase className="h-4 w-4 text-stone-400" />
+                          <Briefcase className="h-4 w-4 text-luxury-gold" />
                           {cabinBagLabel}
                         </div>
                       </td>
@@ -1133,7 +1172,7 @@ function EnhancedPassengerSelectionPanel({
                           {formatCheckInStatusLabel(segment?.checkInStatus ?? 'UNKNOWN')}
                         </div>
                         {segment?.warnings?.length ? (
-                          <div className="mt-1 break-words text-xs leading-5 text-stone-500">
+                          <div className="mt-1 break-words text-xs leading-5 text-on-surface-variant">
                             {segment.warnings.map(formatCheckInStatusLabel).join(', ')}
                           </div>
                         ) : null}
@@ -1156,7 +1195,7 @@ function EnhancedPassengerSelectionPanel({
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center justify-center rounded-2xl border border-stone-200 px-6 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+            className="inline-flex items-center justify-center rounded-2xl border border-outline-variant/35 bg-white px-6 py-3 text-sm font-semibold text-midnight-burgundy transition hover:border-midnight-burgundy/35 hover:bg-surface-container-low"
           >
             Back
           </button>
@@ -1164,7 +1203,7 @@ function EnhancedPassengerSelectionPanel({
             type="button"
             disabled={selected.size === 0}
             onClick={onContinue}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(220,38,38,0.22)] transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-midnight-burgundy px-6 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(125,6,51,0.22)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ArrowRight className="h-4 w-4" />
             Continue: Choose seats ({selected.size} passengers)
@@ -1243,17 +1282,17 @@ function CheckinSeatReviewPanel({
 
   return (
     <section className="pb-6">
-      <h2 className="mb-6 text-2xl font-bold tracking-tight text-stone-950">Online Check-in</h2>
+      <h2 className="mb-6 font-headline text-2xl font-black tracking-tight text-on-surface">Online Check-in</h2>
       <CheckinStepper currentStepId={3} />
 
       <div className="space-y-4">
-        <div className="rounded-[20px] border border-stone-200 bg-white p-5 shadow-sm md:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-stone-200 pb-5">
+        <div className="glass-panel rounded-[1.75rem] border border-luxury-gold/15 bg-white/95 p-5 shadow-[0_18px_50px_rgba(62,16,30,0.08)] md:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-luxury-gold/10 pb-5">
             <div className="flex-1">
-              <h3 className="text-2xl font-semibold text-stone-950">3. Choose seats</h3>
-              <p className="mt-2 text-sm leading-6 text-stone-600">
+              <h3 className="font-headline text-[2rem] font-black tracking-tight text-on-surface">3. Choose seats</h3>
+              <p className="mt-2 text-sm leading-6 text-on-surface-variant">
                 Select seats for chosen passengers on flight{' '}
-                <span className="font-semibold text-stone-900">
+                <span className="font-semibold text-on-surface">
                   {flight.flightNumber} ({flight.departureCode} → {flight.arrivalCode})
                 </span>
                 . Select a passenger on the right column, then select a seat directly on the map.
@@ -1262,12 +1301,12 @@ function CheckinSeatReviewPanel({
           </div>
 
           {seatFlights.length > 1 ? (
-            <div className="mt-5 rounded-[18px] border border-stone-200 bg-stone-50/70 p-3">
+            <div className="mt-5 rounded-[1.35rem] border border-luxury-gold/15 bg-[linear-gradient(180deg,rgba(125,6,51,0.03),rgba(212,175,55,0.05),rgba(255,255,255,0.95))] p-3.5">
               <div className="mb-3">
-                <p className="text-sm font-semibold text-stone-950">
+                <p className="font-headline text-sm font-black text-on-surface">
                   Segments requiring seat selection
                 </p>
-                <p className="text-xs text-stone-500">
+                <p className="text-xs text-on-surface-variant">
                   Each segment has its own seat map. Complete each segment before proceeding to
                   confirmation.
                 </p>
@@ -1283,20 +1322,20 @@ function CheckinSeatReviewPanel({
                       onClick={() => onActiveFlightChange(seatFlight.id)}
                       className={`rounded-2xl border px-4 py-3 text-left transition ${
                         isActiveFlight
-                          ? 'border-red-300 bg-red-50/60 shadow-sm'
-                          : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50'
+                          ? 'border-midnight-burgundy/35 bg-midnight-burgundy/6 shadow-sm'
+                          : 'border-outline-variant/20 bg-white hover:border-luxury-gold/30 hover:bg-surface-container-low'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-midnight-burgundy">
                             Segment {index + 1}
                           </p>
-                          <p className="mt-1 text-sm font-semibold text-stone-950">
+                          <p className="mt-1 text-sm font-semibold text-on-surface">
                             {seatFlight.flightNumber} ({seatFlight.departureCode} →{' '}
                             {seatFlight.arrivalCode})
                           </p>
-                          <p className="mt-1 text-xs text-stone-500">
+                          <p className="mt-1 text-xs text-on-surface-variant">
                             {seatFlight.departureTime} - {seatFlight.arrivalTime} •{' '}
                             {seatFlight.shortDate}
                           </p>
@@ -1321,7 +1360,7 @@ function CheckinSeatReviewPanel({
           ) : null}
 
           <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1.18fr)_340px]">
-            <div className="min-w-0 rounded-[18px] border border-stone-200 p-4">
+            <div className="min-w-0 rounded-[1.35rem] border border-luxury-gold/15 bg-white/85 p-4">
               <AircraftSeatsMap
                 seatMap={seatMap}
                 loading={seatMapLoading}
@@ -1339,15 +1378,15 @@ function CheckinSeatReviewPanel({
             </div>
 
             <div className="space-y-4">
-              <div className="rounded-[18px] border border-stone-200 p-4">
+              <div className="rounded-[1.35rem] border border-luxury-gold/15 bg-white/88 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <h4 className="text-lg font-semibold text-stone-950">
+                  <h4 className="font-headline text-lg font-black text-on-surface">
                     Applicable passenger ({selectedPassengers.length})
                   </h4>
                   <button
                     type="button"
                     onClick={onBack}
-                    className="text-sm font-semibold text-sky-600 transition hover:text-sky-700"
+                    className="text-sm font-semibold text-midnight-burgundy transition hover:text-midnight-burgundy/80"
                   >
                     Reselect passengers
                   </button>
@@ -1367,16 +1406,16 @@ function CheckinSeatReviewPanel({
                           onClick={() => onActivePassengerChange(passenger.id)}
                           className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                             isActive
-                              ? 'border-red-300 bg-red-50/60 shadow-sm'
-                              : 'border-stone-200 hover:border-stone-300 hover:bg-stone-50'
+                              ? 'border-midnight-burgundy/35 bg-midnight-burgundy/6 shadow-sm'
+                              : 'border-outline-variant/20 hover:border-luxury-gold/30 hover:bg-surface-container-low'
                           }`}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="text-sm font-semibold text-stone-950">
+                              <p className="font-headline text-sm font-black text-on-surface">
                                 {index + 1}. {passenger.name.toUpperCase()}
                               </p>
-                              <p className="mt-1 text-xs text-stone-500">
+                              <p className="mt-1 text-xs text-on-surface-variant">
                                 {formatPassengerTypeLabel(passenger.type)}
                               </p>
                             </div>
@@ -1384,7 +1423,7 @@ function CheckinSeatReviewPanel({
                               className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${
                                 seatAssigned
                                   ? 'bg-emerald-50 text-emerald-700'
-                                  : 'bg-red-50 text-red-700'
+                                  : 'bg-midnight-burgundy/8 text-midnight-burgundy'
                               }`}
                             >
                               {segment?.seatNumber ?? 'No seat selected'}
@@ -1394,22 +1433,22 @@ function CheckinSeatReviewPanel({
                       );
                     })
                   ) : (
-                    <div className="rounded-2xl bg-stone-50 px-4 py-3 text-sm text-stone-600">
+                    <div className="rounded-2xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
                       No passengers need to select seats for this segment.
                     </div>
                   )}
                 </div>
 
                 {activePassenger ? (
-                  <div className="mt-4 rounded-2xl bg-stone-50 px-4 py-3 text-sm text-stone-600">
+                  <div className="mt-4 rounded-2xl border border-luxury-gold/12 bg-[linear-gradient(180deg,rgba(125,6,51,0.03),rgba(212,175,55,0.06))] px-4 py-3 text-sm text-on-surface-variant">
                     Operating for{' '}
-                    <span className="font-semibold text-stone-950">{activePassenger.name}</span>.
+                    <span className="font-semibold text-on-surface">{activePassenger.name}</span>.
                     Select a seat on the map to assign or change seat.
                   </div>
                 ) : null}
               </div>
 
-              <div className="rounded-[18px] border border-stone-200 p-4">
+              <div className="rounded-[1.35rem] border border-luxury-gold/15 bg-white/88 p-4">
                 {seatMap ? (
                   <DetailPanel
                     seatMap={seatMap}
@@ -1420,8 +1459,8 @@ function CheckinSeatReviewPanel({
                     onCancel={(seat) => onSeatCancel(buildSelection(seat))}
                   />
                 ) : (
-                  <div className="text-sm text-stone-600">
-                    <p className="font-semibold text-stone-950">Seat pricing note</p>
+                  <div className="text-sm text-on-surface-variant">
+                    <p className="font-headline font-black text-on-surface">Seat pricing note</p>
                     <p className="mt-2">
                       Displayed price is for 1 passenger / 1 segment and may vary by flight.
                     </p>
@@ -1450,7 +1489,7 @@ function CheckinSeatReviewPanel({
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center justify-center rounded-2xl border border-stone-200 px-6 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+            className="inline-flex items-center justify-center rounded-2xl border border-outline-variant/35 bg-white px-6 py-3 text-sm font-semibold text-midnight-burgundy transition hover:border-midnight-burgundy/35 hover:bg-surface-container-low"
           >
             Back
           </button>
@@ -1458,7 +1497,7 @@ function CheckinSeatReviewPanel({
             type="button"
             disabled={!canContinue}
             onClick={onContinue}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(220,38,38,0.22)] transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-midnight-burgundy px-6 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(125,6,51,0.22)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ArrowRight className="h-4 w-4" />
             {continueLabel}
@@ -1484,59 +1523,61 @@ function CheckinConfirmationPanel({
 }) {
   return (
     <section className="pb-6">
-      <h2 className="mb-6 text-2xl font-bold tracking-tight text-stone-950">Online Check-in</h2>
+      <h2 className="mb-6 font-headline text-2xl font-black tracking-tight text-on-surface">Online Check-in</h2>
       <CheckinStepper currentStepId={4} />
 
       <div className="space-y-4">
-        <div className="rounded-[20px] border border-stone-200 bg-white p-5 shadow-sm md:p-6">
-          <div className="border-b border-stone-200 pb-5">
-            <h3 className="text-2xl font-semibold text-stone-950">4. Confirm information</h3>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
+        <div className="glass-panel rounded-[1.75rem] border border-luxury-gold/15 bg-white/95 p-5 shadow-[0_18px_50px_rgba(62,16,30,0.08)] md:p-6">
+          <div className="border-b border-luxury-gold/10 pb-5">
+            <h3 className="font-headline text-[2rem] font-black tracking-tight text-on-surface">
+              4. Confirm information
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-on-surface-variant">
               Review flights, passengers, seats, and extra services before confirming check-in.
             </p>
           </div>
 
           <div className="mt-5 space-y-4">
-            <section className="rounded-[18px] border border-stone-200 p-4">
+            <section className="rounded-[1.35rem] border border-luxury-gold/15 bg-white/88 p-4">
               <div className="mb-4 flex items-center gap-2">
-                <Plane className="h-4 w-4 text-red-600" />
-                <h4 className="text-lg font-semibold text-stone-950">Flight information</h4>
+                <Plane className="h-4 w-4 text-midnight-burgundy" />
+                <h4 className="font-headline text-lg font-black text-on-surface">Flight information</h4>
               </div>
               <div className="space-y-3">
                 {confirmation.flights.map((flight) => (
                   <article
                     key={flight.id}
-                    className="grid gap-4 rounded-2xl border border-stone-200 bg-stone-50/70 p-4 md:grid-cols-[1.1fr_0.9fr]"
+                    className="grid gap-4 rounded-2xl border border-luxury-gold/12 bg-[linear-gradient(180deg,rgba(125,6,51,0.02),rgba(212,175,55,0.04),rgba(255,255,255,0.95))] p-4 md:grid-cols-[1.1fr_0.9fr]"
                   >
                     <div>
-                      <div className="text-sm font-semibold text-stone-950">
+                      <div className="text-sm font-semibold text-on-surface">
                         {flight.segmentLabel} • {flight.flightNumber}
                       </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-stone-700">
-                        <span className="font-semibold text-stone-950">{flight.departureCode}</span>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
+                        <span className="font-semibold text-on-surface">{flight.departureCode}</span>
                         <span>{flight.departureTime}</span>
-                        <span className="text-stone-400">{'->'}</span>
-                        <span className="font-semibold text-stone-950">{flight.arrivalCode}</span>
+                        <span className="text-on-surface-variant/50">{'->'}</span>
+                        <span className="font-semibold text-on-surface">{flight.arrivalCode}</span>
                         <span>{flight.arrivalTime}</span>
                         <span>{flight.shortDate}</span>
                       </div>
-                      <div className="mt-2 text-sm text-stone-500">
+                      <div className="mt-2 text-sm text-on-surface-variant">
                         {flight.departureCity}
                         {flight.departureTerminal
                           ? ` • ${formatTerminalLabel(flight.departureTerminal)}`
                           : ''}
                       </div>
-                      <div className="text-sm text-stone-500">
+                      <div className="text-sm text-on-surface-variant">
                         {flight.arrivalCity}
                         {flight.arrivalTerminal
                           ? ` • ${formatTerminalLabel(flight.arrivalTerminal)}`
                           : ''}
                       </div>
                     </div>
-                    <div className="space-y-1 text-sm text-stone-600 md:text-right">
+                    <div className="space-y-1 text-sm text-on-surface-variant md:text-right">
                       <div>
                         Ticket class:{' '}
-                        <span className="font-medium text-stone-900">{flight.cabin}</span>
+                        <span className="font-medium text-on-surface">{flight.cabin}</span>
                       </div>
                       <div>
                         Status:{' '}
@@ -1546,7 +1587,7 @@ function CheckinConfirmationPanel({
                       </div>
                       <div>
                         Flight duration:{' '}
-                        <span className="font-medium text-stone-900">{flight.durationLabel}</span>
+                        <span className="font-medium text-on-surface">{flight.durationLabel}</span>
                       </div>
                     </div>
                   </article>
@@ -1554,25 +1595,25 @@ function CheckinConfirmationPanel({
               </div>
             </section>
 
-            <section className="rounded-[18px] border border-stone-200 p-4">
+            <section className="rounded-[1.35rem] border border-luxury-gold/15 bg-white/88 p-4">
               <div className="mb-4 flex items-center gap-2">
-                <User className="h-4 w-4 text-red-600" />
-                <h4 className="text-lg font-semibold text-stone-950">Passenger list and seats</h4>
+                <User className="h-4 w-4 text-midnight-burgundy" />
+                <h4 className="font-headline text-lg font-black text-on-surface">Passenger list and seats</h4>
               </div>
               <div className="space-y-3">
                 {confirmation.passengers.map((passenger, index) => (
                   <article
                     key={passenger.id}
-                    className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"
+                    className="rounded-2xl border border-luxury-gold/12 bg-white p-4 shadow-sm"
                   >
-                    <div className="flex flex-col gap-3 border-b border-stone-100 pb-3 md:flex-row md:items-start md:justify-between">
+                    <div className="flex flex-col gap-3 border-b border-luxury-gold/10 pb-3 md:flex-row md:items-start md:justify-between">
                       <div className="flex items-center gap-3">
-                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-50 text-sm font-semibold text-red-700">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[linear-gradient(180deg,rgba(125,6,51,0.05),rgba(212,175,55,0.12))] text-sm font-semibold text-midnight-burgundy">
                           {String(index + 1).padStart(2, '0')}
                         </span>
                         <div>
-                          <div className="font-semibold text-stone-950">{passenger.name}</div>
-                          <div className="text-sm text-stone-500">{passenger.typeLabel}</div>
+                          <div className="font-semibold text-on-surface">{passenger.name}</div>
+                          <div className="text-sm text-on-surface-variant">{passenger.typeLabel}</div>
                         </div>
                       </div>
                       <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -1581,14 +1622,14 @@ function CheckinConfirmationPanel({
                     </div>
                     <div className="mt-3 grid gap-4 md:grid-cols-2">
                       <div>
-                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-midnight-burgundy/70">
                           Seats by segment
                         </div>
                         <div className="mt-2 flex flex-wrap gap-2">
                           {passenger.seatLabels.map((label) => (
                             <span
                               key={label}
-                              className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-sm text-stone-700"
+                              className="rounded-full border border-luxury-gold/15 bg-surface-container-low px-3 py-1 text-sm text-on-surface-variant"
                             >
                               {label}
                             </span>
@@ -1596,10 +1637,10 @@ function CheckinConfirmationPanel({
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-midnight-burgundy/70">
                           Carry-on baggage
                         </div>
-                        <div className="mt-2 space-y-1.5 text-sm text-stone-700">
+                        <div className="mt-2 space-y-1.5 text-sm text-on-surface-variant">
                           {passenger.handBaggageLabels.map((label) => (
                             <div key={label}>{label}</div>
                           ))}
@@ -1611,23 +1652,23 @@ function CheckinConfirmationPanel({
               </div>
             </section>
 
-            <section className="rounded-[18px] border border-stone-200 p-4">
+            <section className="rounded-[1.35rem] border border-luxury-gold/15 bg-white/88 p-4">
               <div className="mb-4 flex items-center gap-2">
-                <Briefcase className="h-4 w-4 text-red-600" />
-                <h4 className="text-lg font-semibold text-stone-950">Additional information</h4>
+                <Briefcase className="h-4 w-4 text-midnight-burgundy" />
+                <h4 className="font-headline text-lg font-black text-on-surface">Additional information</h4>
               </div>
               <div className="space-y-3">
                 {confirmation.passengers.map((passenger) => (
                   <article
                     key={passenger.id}
-                    className="rounded-2xl border border-stone-200 bg-stone-50/60 p-4"
+                    className="rounded-2xl border border-luxury-gold/12 bg-[linear-gradient(180deg,rgba(125,6,51,0.02),rgba(212,175,55,0.04),rgba(255,255,255,0.95))] p-4"
                   >
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div>
-                        <div className="font-semibold text-stone-950">{passenger.name}</div>
-                        <div className="text-sm text-stone-500">{passenger.typeLabel}</div>
+                        <div className="font-semibold text-on-surface">{passenger.name}</div>
+                        <div className="text-sm text-on-surface-variant">{passenger.typeLabel}</div>
                       </div>
-                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-400">
+                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-midnight-burgundy/70">
                         {passenger.serviceGroups.reduce(
                           (sum, group) => sum + group.items.length,
                           0
@@ -1639,16 +1680,16 @@ function CheckinConfirmationPanel({
                       {passenger.serviceGroups.map((group) => (
                         <div
                           key={group.key}
-                          className="rounded-2xl border border-stone-200 bg-white p-3"
+                          className="rounded-2xl border border-luxury-gold/12 bg-white p-3"
                         >
-                          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-midnight-burgundy/70">
                             {group.label}
                           </div>
-                          <div className="mt-2 space-y-1.5 text-sm text-stone-700">
+                          <div className="mt-2 space-y-1.5 text-sm text-on-surface-variant">
                             {group.items.length ? (
                               group.items.map((item) => <div key={item}>{item}</div>)
                             ) : (
-                              <div className="text-stone-400">Not selected</div>
+                              <div className="text-on-surface-variant/60">Not selected</div>
                             )}
                           </div>
                         </div>
@@ -1672,7 +1713,7 @@ function CheckinConfirmationPanel({
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center justify-center rounded-2xl border border-stone-200 px-6 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+            className="inline-flex items-center justify-center rounded-2xl border border-outline-variant/35 bg-white px-6 py-3 text-sm font-semibold text-midnight-burgundy transition hover:border-midnight-burgundy/35 hover:bg-surface-container-low"
           >
             Back
           </button>
@@ -1680,7 +1721,7 @@ function CheckinConfirmationPanel({
             type="button"
             disabled={confirmation.passengers.length === 0 || checkingIn}
             onClick={onConfirm}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(220,38,38,0.22)] transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-midnight-burgundy px-6 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(125,6,51,0.22)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {checkingIn ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1785,30 +1826,37 @@ function EnhancedCheckinSidebar({
   onOpenDetails: () => void;
 }) {
   return (
-    <aside className="space-y-3.5 xl:max-w-[280px] 2xl:max-w-[292px]">
-      <section className="rounded-[20px] border border-stone-200 bg-white p-4 shadow-sm xl:p-3.5">
-        <h3 className="text-2xl font-semibold text-stone-950">Booking information</h3>
-        <div className="mt-4 space-y-3 text-[0.9375rem] xl:mt-3.5 xl:text-[0.9rem]">
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-stone-500">Booking reference (PNR)</span>
-            <span className="text-base font-semibold text-red-600 xl:text-[0.95rem]">
+    <aside className="space-y-3 lg:max-w-[248px] xl:max-w-[256px] 2xl:max-w-[264px]">
+      <section className="glass-panel rounded-[1.5rem] border border-luxury-gold/15 bg-white/95 p-3.5 shadow-[0_14px_36px_rgba(62,16,30,0.07)] xl:p-3.5">
+        <div className="mb-3">
+          <div className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-midnight-burgundy">
+            Booking summary
+          </div>
+          <h3 className="mt-1.5 font-headline text-[1.15rem] font-black tracking-tight text-on-surface">
+            Booking information
+          </h3>
+        </div>
+        <div className="space-y-2.5 text-[0.9rem] xl:text-[0.88rem]">
+          <div className="flex items-center justify-between gap-3 rounded-[1.1rem] border border-outline-variant/12 bg-surface-container-lowest px-3 py-2.5">
+            <span className="text-on-surface-variant">Booking reference (PNR)</span>
+            <span className="text-[0.98rem] font-black text-midnight-burgundy">
               {booking.pnr}
             </span>
           </div>
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-stone-500">Last name</span>
-            <span className="font-semibold uppercase text-stone-950">{booking.lastName}</span>
+          <div className="flex items-center justify-between gap-3 rounded-[1.1rem] border border-outline-variant/12 bg-surface-container-lowest px-3 py-2.5">
+            <span className="text-on-surface-variant">Last name</span>
+            <span className="font-semibold uppercase text-on-surface">{booking.lastName}</span>
           </div>
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-stone-500">Total passengers</span>
-            <span className="font-semibold text-stone-950">{booking.totalPassengers}</span>
+          <div className="flex items-center justify-between gap-3 rounded-[1.1rem] border border-outline-variant/12 bg-surface-container-lowest px-3 py-2.5">
+            <span className="text-on-surface-variant">Total passengers</span>
+            <span className="font-semibold text-on-surface">{booking.totalPassengers}</span>
           </div>
         </div>
 
         <button
           type="button"
           onClick={onOpenDetails}
-          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-stone-200 px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 xl:mt-3.5 xl:h-10 xl:px-3 xl:text-[0.9rem]"
+          className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-[1.1rem] border border-luxury-gold/25 bg-white px-3 text-sm font-semibold text-midnight-burgundy transition hover:border-midnight-burgundy/35 hover:bg-surface-container-low"
         >
           <ClipboardList className="h-4 w-4" />
           Booking details
@@ -1816,27 +1864,29 @@ function EnhancedCheckinSidebar({
       </section>
 
       {flights.length > 0 ? (
-        <section className="rounded-[20px] border border-amber-200 bg-gradient-to-br from-amber-50 via-amber-50/65 to-white p-4 shadow-sm xl:p-3.5">
-          <h3 className="text-2xl font-semibold text-amber-900">Selected flight</h3>
-          <div className="mt-3.5 space-y-3 xl:mt-3 xl:space-y-2.5">
+        <section className="rounded-[1.5rem] border border-luxury-gold/35 bg-gradient-to-br from-[rgba(212,175,55,0.10)] via-[rgba(255,255,255,0.95)] to-white p-3.5 shadow-[0_14px_36px_rgba(62,16,30,0.06)]">
+          <h3 className="font-headline text-[1.15rem] font-black tracking-tight text-[#8a4a08]">
+            Selected flight
+          </h3>
+          <div className="mt-3 space-y-2.5">
             {flights.map((flight) => (
               <div
                 key={flight.id}
-                className="flex items-start gap-2.5 rounded-2xl border border-amber-100/80 bg-white/80 p-3 xl:gap-2 xl:p-2.5"
+                className="flex items-start gap-2.5 rounded-[1.1rem] border border-luxury-gold/18 bg-white/88 p-3"
               >
-                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-stone-100 bg-white text-red-600 shadow-sm xl:h-8 xl:w-8">
+                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-outline-variant/15 bg-white text-midnight-burgundy shadow-sm">
                   <Plane className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[1.7rem] font-semibold leading-none text-stone-950 xl:text-[1.45rem]">
+                  <div className="font-headline text-[1rem] font-black leading-none text-on-surface">
                     {flight.flightNumber}
                   </div>
-                  <div className="mt-1.5 flex items-center gap-2 text-base font-semibold text-stone-900 xl:text-[0.95rem]">
+                  <div className="mt-1 flex items-center gap-2 text-[0.95rem] font-semibold text-on-surface">
                     <span>{flight.departureCode}</span>
-                    <span className="text-stone-400">-&gt;</span>
+                    <span className="text-on-surface-variant/55">-&gt;</span>
                     <span>{flight.arrivalCode}</span>
                   </div>
-                  <div className="mt-1.5 text-[0.9375rem] leading-5 text-stone-600 xl:text-[0.88rem]">
+                  <div className="mt-1 text-[0.86rem] leading-5 text-on-surface-variant">
                     {flight.departureTime} - {flight.arrivalTime} | {flight.shortDate}
                   </div>
                 </div>
@@ -1846,9 +1896,14 @@ function EnhancedCheckinSidebar({
         </section>
       ) : null}
 
-      <section className="rounded-[20px] border border-stone-200 bg-white p-4 shadow-sm xl:p-3.5">
-        <h3 className="text-2xl font-semibold text-stone-950">Need help?</h3>
-        <div className="mt-3.5 space-y-0.5 xl:mt-3">
+      <section className="glass-panel rounded-[1.5rem] border border-luxury-gold/15 bg-white/95 p-3.5 shadow-[0_14px_36px_rgba(62,16,30,0.07)] xl:p-3.5">
+        <div className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-midnight-burgundy">
+          Support
+        </div>
+        <h3 className="mt-1.5 font-headline text-[1.15rem] font-black tracking-tight text-on-surface">
+          Need help?
+        </h3>
+        <div className="mt-2.5 space-y-0.5">
           {[
             { icon: HelpCircle, label: 'Frequently Asked Questions' },
             { icon: Headphones, label: 'Contact support' },
@@ -1857,15 +1912,17 @@ function EnhancedCheckinSidebar({
             <button
               key={item.label}
               type="button"
-              className="flex w-full items-center justify-between rounded-xl px-1.5 py-2 text-left transition hover:bg-stone-50 xl:px-1 xl:py-1.5"
+              className="flex w-full items-center justify-between rounded-[1.1rem] border border-transparent px-2.5 py-2.5 text-left transition hover:border-luxury-gold/20 hover:bg-surface-container-low"
             >
               <div className="flex items-center gap-3">
-                <item.icon className="h-[18px] w-[18px] text-stone-500" />
-                <span className="text-[0.975rem] text-stone-800 xl:text-[0.92rem]">
+                <span className="flex h-8 w-8 items-center justify-center rounded-[0.95rem] bg-[linear-gradient(180deg,rgba(125,6,51,0.05),rgba(212,175,55,0.12))] text-midnight-burgundy">
+                  <item.icon className="h-[18px] w-[18px]" />
+                </span>
+                <span className="text-[0.92rem] text-on-surface">
                   {item.label}
                 </span>
               </div>
-              <ChevronRight className="h-4 w-4 text-stone-400" />
+              <ChevronRight className="h-4 w-4 text-on-surface-variant/55" />
             </button>
           ))}
         </div>
@@ -1876,17 +1933,19 @@ function EnhancedCheckinSidebar({
 
 function CheckinBenefitsStrip() {
   return (
-    <section className="mt-8 grid gap-4 border-t border-stone-200 pt-6 md:grid-cols-2 xl:grid-cols-4">
+    <section className="mt-8 grid gap-4 border-t border-luxury-gold/12 pt-6 md:grid-cols-2 xl:grid-cols-4">
       {CHECKIN_BENEFITS.map((benefit) => (
         <article
           key={benefit.title}
-          className="rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm"
+          className="glass-panel rounded-[1.75rem] border border-luxury-gold/15 bg-white/92 p-5 shadow-[0_16px_40px_rgba(62,16,30,0.06)] transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(62,16,30,0.09)]"
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,rgba(125,6,51,0.06),rgba(212,175,55,0.14))] text-midnight-burgundy">
             <benefit.icon className="h-5 w-5" />
           </div>
-          <h4 className="mt-4 text-base font-semibold text-stone-950">{benefit.title}</h4>
-          <p className="mt-1 text-sm leading-6 text-stone-600">{benefit.desc}</p>
+          <h4 className="mt-4 font-headline text-[1.15rem] font-black tracking-tight text-on-surface">
+            {benefit.title}
+          </h4>
+          <p className="mt-1 text-sm leading-6 text-on-surface-variant">{benefit.desc}</p>
         </article>
       ))}
     </section>
@@ -1906,19 +1965,24 @@ function BookingDetailModal({
   onContinueCheckin: () => void;
   onOpenManageBooking: () => void;
 }) {
-  if (!open || !detail) return null;
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/45 p-4 backdrop-blur-[2px]">
-      <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-[30px] border border-stone-200 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.24)]">
-        <div className="flex items-center justify-between border-b border-stone-200 px-6 py-5 md:px-8">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-[30px] border border-luxury-gold/15 bg-white shadow-[0_30px_90px_rgba(62,16,30,0.18)]">
+        <div className="flex items-center justify-between border-b border-luxury-gold/10 bg-[linear-gradient(180deg,rgba(125,6,51,0.02),rgba(255,255,255,0.98))] px-6 py-5 md:px-8">
           <div>
-            <h3 className="text-2xl font-semibold text-stone-950">Booking details</h3>
+            <div className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-midnight-burgundy">
+              Booking summary
+            </div>
+            <h3 className="mt-2 font-headline text-2xl font-black tracking-tight text-on-surface">
+              Booking details
+            </h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-stone-200 text-stone-500 transition hover:bg-stone-50 hover:text-stone-800"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-outline-variant/30 text-on-surface-variant transition hover:bg-surface-container-low hover:text-on-surface"
             aria-label="Close booking details"
           >
             <X className="h-4 w-4" />
@@ -1926,39 +1990,66 @@ function BookingDetailModal({
         </div>
 
         <div className="max-h-[calc(90vh-88px)] overflow-y-auto">
-          <div className="grid gap-4 border-b border-stone-100 bg-stone-50/80 px-6 py-5 text-sm md:grid-cols-3 md:px-8">
+          {!detail ? (
+            <div className="px-6 py-10 text-center md:px-8">
+              <h4 className="font-headline text-xl font-black text-midnight-burgundy">
+                Booking details are not available yet
+              </h4>
+              <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+                This usually means the check-in session has loaded, but the booking lookup data was not populated in the current store state.
+              </p>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={onOpenManageBooking}
+                  className="inline-flex items-center justify-center rounded-xl border border-outline-variant/40 px-4 py-2.5 text-sm font-semibold text-midnight-burgundy transition hover:bg-surface-container-low"
+                >
+                  Back to Manage Booking
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex items-center justify-center rounded-xl bg-midnight-burgundy px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+          <div className="grid gap-4 border-b border-luxury-gold/10 bg-[linear-gradient(180deg,rgba(125,6,51,0.02),rgba(212,175,55,0.05),rgba(255,255,255,0.98))] px-6 py-5 text-sm md:grid-cols-3 md:px-8">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <span className="text-stone-500">PNR:</span>
-                <span className="font-semibold text-stone-950">{detail.pnr}</span>
+                <span className="text-on-surface-variant">PNR:</span>
+                <span className="font-semibold text-on-surface">{detail.pnr}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-stone-500">Status:</span>
+                <span className="text-on-surface-variant">Status:</span>
                 <span className="font-semibold text-emerald-700">{detail.statusLabel}</span>
               </div>
             </div>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <span className="text-stone-500">Passenger:</span>
-                <span className="font-semibold text-stone-950">{detail.totalPassengers}</span>
+                <span className="text-on-surface-variant">Passenger:</span>
+                <span className="font-semibold text-on-surface">{detail.totalPassengers}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-stone-500">Total amount:</span>
-                <span className="font-semibold text-stone-950">{detail.totalAmountLabel}</span>
+                <span className="text-on-surface-variant">Total amount:</span>
+                <span className="font-semibold text-on-surface">{detail.totalAmountLabel}</span>
               </div>
             </div>
             <div className="space-y-2">
-              <div className="text-stone-500">Contact</div>
-              <div className="font-medium text-stone-950">
+              <div className="text-on-surface-variant">Contact</div>
+              <div className="font-medium text-on-surface">
                 {detail.contactLabel || 'No contact information'}
               </div>
             </div>
           </div>
 
-          <section className="border-b border-stone-100 px-6 py-5 md:px-8">
+          <section className="border-b border-luxury-gold/10 px-6 py-5 md:px-8">
             <div className="mb-4 flex items-center justify-between">
-              <h4 className="text-lg font-semibold text-stone-950">Itinerary</h4>
-              <span className="text-xs uppercase tracking-[0.2em] text-stone-400">
+              <h4 className="font-headline text-lg font-black text-on-surface">Itinerary</h4>
+              <span className="text-xs uppercase tracking-[0.2em] text-midnight-burgundy/60">
                 {detail.flights.length} segment(s)
               </span>
             </div>
@@ -1966,32 +2057,32 @@ function BookingDetailModal({
               {detail.flights.map((flight) => (
                 <article
                   key={flight.id}
-                  className="rounded-2xl border border-stone-200 bg-stone-50/70 px-4 py-4"
+                  className="rounded-2xl border border-luxury-gold/12 bg-[linear-gradient(180deg,rgba(125,6,51,0.02),rgba(212,175,55,0.04),rgba(255,255,255,0.96))] px-4 py-4"
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div className="space-y-1">
-                      <div className="text-sm font-semibold text-stone-950">
+                      <div className="text-sm font-semibold text-on-surface">
                         {flight.segmentLabel} • {flight.dateLabel}
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 text-sm text-stone-700">
-                        <span className="font-semibold text-stone-950">{flight.departureCode}</span>
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
+                        <span className="font-semibold text-on-surface">{flight.departureCode}</span>
                         <span>{flight.departureTime}</span>
-                        <span className="text-stone-400">{'->'}</span>
-                        <span className="font-semibold text-stone-950">{flight.arrivalCode}</span>
+                        <span className="text-on-surface-variant/50">{'->'}</span>
+                        <span className="font-semibold text-on-surface">{flight.arrivalCode}</span>
                         <span>{flight.arrivalTime}</span>
-                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-stone-700">
+                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-midnight-burgundy">
                           {flight.flightNumber}
                         </span>
                       </div>
                     </div>
                     <div className="space-y-1 text-sm md:text-right">
-                      <div className="text-stone-500">
+                      <div className="text-on-surface-variant">
                         Ticket class:{' '}
-                        <span className="font-medium text-stone-900">{flight.cabinLabel}</span>
+                        <span className="font-medium text-on-surface">{flight.cabinLabel}</span>
                       </div>
-                      <div className="text-stone-500">
+                      <div className="text-on-surface-variant">
                         Status:{' '}
-                        <span className="font-medium text-stone-900">{flight.statusLabel}</span>
+                        <span className="font-medium text-on-surface">{flight.statusLabel}</span>
                       </div>
                     </div>
                   </div>
@@ -2002,8 +2093,8 @@ function BookingDetailModal({
 
           <section className="px-6 py-5 md:px-8">
             <div className="mb-4 flex items-center justify-between">
-              <h4 className="text-lg font-semibold text-stone-950">Passenger</h4>
-              <span className="text-xs uppercase tracking-[0.2em] text-stone-400">
+              <h4 className="font-headline text-lg font-black text-on-surface">Passenger</h4>
+              <span className="text-xs uppercase tracking-[0.2em] text-midnight-burgundy/60">
                 {detail.passengers.length} passenger(s)
               </span>
             </div>
@@ -2011,16 +2102,16 @@ function BookingDetailModal({
               {detail.passengers.map((passenger) => (
                 <article
                   key={passenger.id}
-                  className="rounded-2xl border border-stone-200 bg-white px-4 py-4 shadow-sm"
+                  className="rounded-2xl border border-luxury-gold/12 bg-white px-4 py-4 shadow-sm"
                 >
-                  <div className="flex flex-col gap-3 border-b border-stone-100 pb-3 md:flex-row md:items-start md:justify-between">
+                  <div className="flex flex-col gap-3 border-b border-luxury-gold/10 pb-3 md:flex-row md:items-start md:justify-between">
                     <div className="flex items-center gap-3">
-                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-50 text-sm font-semibold text-red-700">
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[linear-gradient(180deg,rgba(125,6,51,0.05),rgba(212,175,55,0.12))] text-sm font-semibold text-midnight-burgundy">
                         {passenger.orderLabel}
                       </span>
                       <div>
-                        <div className="font-semibold text-stone-950">{passenger.name}</div>
-                        <div className="text-sm text-stone-500">{passenger.statusLabel}</div>
+                        <div className="font-semibold text-on-surface">{passenger.name}</div>
+                        <div className="text-sm text-on-surface-variant">{passenger.statusLabel}</div>
                       </div>
                     </div>
                     <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -2029,14 +2120,14 @@ function BookingDetailModal({
                   </div>
                   <div className="grid gap-4 pt-3 md:grid-cols-[1.2fr_1fr]">
                     <div>
-                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-midnight-burgundy/70">
                         Seat by segment
                       </div>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {passenger.seatLabels.map((seatLabel) => (
                           <span
                             key={seatLabel}
-                            className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-sm text-stone-700"
+                            className="rounded-full border border-luxury-gold/15 bg-surface-container-low px-3 py-1 text-sm text-on-surface-variant"
                           >
                             {seatLabel}
                           </span>
@@ -2044,10 +2135,10 @@ function BookingDetailModal({
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-midnight-burgundy/70">
                         Included services
                       </div>
-                      <div className="mt-2 space-y-1.5 text-sm text-stone-700">
+                      <div className="mt-2 space-y-1.5 text-sm text-on-surface-variant">
                         {passenger.serviceLabels.map((serviceLabel) => (
                           <div key={serviceLabel}>{serviceLabel}</div>
                         ))}
@@ -2059,19 +2150,19 @@ function BookingDetailModal({
             </div>
           </section>
 
-          <div className="border-t border-stone-200 bg-stone-50/80 px-6 py-5 md:px-8">
+          <div className="border-t border-luxury-gold/10 bg-[linear-gradient(180deg,rgba(125,6,51,0.02),rgba(255,255,255,0.98))] px-6 py-5 md:px-8">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex items-center justify-center rounded-2xl border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-700 transition hover:bg-white"
+                className="inline-flex items-center justify-center rounded-2xl border border-outline-variant/35 px-5 py-3 text-sm font-semibold text-midnight-burgundy transition hover:border-midnight-burgundy/35 hover:bg-white"
               >
                 Close
               </button>
               <button
                 type="button"
                 onClick={onContinueCheckin}
-                className="inline-flex items-center justify-center rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
+                className="inline-flex items-center justify-center rounded-2xl bg-midnight-burgundy px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110"
               >
                 Continue check-in
               </button>
@@ -2079,11 +2170,13 @@ function BookingDetailModal({
             <button
               type="button"
               onClick={onOpenManageBooking}
-              className="mt-4 text-sm font-medium text-sky-700 transition hover:text-sky-800"
+              className="mt-4 text-sm font-medium text-midnight-burgundy transition hover:text-midnight-burgundy/80"
             >
               View full details in Manage Booking
             </button>
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -2210,47 +2303,91 @@ function CheckinSuccess({
   );
 }
 
-function buildBoardingPassMatrix(seed: string, size = 21) {
+function buildBoardingPassMatrix(seed: string, size = 29) {
   let hash = 2166136261;
   for (let index = 0; index < seed.length; index += 1) {
     hash ^= seed.charCodeAt(index);
     hash = Math.imul(hash, 16777619);
   }
 
-  return Array.from({ length: size }, (_, row) =>
-    Array.from({ length: size }, (_, col) => {
-      const finderBounds =
-        (row < 7 && col < 7) || (row < 7 && col >= size - 7) || (row >= size - 7 && col < 7);
+  const matrix = Array.from({ length: size }, () => Array.from({ length: size }, () => false));
+  const reserved = Array.from({ length: size }, () => Array.from({ length: size }, () => false));
 
-      if (finderBounds) {
-        const localRow = row >= size - 7 ? row - (size - 7) : row;
-        const localCol = col >= size - 7 ? col - (size - 7) : col;
-        const ring = localRow === 0 || localRow === 6 || localCol === 0 || localCol === 6;
-        const core = localRow >= 2 && localRow <= 4 && localCol >= 2 && localCol <= 4;
-        return ring || core;
+  function mark(row: number, col: number, filled: boolean) {
+    if (row < 0 || row >= size || col < 0 || col >= size) return;
+    matrix[row][col] = filled;
+    reserved[row][col] = true;
+  }
+
+  function placeFinder(startRow: number, startCol: number) {
+    for (let row = -1; row <= 7; row += 1) {
+      for (let col = -1; col <= 7; col += 1) {
+        const absoluteRow = startRow + row;
+        const absoluteCol = startCol + col;
+        if (absoluteRow < 0 || absoluteRow >= size || absoluteCol < 0 || absoluteCol >= size) {
+          continue;
+        }
+
+        const isSeparator = row === -1 || row === 7 || col === -1 || col === 7;
+        const isOuterRing = row === 0 || row === 6 || col === 0 || col === 6;
+        const isInnerCore = row >= 2 && row <= 4 && col >= 2 && col <= 4;
+        mark(absoluteRow, absoluteCol, !isSeparator && (isOuterRing || isInnerCore));
       }
+    }
+  }
 
-      hash ^= row * 131 + col * 17;
+  function placeAlignment(centerRow: number, centerCol: number) {
+    for (let row = -2; row <= 2; row += 1) {
+      for (let col = -2; col <= 2; col += 1) {
+        const distance = Math.max(Math.abs(row), Math.abs(col));
+        mark(centerRow + row, centerCol + col, distance === 2 || distance === 0);
+      }
+    }
+  }
+
+  placeFinder(0, 0);
+  placeFinder(0, size - 7);
+  placeFinder(size - 7, 0);
+
+  for (let index = 8; index < size - 8; index += 1) {
+    mark(6, index, index % 2 === 0);
+    mark(index, 6, index % 2 === 0);
+  }
+
+  placeAlignment(size - 7, size - 7);
+
+  for (let row = 0; row < size; row += 1) {
+    for (let col = 0; col < size; col += 1) {
+      if (reserved[row][col]) continue;
+
+      hash ^= row * 197 + col * 263 + (row % 3) * 17 + (col % 5) * 29;
       hash = Math.imul(hash, 16777619);
-      return ((hash >>> 0) & 1) === 1;
-    })
-  );
+
+      const noiseBit = ((hash >>> 0) & 1) === 1;
+      const maskBit = ((row + col) % 3 === 0) !== ((row * col) % 2 === 0);
+      matrix[row][col] = noiseBit !== maskBit;
+    }
+  }
+
+  return matrix;
 }
 
 function BoardingPassCode({ value }: { value: string }) {
   const cells = useMemo(() => buildBoardingPassMatrix(value), [value]);
+  const size = cells.length;
 
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-2">
+    <div className="rounded-xl border border-luxury-gold/15 bg-white p-2.5 shadow-sm">
       <div
-        className="grid aspect-square w-[92px] grid-cols-[repeat(21,minmax(0,1fr))] overflow-hidden rounded-[10px] bg-white"
+        className="grid aspect-square w-[112px] overflow-hidden rounded-[6px] border border-black/8 bg-white p-2"
+        style={{ gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))` }}
         aria-label="Boarding pass code"
       >
         {cells.flatMap((row, rowIndex) =>
           row.map((filled, colIndex) => (
             <span
               key={`${rowIndex}-${colIndex}`}
-              className={filled ? 'bg-stone-950' : 'bg-white'}
+              className={filled ? 'bg-black' : 'bg-white'}
             />
           ))
         )}
@@ -2318,19 +2455,19 @@ function CheckinSuccessExperience({
   return (
     <section className="space-y-8">
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_272px]">
-        <div className="min-w-0 rounded-[32px] border border-stone-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:p-8">
+        <div className="min-w-0 rounded-[32px] border border-luxury-gold/15 bg-white/96 p-6 shadow-[0_20px_60px_rgba(62,16,30,0.08)] sm:p-8">
           <CheckinStepper currentStepId={5} />
-          <section className="mt-6 overflow-hidden rounded-[24px] border border-stone-200 bg-white">
-            <div className="flex flex-col gap-4 border-b border-stone-200 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+          <section className="mt-6 overflow-hidden rounded-[24px] border border-luxury-gold/15 bg-white">
+            <div className="flex flex-col gap-4 border-b border-luxury-gold/10 bg-[linear-gradient(180deg,rgba(125,6,51,0.02),rgba(255,255,255,0.98))] px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
                   <CheckCircle2 className="h-4 w-4" />
                 </div>
                 <div>
-                  <h3 className="text-[1.85rem] font-semibold tracking-tight text-stone-950">
+                  <h3 className="font-headline text-[1.85rem] font-black tracking-tight text-on-surface">
                     Check-in successful!
                   </h3>
-                  <p className="mt-1 text-sm text-stone-600">
+                  <p className="mt-1 text-sm text-on-surface-variant">
                     Thank you for checking in online. Here is your boarding pass.
                   </p>
                 </div>
@@ -2340,7 +2477,7 @@ function CheckinSuccessExperience({
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant/30 bg-white px-4 py-2.5 text-sm font-medium text-midnight-burgundy transition hover:border-midnight-burgundy/30 hover:bg-surface-container-low"
                 >
                   <Mail className="h-4 w-4" />
                   Send via email
@@ -2351,23 +2488,23 @@ function CheckinSuccessExperience({
             <div className="space-y-6 px-4 py-4 sm:px-5 sm:py-5">
               {flightGroups.map((group, groupIndex) => (
                 <section key={group.flight.id} className="space-y-3">
-                  <div className="flex flex-col gap-3 border-b border-stone-200 pb-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-3 border-b border-luxury-gold/10 pb-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-                      <div className="flex items-center gap-2 font-semibold text-stone-800">
-                        <Plane className="h-4 w-4 text-red-600" />
+                      <div className="flex items-center gap-2 font-semibold text-on-surface">
+                        <Plane className="h-4 w-4 text-midnight-burgundy" />
                         <span>
                           Flight {groupIndex + 1}: {group.flight.flightNumber}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-[1.1rem] font-semibold text-stone-950">
+                      <div className="flex items-center gap-2 text-[1.1rem] font-semibold text-on-surface">
                         <span>{group.flight.departureCode}</span>
-                        <ArrowRight className="h-4 w-4 text-stone-400" />
+                        <ArrowRight className="h-4 w-4 text-on-surface-variant/50" />
                         <span>{group.flight.arrivalCode}</span>
                       </div>
-                      <div className="text-stone-600">
+                      <div className="text-on-surface-variant">
                         {group.flight.departureTime} - {group.flight.arrivalTime}
                       </div>
-                      <div className="text-stone-600">{group.flight.shortDate}</div>
+                      <div className="text-on-surface-variant">{group.flight.shortDate}</div>
                     </div>
 
                     <span className="w-fit rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -2379,9 +2516,9 @@ function CheckinSuccessExperience({
                     {group.passengers.map((card) => (
                       <article
                         key={card.id}
-                        className="overflow-hidden rounded-[16px] border border-stone-200 bg-white"
+                        className="overflow-hidden rounded-[16px] border border-luxury-gold/15 bg-white shadow-[0_10px_30px_rgba(62,16,30,0.05)]"
                       >
-                        <div className="flex items-start justify-between gap-3 px-4 pb-3 pt-3.5">
+                        <div className="flex items-start justify-between gap-3 bg-[linear-gradient(180deg,rgba(125,6,51,0.02),rgba(255,255,255,0.96))] px-4 pb-3 pt-3.5">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 text-luxury-gold">
                               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-midnight-burgundy text-luxury-gold">
@@ -2391,16 +2528,16 @@ function CheckinSuccessExperience({
                                 <div className="font-headline text-[0.8rem] font-black uppercase tracking-[0.18em] text-midnight-burgundy">
                                   The Sovereign
                                 </div>
-                                <div className="mt-1 text-[10px] font-medium uppercase tracking-[0.24em] text-stone-400">
+                                <div className="mt-1 text-[10px] font-medium uppercase tracking-[0.24em] text-on-surface-variant/65">
                                   Boarding Pass
                                 </div>
                               </div>
                             </div>
-                            <div className="mt-4 text-[1.02rem] font-semibold uppercase text-stone-950">
+                            <div className="mt-4 text-[1.02rem] font-semibold uppercase text-on-surface">
                               {card.passengerName}
                             </div>
-                            <div className="mt-2 text-xs text-stone-500">Seat</div>
-                            <div className="mt-1 text-[1.9rem] font-semibold leading-none text-stone-950">
+                            <div className="mt-2 text-xs text-on-surface-variant">Seat</div>
+                            <div className="mt-1 text-[1.9rem] font-semibold leading-none text-midnight-burgundy">
                               {card.seatNumber}
                             </div>
                           </div>
@@ -2417,12 +2554,12 @@ function CheckinSuccessExperience({
                           </div>
                         </div>
 
-                        <div className="border-t border-stone-100 px-4 py-3">
-                          <div className="flex items-center gap-3 text-stone-950">
+                        <div className="border-t border-luxury-gold/10 px-4 py-3">
+                          <div className="flex items-center gap-3 text-on-surface">
                             <span className="text-[1.55rem] font-semibold">
                               {group.flight.departureCode}
                             </span>
-                            <ArrowRight className="h-4 w-4 text-stone-400" />
+                            <ArrowRight className="h-4 w-4 text-on-surface-variant/50" />
                             <span className="text-[1.55rem] font-semibold">
                               {group.flight.arrivalCode}
                             </span>
@@ -2430,39 +2567,39 @@ function CheckinSuccessExperience({
 
                           <div className="mt-3 grid grid-cols-3 gap-3 text-[13px]">
                             <div>
-                              <div className="text-stone-400">Flight</div>
-                              <div className="mt-1 font-semibold text-stone-950">
+                              <div className="text-on-surface-variant/65">Flight</div>
+                              <div className="mt-1 font-semibold text-on-surface">
                                 {group.flight.flightNumber}
                               </div>
                             </div>
                             <div>
-                              <div className="text-stone-400">Date</div>
-                              <div className="mt-1 font-semibold text-stone-950">
+                              <div className="text-on-surface-variant/65">Date</div>
+                              <div className="mt-1 font-semibold text-on-surface">
                                 {group.flight.shortDate}
                               </div>
                             </div>
                             <div>
-                              <div className="text-stone-400">Departure time</div>
-                              <div className="mt-1 font-semibold text-stone-950">
+                              <div className="text-on-surface-variant/65">Departure time</div>
+                              <div className="mt-1 font-semibold text-on-surface">
                                 {group.flight.departureTime}
                               </div>
                             </div>
                           </div>
 
-                          <div className="mt-3 grid grid-cols-3 gap-3 border-t border-stone-100 pt-3 text-[13px]">
+                          <div className="mt-3 grid grid-cols-3 gap-3 border-t border-luxury-gold/10 pt-3 text-[13px]">
                             <div>
-                              <div className="text-stone-400">Gate</div>
-                              <div className="mt-1 font-semibold text-stone-950">{card.gate}</div>
+                              <div className="text-on-surface-variant/65">Gate</div>
+                              <div className="mt-1 font-semibold text-on-surface">{card.gate}</div>
                             </div>
                             <div>
-                              <div className="text-stone-400">Boarding time</div>
-                              <div className="mt-1 font-semibold text-stone-950">
+                              <div className="text-on-surface-variant/65">Boarding time</div>
+                              <div className="mt-1 font-semibold text-on-surface">
                                 {card.boardingTime}
                               </div>
                             </div>
                             <div>
-                              <div className="text-stone-400">SEQ</div>
-                              <div className="mt-1 font-semibold text-stone-950">
+                              <div className="text-on-surface-variant/65">SEQ</div>
+                              <div className="mt-1 font-semibold text-on-surface">
                                 {card.sequenceNumber}
                               </div>
                             </div>
@@ -2475,11 +2612,11 @@ function CheckinSuccessExperience({
               ))}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 border-t border-stone-200 px-4 py-4 sm:px-5">
+            <div className="flex flex-wrap items-center gap-3 border-t border-luxury-gold/10 px-4 py-4 sm:px-5">
               <button
                 type="button"
                 onClick={() => navigate('/')}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant/30 px-4 py-2.5 text-sm font-medium text-midnight-burgundy transition hover:border-midnight-burgundy/30 hover:bg-surface-container-low"
               >
                 <Home className="h-4 w-4" />
                 Back to home
@@ -2487,14 +2624,14 @@ function CheckinSuccessExperience({
               <button
                 type="button"
                 onClick={() => navigate('/manage-booking/check-in')}
-                className="inline-flex items-center justify-center rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                className="inline-flex items-center justify-center rounded-xl border border-outline-variant/30 px-4 py-2.5 text-sm font-medium text-midnight-burgundy transition hover:border-midnight-burgundy/30 hover:bg-surface-container-low"
               >
                 Check in another flight
               </button>
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant/30 px-4 py-2.5 text-sm font-medium text-midnight-burgundy transition hover:border-midnight-burgundy/30 hover:bg-surface-container-low"
               >
                 <Download className="h-4 w-4" />
                 Download all (PDF)
@@ -2502,19 +2639,19 @@ function CheckinSuccessExperience({
               <button
                 type="button"
                 onClick={() => navigate('/manage-booking')}
-                className="inline-flex items-center justify-center rounded-xl bg-red-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 sm:ml-auto"
+                className="inline-flex items-center justify-center rounded-xl bg-midnight-burgundy px-6 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 sm:ml-auto"
               >
                 Done
               </button>
             </div>
           </section>
 
-          <section className="mt-6 rounded-[24px] border border-sky-200 bg-sky-50/80 p-5">
+          <section className="mt-6 rounded-[24px] border border-luxury-gold/15 bg-[linear-gradient(180deg,rgba(125,6,51,0.02),rgba(212,175,55,0.07),rgba(255,255,255,0.96))] p-5">
             <div className="flex items-start gap-3">
-              <Info className="mt-0.5 h-5 w-5 shrink-0 text-sky-700" />
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-midnight-burgundy" />
               <div>
-                <h3 className="text-base font-semibold text-sky-950">Note before departure</h3>
-                <div className="mt-2 space-y-1 text-sm leading-6 text-sky-950/80">
+                <h3 className="font-headline text-base font-black text-on-surface">Note before departure</h3>
+                <div className="mt-2 space-y-1 text-sm leading-6 text-on-surface-variant">
                   <p>Arrive at the airport at least 90 minutes early for domestic flights.</p>
                   <p>Recheck your boarding gate on the airport screen as information may change.</p>
                   <p>
@@ -3148,7 +3285,7 @@ export default function Checkin() {
 
   if (manageOptionsQuery.isLoading && !manageOptions) {
     return (
-      <div className="min-h-screen bg-[#faf8f4] text-stone-900 antialiased">
+      <div className="min-h-screen bg-surface text-on-surface antialiased">
         <SiteHeader />
         <main className="mx-auto flex min-h-svh max-w-4xl items-center justify-center px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
           <div className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white px-6 py-4 text-stone-700 shadow-sm">
@@ -3163,7 +3300,7 @@ export default function Checkin() {
 
   if (!bookingLookup || passengers.length === 0) {
     return (
-      <div className="min-h-screen bg-[#faf8f4] text-stone-900 antialiased">
+      <div className="min-h-screen bg-surface text-on-surface antialiased">
         <SiteHeader />
         <main className="mx-auto flex min-h-svh max-w-4xl items-center justify-center px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
           <div className="w-full rounded-[28px] border border-stone-200 bg-white p-8 text-center shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
@@ -3176,7 +3313,7 @@ export default function Checkin() {
             <button
               type="button"
               onClick={() => navigate('/manage-booking')}
-              className="mt-6 inline-flex items-center justify-center rounded-2xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
+              className="mt-6 inline-flex items-center justify-center rounded-2xl bg-midnight-burgundy px-6 py-3 text-sm font-semibold text-white transition hover:brightness-110"
             >
               Back to Manage Booking
             </button>
@@ -3188,9 +3325,22 @@ export default function Checkin() {
   }
 
   return (
-    <div className="min-h-screen bg-[#faf8f4] text-stone-900 antialiased">
+    <div className="min-h-screen bg-surface text-on-surface antialiased">
       <SiteHeader />
       <main className="mx-auto min-h-svh w-full max-w-400 px-6 pb-16 pt-24 sm:pt-28 md:px-8">
+        {!checkinSuccess ? (
+          <div className="mb-8">
+            <div className="mb-2 text-[0.72rem] font-black uppercase tracking-[0.22em] text-midnight-burgundy">
+              Online check-in
+            </div>
+            <h1 className="font-headline text-3xl font-black tracking-tight text-on-surface md:text-4xl">
+              Check in online
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-on-surface-variant">
+              Keep the same check-in content and steps, but with a clearer booking workspace and a consistent brand surface.
+            </p>
+          </div>
+        ) : null}
         {checkinSuccess ? (
           <CheckinSuccessExperience
             booking={booking}
@@ -3207,6 +3357,7 @@ export default function Checkin() {
                     flights={flights}
                     selectedFlights={selectedFlights}
                     onToggleFlight={toggleFlight}
+                    onBack={() => navigate('/manage-booking')}
                     onContinue={() => setCurrentStep(2)}
                   />
                 ) : currentStep === 2 ? (

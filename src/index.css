@@ -368,3 +368,17 @@
 .animate-wing-flash {
   animation: flashing 2s infinite;
 }
+
+@keyframes fare-progress-slide {
+  0% {
+    transform: translateX(-140%);
+  }
+
+  100% {
+    transform: translateX(360%);
+  }
+}
+
+.fare-progress-bar {
+  animation: fare-progress-slide 1.1s ease-in-out infinite;
+}

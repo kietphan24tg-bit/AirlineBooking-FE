@@ -8,17 +8,12 @@ export default function SiteHeader({ showSignIn = true }: SiteHeaderProps) {
   return (
     <nav className="fixed top-0 z-50 w-full border-b border-luxury-gold/20 bg-midnight-burgundy shadow-xl">
       <div className="mx-auto flex h-12 w-full max-w-480 items-center justify-between px-6 md:px-8">
-        <div className="flex items-center md:gap-5">
-          <span className="font-headline text-xl font-black uppercase tracking-tighter text-luxury-gold md:text-2xl">
-            The Sovereign
-          </span>
-          <Link
-            to="/"
-            className="font-body text-sm font-medium transition-all duration-300 md:text-base text-white/80 hover:text-white"
-          >
-            <span className="not-italic">Home</span>
-          </Link>
-        </div>
+        <Link
+          to="/"
+          className="font-headline text-xl font-black uppercase tracking-tighter text-luxury-gold md:text-2xl"
+        >
+          The Sovereign
+        </Link>
         <div className="flex items-center gap-3 md:gap-4">
           {showSignIn ? (
             <Link

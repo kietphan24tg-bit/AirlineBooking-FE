@@ -445,9 +445,10 @@ export default function Landing() {
   const returnDateMin = departDate && departDate >= todayMin ? departDate : todayMin;
 
   useEffect(() => {
-    const state = location.state as
-      | { paymentExpired?: boolean; paymentRedirectMessage?: string }
-      | null;
+    const state = location.state as {
+      paymentExpired?: boolean;
+      paymentRedirectMessage?: string;
+    } | null;
     if (!state) return;
     if (state.paymentRedirectMessage) {
       toast.error(state.paymentRedirectMessage);
@@ -527,7 +528,9 @@ export default function Landing() {
         }))
       );
 
-      const promoApplied = fareStatuses.some((fare) => fare.hasDiscount || fare.status === 'APPLIED');
+      const promoApplied = fareStatuses.some(
+        (fare) => fare.hasDiscount || fare.status === 'APPLIED'
+      );
       if (!promoApplied) {
         const promoMessage =
           fareStatuses.find((fare) => fare.message)?.message ||
@@ -1079,7 +1082,7 @@ export default function Landing() {
                       className="h-5 w-5 shrink-0 stroke-midnight-burgundy text-midnight-burgundy"
                       strokeWidth={1.75}
                     />
-                    <span className="min-w-0 flex-1 font-headline text-base font-bold text-midnight-burgundy sm:text-lg">
+                    <span className="min-w-0 flex-1 truncate whitespace-nowrap font-headline text-base font-bold text-midnight-burgundy sm:text-lg">
                       {travelerSummaryLabel}
                     </span>
                     <ChevronDown

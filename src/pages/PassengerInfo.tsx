@@ -1,9 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { ArrowRight, Baby, ChevronDown, User, Users } from 'lucide-react';
+import axios from 'axios';
+import { ArrowRight, Baby, ChevronDown, Loader2, User, Users } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm, type FieldErrors } from 'react-hook-form';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import BookingStepper from '../components/booking/BookingStepper';
 import AmbientSweep from '../components/layout/AmbientSweep';
@@ -13,6 +14,7 @@ import Button from '../components/ui/Button';
 import FieldLabel from '../components/ui/FieldLabel';
 import TextInput from '../components/ui/TextInput';
 import { bookingService } from '../services/booking.service';
+import { flightService } from '../services/flight.service';
 import { useBookingStore } from '../stores/useBookingStore';
 import type {
   BookingContactPayload,
@@ -20,7 +22,11 @@ import type {
   IdentifyType,
   PassengerType,
 } from '../types/booking.types';
-import type { FlightRevalidatePassengerSummary } from '../types/flight.types';
+import type {
+  FlightRevalidateFareRequest,
+  FlightRevalidateItineraryRequest,
+  FlightRevalidatePassengerSummary,
+} from '../types/flight.types';
 import { passengerInfoSchema, type PassengerInfoFormValues } from '../validations/passenger.schema';
 import { getAxiosErrorCode, getAxiosErrorMessage } from '../utils/apiError';
 
@@ -29,6 +35,23 @@ type PassengerFormEntry = PassengerInfoFormValues['passengers'][number];
 type PassengerSection = {
   passengerType: PassengerType;
   indexWithinType: number;
+};
+
+type PendingPassengerRevalidationState =
+  | {
+      kind: 'ONE_WAY';
+      request: FlightRevalidateFareRequest;
+      originPath: string;
+    }
+  | {
+      kind: 'ROUND_TRIP';
+      request: FlightRevalidateItineraryRequest;
+      originPath: string;
+      restoreOutboundSelection?: unknown;
+    };
+
+type PassengerInfoLocationState = {
+  pendingRevalidation?: PendingPassengerRevalidationState;
 };
 
 const PASSENGER_TYPE_LABELS: Record<PassengerType, string> = {
@@ -155,14 +178,19 @@ function createPassengerFormEntry(
 
 export default function PassengerInfo() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const bookingDraft = useBookingStore((state) => state.bookingDraft);
   const isRevalidateExpired = useBookingStore((state) => state.isRevalidateExpired);
   const setBookingRequestDraft = useBookingStore((state) => state.setBookingRequestDraft);
   const setBookingResponse = useBookingStore((state) => state.setBookingResponse);
+  const setRevalidationDraft = useBookingStore((state) => state.setRevalidationDraft);
   const isPreviewMode = import.meta.env.DEV && searchParams.get('preview') === '1';
   const idempotencyKeyRef = useRef('');
   const isSubmittingRef = useRef(false);
+  const locationState = location.state as PassengerInfoLocationState | null;
+  const pendingRevalidation = locationState?.pendingRevalidation ?? null;
+  const [isPreparingSelection, setIsPreparingSelection] = useState(Boolean(pendingRevalidation));
   const previewPassengerSummary = useMemo<FlightRevalidatePassengerSummary>(
     () => ({
       adult: 1,
@@ -175,7 +203,9 @@ export default function PassengerInfo() {
     ? previewPassengerSummary
     : bookingDraft.passengerSummary;
   const hasValidRevalidation =
-    isPreviewMode || (Boolean(bookingDraft.revalidateId) && !isRevalidateExpired());
+    isPreviewMode ||
+    Boolean(pendingRevalidation) ||
+    (Boolean(bookingDraft.revalidateId) && !isRevalidateExpired());
   const passengerSections = useMemo(
     () => buildPassengerSections(effectivePassengerSummary),
     [effectivePassengerSummary]
@@ -236,6 +266,50 @@ export default function PassengerInfo() {
   }, [hasValidRevalidation, isPreviewMode, navigate]);
 
   useEffect(() => {
+    if (isPreviewMode || !pendingRevalidation) return;
+
+    const controller = new AbortController();
+    setIsPreparingSelection(true);
+
+    void (async () => {
+      try {
+        const response =
+          pendingRevalidation.kind === 'ROUND_TRIP'
+            ? await flightService.revalidateItinerary(pendingRevalidation.request, {
+                signal: controller.signal,
+              })
+            : await flightService.revalidateFare(pendingRevalidation.request, {
+                signal: controller.signal,
+              });
+
+        setRevalidationDraft(response);
+        setIsPreparingSelection(false);
+        navigate('/booking/passengers', { replace: true, state: null });
+      } catch (error) {
+        if (axios.isCancel(error) || controller.signal.aborted) return;
+        const message =
+          axios.isAxiosError(error) && error.code === 'ECONNABORTED'
+            ? 'Fare verification took too long. Please try again.'
+            : getAxiosErrorMessage(error, 'Could not verify latest fare. Please try again.');
+        navigate(pendingRevalidation.originPath, {
+          replace: true,
+          state: {
+            revalidationError: message,
+            restoreOutboundSelection:
+              pendingRevalidation.kind === 'ROUND_TRIP'
+                ? (pendingRevalidation.restoreOutboundSelection ?? null)
+                : null,
+          },
+        });
+      }
+    })();
+
+    return () => {
+      controller.abort();
+    };
+  }, [isPreviewMode, navigate, pendingRevalidation, setRevalidationDraft]);
+
+  useEffect(() => {
     const nextPassengers =
       persistedPassengerDefaults ?? passengerSections.map(createPassengerDefaults);
     reset({ passengers: nextPassengers });
@@ -254,6 +328,22 @@ export default function PassengerInfo() {
   }, [hasValidRevalidation]);
 
   if (!hasValidRevalidation) return null;
+
+  if (isPreparingSelection) {
+    return (
+      <div className="relative min-h-screen bg-surface font-body text-on-surface antialiased">
+        <AmbientSweep />
+        <SiteHeader />
+        <main className="relative z-10 mx-auto max-w-5xl px-4 pb-20 pt-24 sm:px-6 sm:pb-24 sm:pt-28">
+          <BookingStepper current="select" />
+          <div className="flex min-h-[48vh] items-center justify-center">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" strokeWidth={2.2} />
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
 
   if (passengerSections.length === 0) {
     return (

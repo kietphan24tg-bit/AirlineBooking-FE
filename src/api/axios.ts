@@ -28,7 +28,18 @@ const api = axios.create({
 
 function isPublicRequest(url: string | undefined): boolean {
   if (!url) return false;
-  return url.startsWith('/api/services') || url.includes('/api/services?');
+  return (
+    url.startsWith('/api/services') ||
+    url.includes('/api/services?') ||
+    url.startsWith('/api/flights/search') ||
+    url.includes('/api/flights/search?') ||
+    url.startsWith('/api/flights/search-calendar') ||
+    url.includes('/api/flights/search-calendar?') ||
+    url.startsWith('/api/flights/revalidate-fare') ||
+    url.includes('/api/flights/revalidate-fare?') ||
+    url.startsWith('/api/flights/revalidate-itinerary') ||
+    url.includes('/api/flights/revalidate-itinerary?')
+  );
 }
 
 // Auth + client timezone (backend uses X-Timezone for market/locale logic)

@@ -50,14 +50,17 @@ function passengersFromNavigationState(
 }
 
 function formatMoney(amount: number, currency: string): string {
+  const normalizedCurrency = (currency || 'VND').trim().toUpperCase();
+  const locale =
+    normalizedCurrency === 'VND' ? 'vi-VN' : normalizedCurrency === 'THB' ? 'th-TH' : undefined;
   try {
-    return new Intl.NumberFormat('vi-VN', {
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
-      currency,
+      currency: normalizedCurrency,
       maximumFractionDigits: 0,
     }).format(amount);
   } catch {
-    return `${amount.toLocaleString('vi-VN')} ${currency}`;
+    return `${amount.toLocaleString(locale ?? undefined)} ${normalizedCurrency}`;
   }
 }
 

@@ -1,7 +1,7 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import BookingStepper from '../components/booking/BookingStepper';
@@ -106,6 +106,25 @@ const FALLBACK_SLIDER_MAX = 20_000_000;
 const FALLBACK_CURRENCY = 'VND';
 const OUTBOUND_SELECTED_TOAST_ID = 'outbound-fare-selected';
 type ResultDirection = 'OUTBOUND' | 'INBOUND';
+type SelectedFarePayload = { leg: FlightLeg; fareId: number; fareKey: string };
+
+type PendingPassengerRevalidationState =
+  | {
+      kind: 'ONE_WAY';
+      request: FlightRevalidateFareRequest;
+      originPath: string;
+    }
+  | {
+      kind: 'ROUND_TRIP';
+      request: FlightRevalidateItineraryRequest;
+      originPath: string;
+      restoreOutboundSelection: SelectedFarePayload | null;
+    };
+
+type FlightResultsLocationState = {
+  revalidationError?: string;
+  restoreOutboundSelection?: SelectedFarePayload | null;
+};
 
 function formatMoneySafe(amount: number, currency: string): string {
   try {
@@ -291,6 +310,7 @@ function FilterPanel({
 
 export default function FlightResults() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const criteria = useMemo(() => parseFlightSearchCriteria(searchParams), [searchParams]);
   const parsedUrlFilters = useMemo(() => parseFlightResultsFilters(searchParams), [searchParams]);
@@ -308,18 +328,14 @@ export default function FlightResults() {
   );
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [pendingFareKey, setPendingFareKey] = useState<string | null>(null);
-  const selectedOutboundRef = useRef<{
-    leg: FlightLeg;
-    fareId: number;
-    fareKey: string;
-  } | null>(null);
+  const [selectedOutboundFareKey, setSelectedOutboundFareKey] = useState<string | null>(null);
+  const selectedOutboundRef = useRef<SelectedFarePayload | null>(null);
   /** UI value while dragging; `null` = no cap (slider at max). Committed to `filters.maxBudget` after debounce. */
   const [draftMaxBudget, setDraftMaxBudget] = useState<number | null>(
     () => parseFlightResultsFilters(initialSearchParams).maxBudget
   );
   const priceDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearBooking = useBookingStore((state) => state.clearBooking);
-  const setRevalidationDraft = useBookingStore((state) => state.setRevalidationDraft);
   const priceRangeFilters = useMemo<FlightSearchFilters>(
     () => ({
       ...filters,
@@ -347,7 +363,23 @@ export default function FlightResults() {
     setSort(parsedUrlSort);
     setMobileFiltersOpen(false);
     selectedOutboundRef.current = null;
+    setSelectedOutboundFareKey(null);
   }, [criteria, criteriaKey, parsedUrlFilters, parsedUrlSort]);
+
+  useEffect(() => {
+    const state = location.state as FlightResultsLocationState | null;
+    if (!state) return;
+
+    if (state.restoreOutboundSelection) {
+      selectedOutboundRef.current = state.restoreOutboundSelection;
+      setSelectedOutboundFareKey(state.restoreOutboundSelection.fareKey);
+    }
+    if (state.revalidationError) {
+      toast.error(state.revalidationError);
+    }
+
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+  }, [location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
     if (!criteria) return;
@@ -387,10 +419,6 @@ export default function FlightResults() {
     },
     enabled: !!criteria,
   });
-  const revalidateFareMutation = useMutation({
-    mutationFn: (payload: FlightRevalidateFareRequest) => flightService.revalidateFare(payload),
-  });
-
   const priceRangeQuery = useQuery({
     queryKey: criteria
       ? ([
@@ -471,6 +499,7 @@ export default function FlightResults() {
     }
     if (criteria.tripType === 'ROUND_TRIP' && direction === 'OUTBOUND') {
       selectedOutboundRef.current = payload;
+      setSelectedOutboundFareKey(payload.fareKey);
       toast.info(
         `Outbound selected: Flight ${payload.leg.flightNumber} (${payload.leg.departureCode} -> ${payload.leg.arrivalCode}). Select a return fare to continue.`,
         { id: OUTBOUND_SELECTED_TOAST_ID }
@@ -487,15 +516,16 @@ export default function FlightResults() {
     }
 
     setPendingFareKey(payload.fareKey);
-    try {
-      const passengerSummary = {
-        adult: criteria.adult,
-        child: criteria.child,
-        infant: criteria.infant,
-      };
-      const revalidated =
-        criteria.tripType === 'ROUND_TRIP'
-          ? await flightService.revalidateItinerary({
+    const passengerSummary = {
+      adult: criteria.adult,
+      child: criteria.child,
+      infant: criteria.infant,
+    };
+    const pendingState: PendingPassengerRevalidationState =
+      criteria.tripType === 'ROUND_TRIP'
+        ? {
+            kind: 'ROUND_TRIP',
+            request: {
               tripType: 'ROUND_TRIP',
               promoCode: criteria.promoCode?.trim() ?? '',
               passengerSummary,
@@ -511,23 +541,27 @@ export default function FlightResults() {
                   fareId: payload.fareId,
                 },
               ],
-            } satisfies FlightRevalidateItineraryRequest)
-          : await revalidateFareMutation.mutateAsync({
+            } satisfies FlightRevalidateItineraryRequest,
+            originPath: `${location.pathname}${location.search}`,
+            restoreOutboundSelection: selectedOutboundRef.current,
+          }
+        : {
+            kind: 'ONE_WAY',
+            request: {
               flightId,
               fareId: payload.fareId,
               promoCode: criteria.promoCode?.trim() ?? '',
               passengerSummary,
-            } satisfies FlightRevalidateFareRequest);
-      clearBooking();
-      setRevalidationDraft(revalidated);
-      navigate('/booking/passengers');
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Could not verify latest fare. Please try again.'
-      );
-    } finally {
-      setPendingFareKey(null);
-    }
+            } satisfies FlightRevalidateFareRequest,
+            originPath: `${location.pathname}${location.search}`,
+          };
+
+    clearBooking();
+    navigate('/booking/passengers', {
+      state: {
+        pendingRevalidation: pendingState,
+      },
+    });
   };
 
   useEffect(() => {
@@ -594,7 +628,7 @@ export default function FlightResults() {
 
         <div className="mb-8 flex flex-col gap-5 lg:mb-10 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-5xl">
-            <h1 className="mb-2 text-3xl font-black uppercase leading-none tracking-tight text-on-surface sm:text-4xl lg:text-5xl">
+            <h1 className="mb-2 text-2xl font-black uppercase leading-tight tracking-tight text-on-surface sm:text-3xl lg:text-4xl">
               {summary.routeTitle}
             </h1>
             <p className="max-w-3xl text-sm font-medium text-on-surface-variant sm:text-base">
@@ -716,72 +750,77 @@ export default function FlightResults() {
           </aside>
 
           <div className="space-y-8 lg:col-span-9 lg:space-y-10">
-            {loading ? (
-              <section aria-label="Loading flight results" className="space-y-6 lg:space-y-8">
-                {Array.from({ length: LOADING_SKELETON_COUNT }).map((_, index) => (
-                  <FlightResultCardSkeleton key={index} />
-                ))}
-              </section>
-            ) : searchError ? (
-              <div className="rounded-xl border border-error/30 bg-error/5 p-6 text-center">
-                <p className="mb-3 text-on-surface">{searchError}</p>
-                <button
-                  type="button"
-                  onClick={() => void searchQuery.refetch()}
-                  className="rounded-xl bg-primary px-6 py-2 text-sm font-bold text-on-primary"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : (
-              <>
-                <section>
-                  <h2 className="mb-4 text-sm font-black uppercase tracking-widest text-on-surface-variant">
-                    Outbound
-                  </h2>
-                  {sortedOutbound.length === 0 ? (
-                    <p className="text-on-surface-variant">
-                      No outbound flights match your filters.
-                    </p>
-                  ) : (
-                    <div className="space-y-6 lg:space-y-8">
-                      {sortedOutbound.map((leg) => (
-                        <FlightResultCard
-                          key={leg.id}
-                          leg={leg}
-                          pendingFareKey={pendingFareKey}
-                          onSelectFare={(payload) => void handleSelectFare('OUTBOUND', payload)}
-                        />
-                      ))}
-                    </div>
-                  )}
+            <div className="mx-auto w-full max-w-4xl">
+              {loading ? (
+                <section aria-label="Loading flight results" className="space-y-6 lg:space-y-8">
+                  {Array.from({ length: LOADING_SKELETON_COUNT }).map((_, index) => (
+                    <FlightResultCardSkeleton key={index} />
+                  ))}
                 </section>
-
-                {criteria.tripType === 'ROUND_TRIP' ? (
+              ) : searchError ? (
+                <div className="rounded-xl border border-error/30 bg-error/5 p-6 text-center">
+                  <p className="mb-3 text-on-surface">{searchError}</p>
+                  <button
+                    type="button"
+                    onClick={() => void searchQuery.refetch()}
+                    className="rounded-xl bg-primary px-6 py-2 text-sm font-bold text-on-primary"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <>
                   <section>
                     <h2 className="mb-4 text-sm font-black uppercase tracking-widest text-on-surface-variant">
-                      Return
+                      Outbound
                     </h2>
-                    {sortedInbound.length === 0 ? (
+                    {sortedOutbound.length === 0 ? (
                       <p className="text-on-surface-variant">
-                        No return flights for this search yet.
+                        No outbound flights match your filters.
                       </p>
                     ) : (
                       <div className="space-y-6 lg:space-y-8">
-                        {sortedInbound.map((leg) => (
+                        {sortedOutbound.map((leg) => (
                           <FlightResultCard
-                            key={`in-${leg.id}`}
+                            key={leg.id}
                             leg={leg}
                             pendingFareKey={pendingFareKey}
-                            onSelectFare={(payload) => void handleSelectFare('INBOUND', payload)}
+                            selectedFareKey={
+                              criteria.tripType === 'ROUND_TRIP' ? selectedOutboundFareKey : null
+                            }
+                            onSelectFare={(payload) => void handleSelectFare('OUTBOUND', payload)}
                           />
                         ))}
                       </div>
                     )}
                   </section>
-                ) : null}
-              </>
-            )}
+
+                  {criteria.tripType === 'ROUND_TRIP' ? (
+                    <section className="mt-8 lg:mt-10">
+                      <h2 className="mb-4 text-sm font-black uppercase tracking-widest text-on-surface-variant">
+                        Return
+                      </h2>
+                      {sortedInbound.length === 0 ? (
+                        <p className="text-on-surface-variant">
+                          No return flights for this search yet.
+                        </p>
+                      ) : (
+                        <div className="space-y-6 lg:space-y-8">
+                          {sortedInbound.map((leg) => (
+                            <FlightResultCard
+                              key={`in-${leg.id}`}
+                              leg={leg}
+                              pendingFareKey={pendingFareKey}
+                              onSelectFare={(payload) => void handleSelectFare('INBOUND', payload)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  ) : null}
+                </>
+              )}
+            </div>
           </div>
         </div>
       </main>

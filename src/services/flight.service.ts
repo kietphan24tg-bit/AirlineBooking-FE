@@ -120,6 +120,10 @@ export type FlightCalendarSearchApiEnvelope = {
   message?: string;
 };
 
+type RequestOptions = {
+  signal?: AbortSignal;
+};
+
 const CABIN_ORDER: CabinClassKey[] = ['Economy', 'Premium', 'Business', 'First'];
 
 function unwrapData(body: unknown): unknown {
@@ -515,12 +519,10 @@ function buildMockCalendarFlight(
   dayOffset: number,
   index: number
 ): SearchFlightDto {
-  const prices = [920000, 1080000, 1260000];
   const departureTimes = ['06:30:00', '10:20:00', '18:45:00'];
   const durations = [125, 130, 140];
   const flightNumberSeed = 220 + dayOffset * 3 + index;
   const flightIdSeed = 80000 + dayOffset * 10 + index;
-  const basePrice = prices[index] + dayOffset * 35000;
   const mockFarePrices = {
     economy: 700000,
     premium: 1000000,
@@ -692,7 +694,9 @@ function buildMockCalendarSearchResult(
     const noFlights = Math.abs(offset) === 3;
     const rawFlights = noFlights
       ? []
-      : [0, 1, 2].map((index) => buildMockCalendarFlight(criteria, dayIso, offset, index)).slice(0, limit);
+      : [0, 1, 2]
+          .map((index) => buildMockCalendarFlight(criteria, dayIso, offset, index))
+          .slice(0, limit);
     const flights = rawFlights.map((flight) =>
       mapSearchFlightToLeg(flight, {
         originCode: criteria.from.toUpperCase(),
@@ -702,11 +706,12 @@ function buildMockCalendarSearchResult(
       })
     );
     const prices = flights
-      .map((flight) =>
-        flight.cabinFares
-          .filter((fare) => fare.selectable)
-          .map((fare) => fare.priceAmount)
-          .sort((a, b) => a - b)[0]
+      .map(
+        (flight) =>
+          flight.cabinFares
+            .filter((fare) => fare.selectable)
+            .map((fare) => fare.priceAmount)
+            .sort((a, b) => a - b)[0]
       )
       .filter((price): price is number => Number.isFinite(price));
 
@@ -786,13 +791,17 @@ export async function searchCalendarMapped(
 }
 
 export async function revalidateFareMapped(
-  payload: FlightRevalidateFareRequest
+  payload: FlightRevalidateFareRequest,
+  options?: RequestOptions
 ): Promise<FlightRevalidateFareResponse> {
   // Re-check the selected fare right before booking so the backend can confirm
   // the latest price/availability and return a revalidateId for downstream steps.
   const res = await api.post<
     FlightRevalidateFareResponse | { data?: FlightRevalidateFareResponse }
-  >('/api/flights/revalidate-fare', payload);
+  >('/api/flights/revalidate-fare', payload, {
+    signal: options?.signal,
+    timeout: 15_000,
+  });
   const raw = unwrapData(res.data) as FlightRevalidateFareResponse;
   if (!raw?.revalidateId) {
     throw new Error('Fare revalidation failed');
@@ -801,11 +810,15 @@ export async function revalidateFareMapped(
 }
 
 export async function revalidateItineraryMapped(
-  payload: FlightRevalidateItineraryRequest
+  payload: FlightRevalidateItineraryRequest,
+  options?: RequestOptions
 ): Promise<FlightRevalidateItineraryResponse> {
   const res = await api.post<
     FlightRevalidateItineraryResponse | { data?: FlightRevalidateItineraryResponse }
-  >('/api/flights/revalidate-itinerary', payload);
+  >('/api/flights/revalidate-itinerary', payload, {
+    signal: options?.signal,
+    timeout: 15_000,
+  });
   const raw = unwrapData(res.data) as FlightRevalidateItineraryResponse;
   if (!raw?.revalidateId || !Array.isArray(raw.segments) || raw.segments.length === 0) {
     throw new Error('Itinerary revalidation failed');

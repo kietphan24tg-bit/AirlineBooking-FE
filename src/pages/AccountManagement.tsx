@@ -1,103 +1,195 @@
-import { Bell, Lock, User } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import Button from '../components/ui/Button';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import AccountProfileCard from '../components/account/AccountProfileCard';
+import AccountRecentAirportsCard from '../components/account/AccountRecentAirportsCard';
+import AccountSecurityCard from '../components/account/AccountSecurityCard';
+import AccountSidebar from '../components/account/AccountSidebar';
+import AccountStatCards from '../components/account/AccountStatCards';
+import ChangePasswordModal from '../components/account/ChangePasswordModal';
+import EditProfileModal from '../components/account/EditProfileModal';
+import MarketingNav from '../components/layout/MarketingNav';
+import SiteFooter from '../components/layout/SiteFooter';
+import { authService, type AccountOverviewResult } from '../services/auth.service';
+import { countryService, FALLBACK_COUNTRY_OPTIONS } from '../services/country.service';
 import { useAuthStore } from '../stores/useAuthStore';
-import FieldLabel from '../components/ui/FieldLabel';
-import TextInput from '../components/ui/TextInput';
+import type { UpdateProfilePayload } from '../types/user.type';
+import { normalizeUser } from '../utils/normalizeUser';
 
 export default function AccountManagement() {
   const navigate = useNavigate();
-  const signOut = useAuthStore((s) => s.signOut);
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const loading = useAuthStore((state) => state.loading);
+  const signOut = useAuthStore((state) => state.signOut);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+
+  const countriesQuery = useQuery({
+    queryKey: ['countries'],
+    queryFn: () => countryService.fetchCountryOptions(),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+
+  const overviewQuery = useQuery({
+    queryKey: ['account', 'overview'],
+    enabled: Boolean(accessToken),
+    queryFn: async () => {
+      const overview = await authService.fetchAccountOverview();
+      if (!overview) {
+        throw new Error('Unable to load account overview');
+      }
+      return overview;
+    },
+    staleTime: 30_000,
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (payload: UpdateProfilePayload) => {
+      const updated = await authService.updateMe(payload);
+      const profile = normalizeUser(updated);
+      if (!profile) {
+        throw new Error('Invalid profile response');
+      }
+      return profile;
+    },
+    onSuccess: (profile) => {
+      useAuthStore.setState({ user: profile });
+      queryClient.setQueryData<AccountOverviewResult | undefined>(
+        ['account', 'overview'],
+        (current) => (current ? { ...current, profile } : current)
+      );
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: authService.changePassword,
+    onSuccess: () => {
+      toast.success('Doi mat khau thanh cong. Vui long dang nhap lai.');
+      queryClient.clear();
+      useAuthStore.getState().clearStore();
+      navigate('/login', { replace: true });
+    },
+  });
+
+  const user = overviewQuery.data?.profile ?? null;
+
+  const nationalityLabel = useMemo(() => {
+    if (!user?.nationality) return null;
+    const options = countriesQuery.data ?? FALLBACK_COUNTRY_OPTIONS;
+    return options.find((country) => country.value === user.nationality)?.label ?? user.nationality;
+  }, [countriesQuery.data, user?.nationality]);
+
+  const scrollToSecurity = () => {
+    document
+      .getElementById('account-security')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/login', { replace: true });
   };
 
-  return (
-    <div className="min-h-screen bg-surface font-body text-on-surface">
-      <header className="bg-primary shadow-md">
-        <div className="mx-auto flex h-20 max-w-[1920px] items-center justify-between px-8">
-          <Link to="/" className="font-headline text-2xl font-black tracking-tight text-white">
-            The Sovereign
-          </Link>
-          <nav className="hidden gap-8 md:flex">
-            <Link
-              to="/flights"
-              className="text-[0.6875rem] font-bold uppercase tracking-[0.05rem] text-white/80 hover:text-white"
-            >
-              Book
-            </Link>
-            <span className="border-b-2 border-secondary-fixed pb-1 text-[0.6875rem] font-bold uppercase tracking-[0.05rem] text-white">
-              Account
-            </span>
-          </nav>
-          <button
-            type="button"
-            onClick={() => void handleSignOut()}
-            className="rounded-lg bg-secondary-fixed px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-[0.05rem] text-primary"
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
-      <main className="gold-pattern-bg mx-auto max-w-4xl px-6 py-12">
-        <h1 className="mb-2 font-headline text-3xl font-black text-on-surface">
-          Quản lý tài khoản
-        </h1>
-        <p className="mb-10 text-on-surface-variant">Cập nhật hồ sơ và tùy chọn bảo mật.</p>
-        <div className="space-y-8">
-          <section className="glass-card rounded-xl border border-outline-variant/20 p-8 shadow-sm">
-            <div className="mb-6 flex items-center gap-3">
-              <User className="h-6 w-6 text-primary" strokeWidth={1.75} />
-              <h2 className="font-headline text-xl font-bold">Hồ sơ</h2>
-            </div>
-            <div className="grid gap-6 md:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="acc-first">Tên</FieldLabel>
-                <TextInput id="acc-first" defaultValue="Minh" />
-              </div>
-              <div>
-                <FieldLabel htmlFor="acc-last">Họ</FieldLabel>
-                <TextInput id="acc-last" defaultValue="Nguyễn" />
-              </div>
-              <div className="md:col-span-2">
-                <FieldLabel htmlFor="acc-email">Email</FieldLabel>
-                <TextInput id="acc-email" type="email" defaultValue="name@example.com" />
-              </div>
-            </div>
-            <Button type="button" className="mt-6 max-w-xs">
-              Lưu thay đổi
-            </Button>
-          </section>
-          <section className="glass-card rounded-xl border border-outline-variant/20 p-8 shadow-sm">
-            <div className="mb-6 flex items-center gap-3">
-              <Bell className="h-6 w-6 text-secondary" strokeWidth={1.75} />
-              <h2 className="font-headline text-xl font-bold">Thông báo</h2>
-            </div>
-            <label className="flex items-center gap-3 text-sm text-on-surface-variant">
-              <input type="checkbox" defaultChecked className="h-4 w-4 accent-primary" />
-              Nhận email khuyến mãi và cập nhật chuyến bay
-            </label>
-          </section>
-          <section className="glass-card rounded-xl border border-outline-variant/20 p-8 shadow-sm">
-            <div className="mb-6 flex items-center gap-3">
-              <Lock className="h-6 w-6 text-on-surface-variant" strokeWidth={1.75} />
-              <h2 className="font-headline text-xl font-bold">Bảo mật</h2>
-            </div>
-            <p className="mb-4 text-sm text-on-surface-variant">
-              Đổi mật khẩu định kỳ để bảo vệ tài khoản.
-            </p>
-            <Button
+  if (!accessToken && !loading) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (overviewQuery.isLoading || (loading && !user)) {
+    return (
+      <div className="flex min-h-screen flex-col bg-surface font-body text-on-surface">
+        <MarketingNav />
+        <main className="mx-auto flex w-full max-w-[1180px] flex-1 items-center justify-center px-6 py-32">
+          <p className="text-sm text-on-surface-variant/80">Dang tai tai khoan...</p>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
+  if (overviewQuery.isError || !user) {
+    return (
+      <div className="flex min-h-screen flex-col bg-surface font-body text-on-surface">
+        <MarketingNav />
+        <main className="mx-auto flex w-full max-w-[1180px] flex-1 items-center justify-center px-6 py-32">
+          <div className="text-center">
+            <p className="text-sm text-on-surface-variant/80">Khong the tai thong tin tai khoan.</p>
+            <button
               type="button"
-              variant="ghost"
-              className="max-w-xs border border-outline-variant/30"
+              onClick={() => void overviewQuery.refetch()}
+              className="mt-4 rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary transition-all hover:bg-primary hover:text-white"
             >
-              Đổi mật khẩu
-            </Button>
-          </section>
+              Thu lai
+            </button>
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
+  const recentAirports = overviewQuery.data.recentAirports;
+  const tripStats = overviewQuery.data.tripStats;
+
+  return (
+    <div className="flex min-h-screen flex-col bg-surface font-body text-on-surface antialiased">
+      <MarketingNav />
+
+      <main className="mx-auto w-full max-w-[1180px] flex-1 px-6 pb-20 pt-28 md:pt-32">
+        <h1 className="font-headline text-[30px] font-black tracking-tight text-dark-charcoal">
+          Tai khoan cua toi
+        </h1>
+        <p className="mb-9 mt-1.5 text-[15px] text-on-surface-variant/80">
+          Quan ly thong tin ca nhan va bao mat tai khoan.
+        </p>
+
+        <div className="grid items-start gap-7 lg:grid-cols-[272px_1fr]">
+          <AccountSidebar
+            user={user}
+            onSignOut={() => void handleSignOut()}
+            onSecurityClick={scrollToSecurity}
+          />
+
+          <div className="flex flex-col gap-6">
+            <AccountStatCards
+              completedTrips={tripStats.completed}
+              upcomingTrips={tripStats.upcoming}
+              frequentAirports={recentAirports.length}
+              loading={overviewQuery.isFetching}
+            />
+
+            <AccountProfileCard
+              user={user}
+              nationalityLabel={nationalityLabel}
+              onEdit={() => setEditOpen(true)}
+            />
+
+            <AccountRecentAirportsCard
+              airports={recentAirports}
+              loading={overviewQuery.isFetching}
+            />
+
+            <AccountSecurityCard onChangePassword={() => setPasswordOpen(true)} />
+          </div>
         </div>
       </main>
+
+      <SiteFooter />
+
+      <EditProfileModal
+        open={editOpen}
+        user={user}
+        onClose={() => setEditOpen(false)}
+        onSave={(payload) => updateProfileMutation.mutateAsync(payload)}
+      />
+      <ChangePasswordModal
+        open={passwordOpen}
+        onClose={() => setPasswordOpen(false)}
+        onSubmit={(payload) => changePasswordMutation.mutateAsync(payload)}
+        submitting={changePasswordMutation.isPending}
+      />
     </div>
   );
 }

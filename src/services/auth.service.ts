@@ -1,5 +1,8 @@
 import api from '../api/axios';
+import type { Airport } from './airport.service';
 import type { RegisterPayload } from '../types/useAuthStore.type';
+import type { User } from '../types/user.type';
+import { normalizeUser } from '../utils/normalizeUser';
 
 /** Unwrap common API envelopes and token field names. */
 function normalizeAuthPayload(raw: unknown): Record<string, unknown> {
@@ -16,6 +19,39 @@ export type SignInResult = {
   accessToken: string | null;
   user: unknown;
 };
+
+export type AccountOverviewResult = {
+  profile: User;
+  tripStats: {
+    completed: number;
+    upcoming: number;
+    cancelled: number;
+  };
+  recentAirports: Airport[];
+};
+
+function normalizeAccountOverview(raw: unknown): AccountOverviewResult | null {
+  const payload = normalizeAuthPayload(raw);
+  const profile = normalizeUser(payload.profile);
+  if (!profile) return null;
+
+  const tripStatsRaw =
+    payload.tripStats && typeof payload.tripStats === 'object'
+      ? (payload.tripStats as Record<string, unknown>)
+      : {};
+
+  return {
+    profile,
+    tripStats: {
+      completed: typeof tripStatsRaw.completed === 'number' ? tripStatsRaw.completed : 0,
+      upcoming: typeof tripStatsRaw.upcoming === 'number' ? tripStatsRaw.upcoming : 0,
+      cancelled: typeof tripStatsRaw.cancelled === 'number' ? tripStatsRaw.cancelled : 0,
+    },
+    recentAirports: Array.isArray(payload.recentAirports)
+      ? (payload.recentAirports as Airport[])
+      : [],
+  };
+}
 
 export const authService = {
   signUp: async (data: RegisterPayload) => {
@@ -45,7 +81,7 @@ export const authService = {
   },
   fetchMe: async () => {
     const res = await api.get('/api/users/me');
-    return res.data;
+    return normalizeAuthPayload(res.data);
   },
   refresh: async () => {
     const res = await api.post('/api/auth/refresh');
@@ -59,11 +95,15 @@ export const authService = {
   },
   profile: async () => {
     const res = await api.get('/api/users/me');
-    return res.data;
+    return normalizeAuthPayload(res.data);
+  },
+  fetchAccountOverview: async (): Promise<AccountOverviewResult | null> => {
+    const res = await api.get('/api/account/overview');
+    return normalizeAccountOverview(res.data);
   },
   updateMe: async (data: Record<string, unknown>) => {
     const res = await api.patch('/api/users/me', data);
-    return res.data;
+    return normalizeAuthPayload(res.data);
   },
   changePassword: async (data: { currentPassword: string; newPassword: string }) => {
     const res = await api.post('/api/users/me/password', data);

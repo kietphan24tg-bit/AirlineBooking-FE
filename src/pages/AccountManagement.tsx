@@ -109,7 +109,7 @@ export default function AccountManagement() {
     );
   }
 
-  if (overviewQuery.isError || !user) {
+  if (overviewQuery.isError || !user || !overviewQuery.data) {
     return (
       <div className="flex min-h-screen flex-col bg-surface font-body text-on-surface">
         <MarketingNav />
@@ -130,8 +130,9 @@ export default function AccountManagement() {
     );
   }
 
-  const recentAirports = overviewQuery.data.recentAirports;
-  const tripStats = overviewQuery.data.tripStats;
+  const overview = overviewQuery.data;
+  const recentAirports = overview.recentAirports;
+  const tripStats = overview.tripStats;
 
   return (
     <div className="flex min-h-screen flex-col bg-surface font-body text-on-surface antialiased">
@@ -182,7 +183,9 @@ export default function AccountManagement() {
         open={editOpen}
         user={user}
         onClose={() => setEditOpen(false)}
-        onSave={(payload) => updateProfileMutation.mutateAsync(payload)}
+        onSave={async (payload) => {
+          await updateProfileMutation.mutateAsync(payload);
+        }}
       />
       <ChangePasswordModal
         open={passwordOpen}

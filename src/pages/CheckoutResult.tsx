@@ -298,142 +298,28 @@ function StateCard({
   );
 }
 
-function SkeletonBlock({ className }: { className: string }) {
-  return <div className={`animate-pulse rounded-2xl bg-surface-container-high/55 ${className}`} />;
-}
-
-function PendingResultSkeleton() {
+function LoadingSpinnerState({
+  title = 'Loading payment details',
+  message = 'Please wait while we fetch the latest booking and payment information.',
+}: {
+  title?: string;
+  message?: string;
+}) {
   return (
-    <div className="space-y-6">
-      <section className="overflow-hidden rounded-[2rem] border border-luxury-gold/15 bg-white/92 shadow-[0_24px_60px_rgba(62,16,30,0.10)] backdrop-blur-sm">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1.2fr)_24rem]">
-          <div className="relative px-7 py-8 sm:px-10 sm:py-10">
-            <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-luxury-gold/50 to-transparent" />
-            <SkeletonBlock className="h-10 w-64 rounded-full bg-amber-100" />
-            <SkeletonBlock className="mt-6 h-4 w-36" />
-            <SkeletonBlock className="mt-4 h-14 w-full max-w-[42rem]" />
-            <SkeletonBlock className="mt-3 h-5 w-full max-w-[38rem]" />
-            <SkeletonBlock className="mt-2 h-5 w-full max-w-[34rem]" />
-
-            <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
-                <SkeletonBlock className="h-3 w-24" />
-                <SkeletonBlock className="mt-4 h-8 w-36" />
-              </div>
-              <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
-                <SkeletonBlock className="h-3 w-24" />
-                <SkeletonBlock className="mt-4 h-6 w-32" />
-              </div>
-              <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
-                <SkeletonBlock className="h-3 w-24" />
-                <SkeletonBlock className="mt-4 h-6 w-40" />
-              </div>
-              <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
-                <SkeletonBlock className="h-3 w-24" />
-                <SkeletonBlock className="mt-4 h-6 w-36" />
-              </div>
-              <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
-                <SkeletonBlock className="h-3 w-24" />
-                <SkeletonBlock className="mt-4 h-6 w-32" />
-              </div>
-              <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
-                <SkeletonBlock className="h-3 w-24" />
-                <SkeletonBlock className="mt-4 h-6 w-40" />
-              </div>
-            </div>
-
-            <div className="mt-8 rounded-[1.5rem] border border-amber-200/70 bg-amber-50/80 p-5">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="min-w-0 flex-1">
-                  <SkeletonBlock className="h-3 w-28 bg-amber-100" />
-                  <SkeletonBlock className="mt-4 h-10 w-40 bg-amber-100" />
-                  <SkeletonBlock className="mt-4 h-5 w-full max-w-[25rem] bg-amber-100" />
-                  <SkeletonBlock className="mt-2 h-5 w-full max-w-[20rem] bg-amber-100" />
-                </div>
-                <div className="flex gap-3 sm:flex-row">
-                  <SkeletonBlock className="h-14 w-48 rounded-xl bg-amber-200/80" />
-                  <SkeletonBlock className="h-14 w-36 rounded-xl bg-white/90" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="relative overflow-hidden border-t border-luxury-gold/10 bg-[linear-gradient(180deg,rgba(125,6,51,0.96),rgba(62,16,30,0.96))] px-7 py-8 text-white lg:border-l lg:border-t-0 lg:px-8 lg:py-10">
-            <SkeletonBlock className="h-3 w-32 bg-white/15" />
-            <SkeletonBlock className="mt-4 h-12 w-44 bg-white/15" />
-
-            <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-5">
-              <SkeletonBlock className="mx-auto h-3 w-32 bg-white/15" />
-              <SkeletonBlock className="mx-auto mt-6 aspect-square w-full max-w-[220px] rounded-2xl bg-white/15" />
-            </div>
-
-            <div className="mt-6 space-y-4 border-t border-luxury-gold/15 pt-6">
-              <div className="flex items-center justify-between gap-4">
-                <SkeletonBlock className="h-4 w-20 bg-white/15" />
-                <SkeletonBlock className="h-8 w-32 rounded-full bg-white/15" />
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <SkeletonBlock className="h-4 w-24 bg-white/15" />
-                <SkeletonBlock className="h-4 w-28 bg-white/15" />
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <SkeletonBlock className="h-4 w-24 bg-white/15" />
-                <SkeletonBlock className="h-4 w-16 bg-white/15" />
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <SkeletonBlock className="h-4 w-24 bg-white/15" />
-                <SkeletonBlock className="h-4 w-36 bg-white/15" />
-              </div>
-            </div>
-          </div>
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex flex-col items-center gap-5 rounded-[2rem] border border-luxury-gold/15 bg-white/92 px-10 py-12 text-center shadow-[0_24px_60px_rgba(62,16,30,0.10)] backdrop-blur-sm">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-cabin-burgundy/8">
+          <Loader2 className="h-10 w-10 animate-spin text-cabin-burgundy" strokeWidth={2.4} />
         </div>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
-        <article className="rounded-[1.75rem] border border-luxury-gold/12 bg-white/92 p-7 shadow-[0_18px_50px_rgba(15,23,42,0.06)] backdrop-blur-sm">
-          <div className="border-b border-luxury-gold/10 pb-5">
-            <SkeletonBlock className="h-3 w-36" />
-            <SkeletonBlock className="mt-4 h-10 w-80" />
-            <SkeletonBlock className="mt-3 h-5 w-full max-w-[28rem]" />
-          </div>
-
-          <div className="mt-6 space-y-4">
-            <div className="rounded-[1.5rem] bg-surface-container-low px-5 py-5">
-              <SkeletonBlock className="h-3 w-32" />
-              <SkeletonBlock className="mt-4 h-7 w-48" />
-              <SkeletonBlock className="mt-3 h-4 w-full" />
-              <SkeletonBlock className="mt-2 h-4 w-[88%]" />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {Array.from({ length: 2 }).map((_, index) => (
-                <div key={index} className="rounded-2xl bg-surface-container-low px-5 py-4">
-                  <SkeletonBlock className="h-3 w-28" />
-                  <SkeletonBlock className="mt-4 h-5 w-full" />
-                  <SkeletonBlock className="mt-2 h-4 w-[82%]" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </article>
-
-        <article className="rounded-[1.75rem] border border-luxury-gold/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(247,244,240,0.92))] p-7 shadow-[0_18px_50px_rgba(15,23,42,0.06)] backdrop-blur-sm">
-          <SkeletonBlock className="h-3 w-40" />
-          <SkeletonBlock className="mt-4 h-10 w-72" />
-          <div className="mt-6 space-y-4">
-            <SkeletonBlock className="h-5 w-full" />
-            <div className="rounded-2xl border border-luxury-gold/12 bg-white/80 px-5 py-4">
-              <SkeletonBlock className="h-5 w-40" />
-              <SkeletonBlock className="mt-4 h-4 w-full" />
-              <SkeletonBlock className="mt-2 h-4 w-[88%]" />
-            </div>
-            <div className="rounded-2xl border border-luxury-gold/12 bg-white/80 px-5 py-4">
-              <SkeletonBlock className="h-5 w-44" />
-              <SkeletonBlock className="mt-4 h-4 w-full" />
-              <SkeletonBlock className="mt-2 h-4 w-[82%]" />
-            </div>
-          </div>
-        </article>
-      </section>
+        <div className="space-y-2">
+          <h1 className="font-headline text-2xl font-black text-on-surface sm:text-3xl">
+            {title}
+          </h1>
+          <p className="max-w-xl text-sm leading-7 text-on-surface-variant sm:text-base">
+            {message}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1505,7 +1391,10 @@ export default function CheckoutResult() {
   if (statusQuery.isLoading && !statusQuery.data) {
     return (
       <ResultShell>
-        <PendingResultSkeleton />
+        <LoadingSpinnerState
+          title="Loading payment details"
+          message="Please wait while we verify the payment session and prepare your booking details."
+        />
       </ResultShell>
     );
   }
@@ -1513,7 +1402,10 @@ export default function CheckoutResult() {
   if (waitingForSuccessRedirect) {
     return (
       <ResultShell>
-        <PendingResultSkeleton />
+        <LoadingSpinnerState
+          title="Completing payment result"
+          message="Your payment is confirmed. Redirecting you to the completed booking view."
+        />
       </ResultShell>
     );
   }
@@ -1521,7 +1413,10 @@ export default function CheckoutResult() {
   if (waitingForFailureRedirect) {
     return (
       <ResultShell>
-        <PendingResultSkeleton />
+        <LoadingSpinnerState
+          title="Preparing payment failure details"
+          message="Please wait while we open the correct result page for this payment attempt."
+        />
       </ResultShell>
     );
   }
@@ -1564,24 +1459,9 @@ export default function CheckoutResult() {
   if (showPending) {
     return (
       <ResultShell>
-        <PendingResultSkeleton />
-      </ResultShell>
-    );
-  }
-
-  if (showPending) {
-    return (
-      <ResultShell>
-        <StateCard
-          icon={<Loader2 className="h-12 w-12 animate-spin text-luxury-gold" strokeWidth={2.2} />}
+        <LoadingSpinnerState
           title="Loading pending booking details"
-          message="Loading flight, passenger, and fare details for this payment session."
-          actions={
-            <div className="inline-flex items-center gap-2 rounded-full bg-surface-container-low px-4 py-2 text-sm font-semibold text-on-surface-variant">
-              <Clock3 className="h-4 w-4" />
-              {summaryQuery.isFetching ? 'Fetching summary from backend' : 'Waiting for details'}
-            </div>
-          }
+          message="Please wait while we fetch the latest pay-later booking summary."
         />
       </ResultShell>
     );
@@ -1642,18 +1522,9 @@ export default function CheckoutResult() {
   if (!summaryQuery.data) {
     return (
       <ResultShell>
-        <PendingResultSkeleton />
-      </ResultShell>
-    );
-  }
-
-  if (!summaryQuery.data) {
-    return (
-      <ResultShell>
-        <StateCard
-          icon={<Loader2 className="h-12 w-12 animate-spin text-luxury-gold" strokeWidth={2.2} />}
+        <LoadingSpinnerState
           title="Loading trip details"
-          message="Payment succeeded. Loading ticket and passenger details from the backend."
+          message="Payment succeeded. We are fetching ticket, passenger, and fare details now."
         />
       </ResultShell>
     );

@@ -207,6 +207,13 @@ function unwrapData(body: unknown): unknown {
   return body;
 }
 
+function extractPickerRecentAirports(body: unknown): Airport[] {
+  const data = unwrapData(body);
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return [];
+  const recent = (data as Record<string, unknown>).recent;
+  return Array.isArray(recent) ? (recent as Airport[]) : [];
+}
+
 function extractPickerAirports(body: unknown): Airport[] {
   const data = unwrapData(body);
   if (!data) return [];
@@ -300,6 +307,25 @@ export const airportService = {
 
     const res = await api.get<unknown>('/api/airports/picker', { params });
     const list = extractPickerAirports(res.data);
+    if (list.length > 0) {
+      saveCachedPicker(pk, list);
+    }
+    return list;
+  },
+
+  /** Recent airports only — for account profile (authenticated users). */
+  fetchRecentAirportsForAccount: async (
+    options?: FetchAirportPickerOptions
+  ): Promise<Airport[]> => {
+    const params: AirportPickerParams = { recentLimit: 8, suggestedLimit: 0, limit: 0 };
+    const pk = pickerParamsKey(params);
+    if (!options?.force) {
+      const cached = loadCachedPicker(pk);
+      if (cached) return cached;
+    }
+
+    const res = await api.get<unknown>('/api/airports/picker', { params });
+    const list = extractPickerRecentAirports(res.data);
     if (list.length > 0) {
       saveCachedPicker(pk, list);
     }

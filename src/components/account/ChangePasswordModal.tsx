@@ -9,12 +9,12 @@ import TextInput from '../ui/TextInput';
 
 const changePasswordSchema = z
   .object({
-    currentPassword: z.string().min(1, 'Vui long nhap mat khau hien tai.'),
-    newPassword: z.string().min(8, 'Mat khau moi phai co it nhat 8 ky tu.'),
-    confirmPassword: z.string().min(1, 'Vui long xac nhan mat khau moi.'),
+    currentPassword: z.string().min(1, 'Please enter your current password.'),
+    newPassword: z.string().min(8, 'New password must be at least 8 characters.'),
+    confirmPassword: z.string().min(1, 'Please confirm your new password.'),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
-    message: 'Mat khau xac nhan khong khop.',
+    message: 'Password confirmation does not match.',
     path: ['confirmPassword'],
   });
 
@@ -70,7 +70,7 @@ export default function ChangePasswordModal({
       });
       onClose();
     } catch {
-      toast.error('Khong the doi mat khau. Kiem tra mat khau hien tai va thu lai.');
+      toast.error('Unable to change password. Check your current password and try again.');
     }
   });
 
@@ -104,17 +104,17 @@ export default function ChangePasswordModal({
               id="change-password-title"
               className="font-headline text-xl font-bold text-dark-charcoal"
             >
-              Doi mat khau
+              Change password
             </h2>
             <p className="mt-1 text-sm text-on-surface-variant/80">
-              Sau khi doi, ban se can dang nhap lai.
+              You will need to sign in again after changing your password.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-full p-1 text-on-surface-variant/80 transition-colors hover:bg-surface"
-            aria-label="Dong"
+            aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
@@ -122,7 +122,7 @@ export default function ChangePasswordModal({
 
         <form className="space-y-4" onSubmit={submitForm}>
           <div>
-            <FieldLabel htmlFor="current-password">Mat khau hien tai</FieldLabel>
+            <FieldLabel htmlFor="current-password">Current password</FieldLabel>
             <TextInput
               id="current-password"
               type="password"
@@ -135,7 +135,7 @@ export default function ChangePasswordModal({
             ) : null}
           </div>
           <div>
-            <FieldLabel htmlFor="new-password">Mat khau moi</FieldLabel>
+            <FieldLabel htmlFor="new-password">New password</FieldLabel>
             <TextInput
               id="new-password"
               type="password"
@@ -148,7 +148,7 @@ export default function ChangePasswordModal({
             ) : null}
           </div>
           <div>
-            <FieldLabel htmlFor="confirm-password">Xac nhan mat khau moi</FieldLabel>
+            <FieldLabel htmlFor="confirm-password">Confirm new password</FieldLabel>
             <TextInput
               id="confirm-password"
               type="password"
@@ -167,14 +167,14 @@ export default function ChangePasswordModal({
               onClick={onClose}
               className="flex-1 rounded-xl border border-outline-variant/40 px-4 py-2.5 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface"
             >
-              Huy
+              Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
               className="flex-1 rounded-xl bg-linear-to-br from-primary to-primary-container px-4 py-2.5 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(125,6,51,0.16)] transition-all hover:brightness-105 disabled:opacity-60"
             >
-              {submitting ? 'Dang luu...' : 'Luu mat khau'}
+              {submitting ? 'Saving...' : 'Save password'}
             </button>
           </div>
         </form>

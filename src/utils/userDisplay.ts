@@ -43,7 +43,7 @@ export function formatDobLabel(dob: string | null | undefined): string | null {
   }
   const date = new Date(dob);
   if (Number.isNaN(date.getTime())) return dob;
-  return date.toLocaleDateString('vi-VN');
+  return date.toLocaleDateString('en-US');
 }
 
 export function maskIdentifyNumber(value: string | null | undefined): string | null {

@@ -25,6 +25,7 @@ import {
   resetMockManageBookingVariant,
   resolveMockManageBookingVariant,
 } from '../services/booking.service';
+import { toast } from 'sonner';
 import { flightService } from '../services/flight.service';
 import {
   cancelPayment,
@@ -1600,9 +1601,10 @@ export default function ChangeFlight() {
         const options = await bookingService.getManageOptions(lookup.booking.bookingId);
         setManageOptions(options);
       } catch (error) {
-        setBootstrapError(
-          error instanceof Error ? error.message : 'Unable to load sample booking data.'
-        );
+        const message =
+          error instanceof Error ? error.message : 'Unable to load sample booking data.';
+        setBootstrapError(message);
+        toast.error(message);
       } finally {
         setBootstrapping(false);
       }
@@ -1884,7 +1886,10 @@ export default function ChangeFlight() {
       setFlightChangeConfirm(null);
       setStep(3);
     } catch (error) {
-      setQuoteError(error instanceof Error ? error.message : 'Unable to create a flight change quote.');
+      const message =
+        error instanceof Error ? error.message : 'Unable to create a flight change quote.';
+      setQuoteError(message);
+      toast.error(message);
     } finally {
       setQuoting(false);
     }
@@ -1919,7 +1924,10 @@ export default function ChangeFlight() {
 
       setStep(5);
     } catch (error) {
-      setQuoteError(error instanceof Error ? error.message : 'Unable to confirm the flight change.');
+      const message =
+        error instanceof Error ? error.message : 'Unable to confirm the flight change.';
+      setQuoteError(message);
+      toast.error(message);
     } finally {
       setConfirmingChange(false);
     }
@@ -1986,7 +1994,9 @@ export default function ChangeFlight() {
     }
     if (variant) {
       clearFlightChangeRedirectContext();
-      setPaymentError(getFlightChangePaymentErrorMessage(variant));
+      const message = getFlightChangePaymentErrorMessage(variant);
+      setPaymentError(message);
+      toast.error(message);
       setStep(4);
     }
   }
@@ -2009,7 +2019,9 @@ export default function ChangeFlight() {
       availableMethods.find((method) => method.code === methodCode) ?? availableMethods[0];
 
     if (!resolvedMethod?.code) {
-      setPaymentError('No valid payment method found for this flight change.');
+      const message = 'No valid payment method found for this flight change.';
+      setPaymentError(message);
+      toast.error(message);
       return;
     }
 
@@ -2050,9 +2062,10 @@ export default function ChangeFlight() {
       }
       setActivePayment(response);
     } catch (error) {
-      setPaymentError(
-        error instanceof Error ? error.message : 'Unable to create a payment link.'
-      );
+      const message =
+        error instanceof Error ? error.message : 'Unable to create a payment link.';
+      setPaymentError(message);
+      toast.error(message);
     } finally {
       if (mode === 'create') {
         setPaying(false);
@@ -2082,11 +2095,12 @@ export default function ChangeFlight() {
       const status = (response.payment?.status as PaymentStatus | undefined) ?? null;
       setPaymentStatusOverride(status);
     } catch (error) {
-      setPaymentError(
+      const message =
         error instanceof Error
           ? error.message
-          : 'Unable to check payment status. Please try again.'
-      );
+          : 'Unable to check payment status. Please try again.';
+      setPaymentError(message);
+      toast.error(message);
     } finally {
       setCheckingPaymentStatus(false);
     }
@@ -2104,9 +2118,10 @@ export default function ChangeFlight() {
       await cancelPayment(paymentId, 'Flight change payment cancelled');
       setPaymentStatusOverride('CANCELLED');
     } catch (error) {
-      setPaymentError(
-        error instanceof Error ? error.message : 'Unable to cancel the payment transaction.'
-      );
+      const message =
+        error instanceof Error ? error.message : 'Unable to cancel the payment transaction.';
+      setPaymentError(message);
+      toast.error(message);
     } finally {
       setCancelingPayment(false);
     }
@@ -2255,8 +2270,7 @@ export default function ChangeFlight() {
               No booking information
             </h1>
             <p className="mt-3 text-base leading-7 text-stone-600">
-              {bootstrapError ??
-                'Go back to Manage booking and look up your booking before changing flights.'}
+              Go back to Manage booking and look up your booking before changing flights.
             </p>
             <button
               type="button"
@@ -2281,6 +2295,11 @@ export default function ChangeFlight() {
       : newFlightsQuery.isError
         ? 'Unable to load flights.'
         : null;
+
+  useEffect(() => {
+    if (!newFlightsError) return;
+    toast.error(newFlightsError, { id: 'change-flight-options-error' });
+  }, [newFlightsError]);
 
   return (
     <div className="min-h-screen bg-surface text-on-surface antialiased">
@@ -2326,7 +2345,7 @@ export default function ChangeFlight() {
               selectedDate={activeCalendarDate}
               options={newFlightOptions}
               loading={newFlightsQuery.isPending && !newFlightsQuery.data}
-              errorMessage={newFlightsError ?? quoteError}
+              errorMessage={null}
               continuing={quoting}
               selectedOptionId={selectedNewOptionId}
               passengerSummary={passengerSummary}
@@ -2352,7 +2371,7 @@ export default function ChangeFlight() {
               currency={flightChangeQuote?.currency ?? selectedNewOption.currency}
               extrasSummary={extrasSummary}
               continuing={confirmingChange}
-              errorMessage={quoteError}
+              errorMessage={null}
               onBack={() => setStep(2)}
               onContinue={() => void handleContinueFromQuote()}
             />
@@ -2365,7 +2384,7 @@ export default function ChangeFlight() {
               paymentMethods={paymentMethods}
               paymentMethodsLoading={paymentMethodsQuery.isLoading}
               paying={paying}
-              errorMessage={paymentError}
+              errorMessage={null}
               passengerName={passengerItems[0]?.fullName ?? ''}
               onBack={() => setStep(3)}
               onConfirm={(methodCode) => void handlePayment(methodCode)}
@@ -2394,7 +2413,7 @@ export default function ChangeFlight() {
           canceling={cancelingPayment}
           regenerating={regeneratingPayment}
           statusOverride={paymentStatusOverride}
-          errorMessage={paymentError}
+          errorMessage={null}
         />
       ) : null}
     </div>

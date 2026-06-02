@@ -86,14 +86,20 @@
 
   html {
     scroll-behavior: smooth;
+    min-height: 100dvh;
   }
 
   body {
     margin: 0;
+    min-height: 100dvh;
     font-family: var(--font-body);
     color: var(--color-on-surface);
-    background: var(--color-surface);
+    background: var(--color-surface-lowest);
     -webkit-font-smoothing: antialiased;
+  }
+
+  #root {
+    min-height: 100dvh;
   }
 
   a {
@@ -104,8 +110,9 @@
 
 @layer components {
   .gold-line-pattern {
-    background-color: var(--color-surface-lowest);
+    background-color: var(--color-surface);
     background-image: var(--texture-gold);
+    background-repeat: repeat;
   }
 
   .glass-panel {
@@ -146,6 +153,19 @@
 
   .auth-input:focus {
     box-shadow: 0 0 0 2px rgb(255 223 158 / 50%);
+  }
+
+  /* Sonner: close button top-right (default LTR places it top-left) */
+  [data-sonner-toaster] {
+    --toast-close-button-start: unset;
+    --toast-close-button-end: 0;
+    --toast-close-button-transform: translate(35%, -35%);
+  }
+
+  [data-sonner-toast][data-styled='true'] [data-close-button] {
+    right: 0 !important;
+    left: unset !important;
+    transform: translate(35%, -35%) !important;
   }
 
   /* Date inputs in hero search: strip UA chrome (border/focus box) so they match From/To/Travelers */
@@ -244,6 +264,34 @@
       min-height: 2.375rem !important;
       padding-top: 0.5rem !important;
       padding-bottom: 0.5rem !important;
+    }
+  }
+
+  @media (min-width: 1024px) and (max-height: 820px) {
+    .landing-hero-section {
+      height: auto;
+      min-height: calc(100dvh - 5rem);
+    }
+
+    .landing-hero-shell {
+      height: auto;
+      min-height: calc(100dvh - 8rem);
+      justify-content: flex-end;
+      padding-top: 5.5rem;
+      padding-bottom: 1rem;
+    }
+
+    .landing-hero-copy {
+      margin-top: 0;
+      padding-top: 0;
+    }
+
+    .landing-booking-grid > .booking-field {
+      min-height: 7.5rem;
+    }
+
+    .landing-booking-grid .booking-field--actions {
+      gap: 0.75rem;
     }
   }
 }

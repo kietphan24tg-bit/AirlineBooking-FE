@@ -1,37 +1,40 @@
-import { isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js';
+import { isValidPhoneNumber, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js';
 import { z } from 'zod';
 
-const nationalityEnum = z.enum(['VN', 'US', 'JP', 'KR']);
+/** Backend expects ISO 3166-1 alpha-2 (e.g. VN), not alpha-3 (VNM). */
+export const isoAlpha2CountryCodeSchema = z
+  .string()
+  .length(2, 'Invalid nationality.')
+  .regex(/^[A-Z]{2}$/, 'Nationality must be an ISO alpha-2 code (e.g. VN).');
 
 export const loginSchema = z.object({
-  email: z.email('Email không đúng định dạng.'),
+  email: z.email('Invalid email format.'),
   password: z
     .string()
-    .min(8, 'Mật khẩu phải có ít nhất 8 ký tự.')
-    .max(128, 'Mật khẩu tối đa 128 ký tự.'),
-  remember: z.boolean().optional(),
+    .min(8, 'Password must be at least 8 characters.')
+    .max(128, 'Password must be at most 128 characters.'),
 });
 
 export const registerSchema = z
   .object({
-    email: z.email('Email không đúng định dạng.'),
-    firstName: z.string().min(1, 'Vui lòng nhập tên.'),
-    lastName: z.string().min(1, 'Vui lòng nhập họ.'),
-    acceptTerms: z.literal(true, 'Vui lòng chấp nhận điều khoản.'),
-    phone: z.string().min(1, 'Vui lòng nhập số điện thoại.'),
-    nationality: nationalityEnum,
+    email: z.email('Invalid email format.'),
+    firstName: z.string().min(1, 'Please enter your first name.'),
+    lastName: z.string().min(1, 'Please enter your last name.'),
+    acceptTerms: z.literal(true, 'Please accept the terms and conditions.'),
+    phone: z.string().min(1, 'Please enter your phone number.'),
+    nationality: isoAlpha2CountryCodeSchema,
     password: z
       .string()
-      .min(8, 'Mật khẩu phải có ít nhất 8 ký tự.')
-      .max(128, 'Mật khẩu tối đa 128 ký tự.'),
-    confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu.'),
+      .min(8, 'Password must be at least 8 characters.')
+      .max(128, 'Password must be at most 128 characters.'),
+    confirmPassword: z.string().min(1, 'Please confirm your password.'),
   })
   .superRefine((data, ctx) => {
     if (data.password !== data.confirmPassword) {
       ctx.addIssue({
         code: 'custom',
         path: ['confirmPassword'],
-        message: 'Mật khẩu xác nhận không khớp.',
+        message: 'Passwords do not match.',
       });
     }
 
@@ -39,7 +42,7 @@ export const registerSchema = z
     const withCountryCode = phoneValue.startsWith('+');
     const parsedPhone = withCountryCode
       ? parsePhoneNumberFromString(phoneValue)
-      : parsePhoneNumberFromString(phoneValue, data.nationality);
+      : parsePhoneNumberFromString(phoneValue, data.nationality as CountryCode);
     const valid =
       Boolean(parsedPhone?.isValid()) &&
       (!withCountryCode ||
@@ -49,30 +52,30 @@ export const registerSchema = z
       ctx.addIssue({
         code: 'custom',
         path: ['phone'],
-        message: `Số điện thoại không hợp lệ hoặc không khớp quốc tịch ${data.nationality}.`,
+        message: `Phone number is invalid or does not match nationality ${data.nationality}.`,
       });
     }
   });
 
 export const passwordResetRequestSchema = z.object({
-  email: z.email('Email không đúng định dạng.'),
+  email: z.email('Invalid email format.'),
 });
 
 export const passwordResetConfirmSchema = z
   .object({
-    token: z.string().min(1, 'Mã xác nhận không hợp lệ.'),
+    token: z.string().min(1, 'Invalid confirmation code.'),
     password: z
       .string()
-      .min(8, 'Mật khẩu phải có ít nhất 8 ký tự.')
-      .max(128, 'Mật khẩu tối đa 128 ký tự.'),
-    confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu.'),
+      .min(8, 'Password must be at least 8 characters.')
+      .max(128, 'Password must be at most 128 characters.'),
+    confirmPassword: z.string().min(1, 'Please confirm your password.'),
   })
   .superRefine((data, ctx) => {
     if (data.password !== data.confirmPassword) {
       ctx.addIssue({
         code: 'custom',
         path: ['confirmPassword'],
-        message: 'Mật khẩu xác nhận không khớp.',
+        message: 'Passwords do not match.',
       });
     }
   });
@@ -81,9 +84,3 @@ export type LoginFormValues = z.infer<typeof loginSchema>;
 export type RegisterFormValues = z.infer<typeof registerSchema>;
 export type PasswordResetRequestFormValues = z.infer<typeof passwordResetRequestSchema>;
 export type PasswordResetConfirmFormValues = z.infer<typeof passwordResetConfirmSchema>;
-export const nationalityOptions = [
-  { label: 'Việt Nam', value: 'VN' },
-  { label: 'Hoa Kỳ', value: 'US' },
-  { label: 'Nhật Bản', value: 'JP' },
-  { label: 'Hàn Quốc', value: 'KR' },
-] as const;

@@ -16,6 +16,7 @@ import {
   isManageBookingMockVariant,
   type ManageBookingMockVariant,
 } from '../mocks/manageBooking';
+import { getMockTripDetailResult, getMockTripHistoryResult } from '../mocks/tripHistory';
 import { useBookingStore } from '../stores/useBookingStore';
 import type {
   BookingCancellationConfirmRequest,
@@ -54,6 +55,9 @@ import type {
   SeatChangePreviewResponse,
   SeatUnassignmentRequest,
   SeatUnassignmentResponse,
+  TripDetailResult,
+  TripHistoryQuery,
+  TripHistoryResult,
 } from '../types/booking.types';
 
 function unwrapData(body: unknown): unknown {
@@ -67,6 +71,14 @@ type ManageBookingMockSession = {
   variant: ManageBookingMockVariant;
   lookup: BookingLookupResponse;
   manageOptions: BookingManageOptionsResponse;
+};
+
+export type ManageBookingRouteSeed = {
+  bookingId: number;
+  pnrCode: string;
+  lastName: string;
+  expiresAt: string | null;
+  primaryFlightId: number | null;
 };
 
 const mockManageBookingSessions = new Map<ManageBookingMockVariant, ManageBookingMockSession>();
@@ -374,6 +386,15 @@ function isManageBookingRoute(): boolean {
   return window.location.pathname.startsWith('/manage-booking');
 }
 
+function isDevLocalhostTripHistory(): boolean {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  return (
+    (hostname === 'localhost' || hostname === '127.0.0.1') &&
+    window.location.pathname.startsWith('/trips')
+  );
+}
+
 function normalizeLookupToken(value: string): string {
   return value.trim().toUpperCase();
 }
@@ -392,14 +413,52 @@ function resolveImplicitMockManageBookingVariant(
     }
   }
 
-  if (!implicitMockManageBookingVariant || bookingId == null) return null;
-
-  const normalizedBookingId = typeof bookingId === 'string' ? Number(bookingId) : bookingId;
-  if (normalizedBookingId === DEFAULT_IMPLICIT_MOCK_LOOKUP.booking.bookingId) {
-    return implicitMockManageBookingVariant;
+  if (bookingId != null) {
+    const normalizedBookingId = typeof bookingId === 'string' ? Number(bookingId) : bookingId;
+    if (normalizedBookingId === DEFAULT_IMPLICIT_MOCK_LOOKUP.booking.bookingId) {
+      implicitMockManageBookingVariant ??= DEFAULT_IMPLICIT_MOCK_VARIANT;
+      return implicitMockManageBookingVariant;
+    }
   }
 
   return null;
+}
+
+export function resolveManageBookingRouteSeed(
+  bookingId?: string | number | null,
+  pnrCode?: string | null
+): ManageBookingRouteSeed | null {
+  const normalizedBookingId =
+    bookingId == null ? null : typeof bookingId === 'string' ? Number(bookingId) : bookingId;
+  const normalizedPnrCode = pnrCode ? normalizeLookupToken(pnrCode) : null;
+
+  if (Number.isFinite(normalizedBookingId)) {
+    const { bookingLookup } = useBookingStore.getState();
+    if (bookingLookup?.booking?.bookingId === normalizedBookingId) {
+      return {
+        bookingId: bookingLookup.booking.bookingId,
+        pnrCode: bookingLookup.booking.pnrCode,
+        lastName: bookingLookup.passengers[0]?.lastName ?? '',
+        expiresAt: bookingLookup.booking.expiresAt ?? null,
+        primaryFlightId: bookingLookup.itineraries[0]?.flightId ?? null,
+      };
+    }
+  }
+
+  const mockVariant =
+    resolveMockManageBookingVariant() ??
+    resolveImplicitMockManageBookingVariant(undefined, normalizedBookingId ?? undefined) ??
+    (normalizedPnrCode === DEFAULT_IMPLICIT_MOCK_PNR ? DEFAULT_IMPLICIT_MOCK_VARIANT : null);
+  if (!mockVariant) return null;
+
+  const lookup = getMockManageBookingSession(mockVariant).lookup;
+  return {
+    bookingId: lookup.booking.bookingId,
+    pnrCode: lookup.booking.pnrCode,
+    lastName: lookup.passengers[0]?.lastName ?? '',
+    expiresAt: lookup.booking.expiresAt ?? null,
+    primaryFlightId: lookup.itineraries[0]?.flightId ?? null,
+  };
 }
 
 function recomputeMockLookupTotals(session: ManageBookingMockSession): void {
@@ -1131,6 +1190,57 @@ export async function lookupBooking(payload: BookingLookupRequest): Promise<Book
   return raw;
 }
 
+export async function getMyTrips(query: TripHistoryQuery = {}): Promise<TripHistoryResult> {
+  if (isDevLocalhostTripHistory()) {
+    return Promise.resolve(getMockTripHistoryResult(query));
+  }
+
+  const params = new URLSearchParams();
+  if (query.status) params.set('status', query.status);
+  if (query.query?.trim()) params.set('query', query.query.trim());
+  if (query.fromDate) params.set('fromDate', query.fromDate);
+  if (query.toDate) params.set('toDate', query.toDate);
+  if (query.cursor) params.set('cursor', query.cursor);
+  if (typeof query.limit === 'number') params.set('limit', String(query.limit));
+
+  const res = await api.get<TripHistoryResult | { data?: TripHistoryResult }>('/api/bookings/my-trips', {
+    params,
+  });
+  const raw = unwrapData(res.data) as TripHistoryResult;
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.items) || !raw.pageInfo) {
+    throw new Error('Trip history fetch failed');
+  }
+  return raw;
+}
+
+export async function getTripDetail(
+  bookingId: string | number,
+  flightId: string | number
+): Promise<TripDetailResult> {
+  if (isDevLocalhostTripHistory()) {
+    return Promise.resolve(getMockTripDetailResult(bookingId, flightId));
+  }
+
+  const booking = typeof bookingId === 'string' ? bookingId : String(bookingId);
+  const flight = typeof flightId === 'string' ? flightId : String(flightId);
+  const res = await api.get<TripDetailResult | { data?: TripDetailResult }>(
+    `/api/bookings/${booking}/trips/${flight}`
+  );
+  const raw = unwrapData(res.data) as TripDetailResult;
+  if (
+    !raw ||
+    typeof raw !== 'object' ||
+    !raw.booking ||
+    !raw.segment ||
+    !Array.isArray(raw.passengers) ||
+    !raw.payment ||
+    !raw.actions
+  ) {
+    throw new Error('Trip detail fetch failed');
+  }
+  return raw;
+}
+
 export async function getManageOptions(
   bookingId: string | number
 ): Promise<BookingManageOptionsResponse> {
@@ -1787,6 +1897,8 @@ export async function confirmCheckIn(body: CheckInConfirmRequest): Promise<Check
 export const bookingService = {
   createBooking,
   lookupBooking,
+  getMyTrips,
+  getTripDetail,
   getManageOptions,
   getBookingTickets,
   previewCancellation,

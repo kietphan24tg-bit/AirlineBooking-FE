@@ -8,6 +8,123 @@ export interface TripRecord {
   cabin?: string;
 }
 
+export type TripHistoryStatus = 'UPCOMING' | 'COMPLETED' | 'CANCELLED';
+
+export interface TripHistoryQuery {
+  status?: TripHistoryStatus;
+  query?: string;
+  fromDate?: string;
+  toDate?: string;
+  cursor?: string | null;
+  limit?: number;
+}
+
+export interface TripHistoryPageInfo {
+  nextCursor: string | null;
+  hasMore: boolean;
+  limit: number;
+}
+
+export interface TripHistoryItem {
+  bookingId: number;
+  flightId: number;
+  pnrCode: string;
+  tripStatus: TripHistoryStatus;
+  tripStatusLabel: string;
+  paymentStatus: string;
+  paymentStatusLabel: string;
+  flightNumber: string;
+  cabinClass: string;
+  departureAirportCode: string;
+  departureCity: string;
+  arrivalAirportCode: string;
+  arrivalCity: string;
+  departureTime: string;
+  arrivalTime: string;
+  flightDate: string;
+  passengerCount: number;
+  totalAmount: number;
+  currency: string;
+  actions: {
+    canManageBooking: boolean;
+    canCheckIn: boolean;
+    canViewDetail: boolean;
+  };
+}
+
+export interface TripHistoryResult {
+  items: TripHistoryItem[];
+  pageInfo: TripHistoryPageInfo;
+}
+
+export interface TripDetailResult {
+  booking: {
+    bookingId: number;
+    pnrCode: string;
+    bookingStatus: string;
+    bookingStatusLabel: string;
+    tripStatus: string;
+    tripStatusLabel: string;
+    totalAmount: number;
+    currency: string;
+    createdAt: string;
+  };
+  segment: {
+    flightId: number;
+    flightNumber: string;
+    flightDate: string;
+    departureTime: string;
+    arrivalTime: string;
+    durationMinutes: number;
+    departureAirportCode: string;
+    departureAirportName: string;
+    departureCity: string;
+    departureTerminal: string | null;
+    arrivalAirportCode: string;
+    arrivalAirportName: string;
+    arrivalCity: string;
+    arrivalTerminal: string | null;
+    fareClassCode: string;
+    fareClassName: string;
+    cabinClass: string;
+    checkedBaggageKg: number | null;
+    carryOnBaggageKg: number | null;
+  };
+  passengers: Array<{
+    passengerId: number;
+    firstName: string;
+    lastName: string;
+    fullName: string;
+    passengerType: string;
+    ticket: {
+      ticketId: number;
+      ticketNumber: string;
+      status: string;
+      issuedAt: string | null;
+    } | null;
+    seat: {
+      seatId: number;
+      seatNumber: string;
+      status: string;
+      surchargeAmount: number;
+      currency: string | null;
+    } | null;
+  }>;
+  payment: {
+    paymentStatus: string;
+    paymentStatusLabel: string;
+    paymentMethod: string | null;
+    transactionId: string | null;
+    amount: number;
+    currency: string;
+  };
+  actions: {
+    canManageBooking: boolean;
+    canViewETicket: boolean;
+    canDownloadInvoice: boolean;
+  };
+}
+
 export interface PassengerProfile {
   id: string;
   fullName: string;

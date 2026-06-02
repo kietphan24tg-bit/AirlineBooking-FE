@@ -27,6 +27,7 @@ import { airportService, type Airport } from '../services/airport.service';
 import { flightService } from '../services/flight.service';
 import type { FlightSearchCriteria, FlightSearchFilters } from '../types/flight.types';
 import { buildFlightResultsSearch, airportLabel } from '../utils/flightSearchUrl';
+import { FEATURED_DESTINATIONS } from '../data/destinations';
 
 //const HERO_WING = 'https://lh3.googleusercontent.com/aida-public/AB6AXuDhbnWHSXyZEIc2WLBnhOd8qPY45Y8JYORsa-L0oq7JPRn9I4oA9_W7OkkNhMz9zF8JD3bicGF4GrcM506MBeGkuKj4o9A6fHVkHaAMgcqxRr2xqWTzrWEdOFtljcl0_8qdOxagUmxX_oTMFP_3N2YaRyH0RGeVAXtvJvdRu6KhMFIrrcWTVzmVFSeaeNi7vqxkms17m4cZWkdLwWtdz1zZ17qMDCUZ_3_1otxOuya4kNUb_BN5Wc7E4sM56D5JgO3fZytmZtSOOyJU';
 
@@ -66,32 +67,11 @@ function formatTravelerSummary(p: TravelerCounts): string {
   return total === 1 ? '1 Passenger' : `${total} Passengers`;
 }
 
-const destinations = [
-  {
-    tag: 'TRENDING',
-    tagClass: 'bg-midnight-burgundy text-luxury-gold',
-    city: 'Dubai',
-    line: 'From $1,240 | First Class Experience',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAzQoRszQ9DoYWqrmkICRM_5R6URZXKVjMsaosolUgHNilP8s5srYmEPnNXXBAPikFHweburezdnp1Z94bpBFM7TBcfeHKjeMNUfdqUgpD250iLKxHouuXEHRH5vSdk9MmR-99-COmPExlTcMfWiym3-b9z9mEYntXklDSt265R2qmcYwluquIBakeFin-WyilQvHpz9tTZUNCw83Br2bsGIq3_63Rj_g1H9xulMmpBe6chtogNz7g4N77Q2YM6Q_4lgDb6Ppp36bop',
-    offset: '',
-  },
-  {
-    tag: 'FEATURED',
-    tagClass: 'bg-luxury-gold text-midnight-burgundy',
-    city: 'Paris',
-    line: 'From $980 | Cultural Elegance',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCGJCt58g5Q3lJDwA8yHseLk4ECQqDj8JwZtvA3ub7MIh3sFCnqMKvFmEU93nt0fnkqRlGTMXucg2alHD-bssfl3pnBJGsLUvSJf2ziz1xk5QXAnFzjFd_I2sTyQAIDsUKSL0J8D3Rr9pm4M717Ts3krl_V_cdhkB2xarlNhsjRpwtXWs5fhZoVv8PD7mpgGhUNohZ1oX67E5we99w4MdsvY73zBGUl2bXjj9N9bPse7uDjM_scP87xFnl7YyQnYexRjC8U5WUz37FD',
-    offset: 'md:-translate-y-8',
-  },
-  {
-    tag: 'LIMITED',
-    tagClass: 'bg-midnight-burgundy text-luxury-gold',
-    city: 'Tokyo',
-    line: 'From $1,560 | Urban Sophistication',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDmSdCW-K2plV9pnsU7pJS-1INqVfmROXBQGkU-LLL4aOhQ62VnWMUqAVXilhgQSAI6DWZuvDZ3PjI32_XeWOLCy9HihdXoNGpiFrKPWlMm6cWeA_k_HICKIc18PkmRNABDcoHhwo3n8SQVqSU1NfcHNZxUiXtuj07yPsrh2tpJW1UashVTXXjXe-JoOVjehMnKISgiVO87usxTH_G4XxEFalM59OaESVoGglNSj4FroDwEfMBsq0TTOZf3UmbB-S3anh2EFDBbAw6U',
-    offset: '',
-  },
-];
+const destinations = FEATURED_DESTINATIONS.map((d, i) => ({
+  ...d,
+  line: d.line.replace(' · ', ' | '),
+  offset: i === 1 ? 'md:-translate-y-8' : '',
+}));
 
 const BANNER_SUITE =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuA3PIrZqKqBOtsY76vWhimpUUlYthHM4y8zXe5e86W9R3JOSoVuyVdG5jLy-9XzNeh0csUNmMGRt1W3uyTrrHXnUScKQQrmKEmgj82-slcm4Y9RGYse7U7bbQ_aA4EVIr_x6_tDglJHOhU1KWXQpJcEKBRX5QN7c5ch24nFs2RNda4O47SK-NcJyuLklQzGsa-oubeIJxP8ElytxX1ZV1EHUCS_FJgUg8Q0I5oe88Zt91sZNupuXXqReEwWT5-Zxjs10dEIYXsmWOAG';
@@ -703,7 +683,11 @@ export default function Landing() {
       setAirportsByRegion(byCountry);
       setAirportList(list);
     } catch (error) {
-      console.error('Error fetching airports:', error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Unable to load airport options right now. Please try again.'
+      );
     }
   };
 
@@ -742,7 +726,7 @@ export default function Landing() {
           aria-hidden
         />
         <section
-          className={`relative flex h-260 w-full items-stretch ${
+          className={`landing-hero-section relative flex h-260 w-full items-stretch ${
             isFromPicking || isToPicking || travelersMenuOpen
               ? 'overflow-visible'
               : 'overflow-hidden'
@@ -767,8 +751,8 @@ export default function Landing() {
               className="absolute inset-0 h-full w-full object-cover"
             />
           </div>
-          <div className="relative mx-auto flex h-220 w-full min-w-0 max-w-480 flex-col px-4 pb-0 pt-24 sm:px-6 md:px-20 md:pb-0">
-            <div className="max-w-full mt-50 pt-4 md:pt-6">
+          <div className="landing-hero-shell relative mx-auto flex h-220 w-full min-w-0 max-w-480 flex-col px-4 pb-0 pt-24 sm:px-6 md:px-20 md:pb-0">
+            <div className="landing-hero-copy mt-50 max-w-full pt-4 md:pt-6">
               <h1 className="mb-4 font-headline text-4xl font-black leading-[0.92] tracking-tighter text-white md:mb-5 md:text-7xl drop-shadow-2xl">
                 REDEFINING <br />
                 THE <span className="text-luxury-gold">EXCEPTIONAL</span>
@@ -824,7 +808,7 @@ export default function Landing() {
                 {/* From */}
                 <div
                   ref={fromFieldRef}
-                  className={`booking-field booking-field--from relative space-y-1 p-3 sm:min-h-[9rem] sm:p-4 ${isFromPicking ? 'z-30' : ''} ${
+                    className={`booking-field booking-field--from relative space-y-1 p-3 sm:min-h-[9rem] sm:p-4 ${isFromPicking ? 'z-30' : ''} ${
                     tripType === 'round-trip'
                       ? 'sm:border-b sm:border-luxury-gold/10 xl:border-b-0'
                       : 'sm:border-b sm:border-luxury-gold/10 lg:border-b-0'
@@ -893,7 +877,7 @@ export default function Landing() {
                 {/* To */}
                 <div
                   ref={toFieldRef}
-                  className={`booking-field booking-field--to relative space-y-1 p-3 sm:min-h-[9rem] sm:p-4 ${isToPicking ? 'z-30' : ''} ${
+                    className={`booking-field booking-field--to relative space-y-1 p-3 sm:min-h-[9rem] sm:p-4 ${isToPicking ? 'z-30' : ''} ${
                     tripType === 'round-trip'
                       ? 'sm:border-b sm:border-luxury-gold/10 xl:border-b-0'
                       : 'sm:border-b sm:border-luxury-gold/10 lg:border-b-0'
@@ -1278,7 +1262,7 @@ export default function Landing() {
                 </h2>
               </div>
               <Link
-                to="/flights"
+                to="/destinations"
                 className="group flex items-center gap-2 font-headline font-bold text-midnight-burgundy"
               >
                 VIEW ALL DESTINATIONS
@@ -1342,12 +1326,12 @@ export default function Landing() {
                   Experience our new suites with fully flat beds, artisanal dining, and exclusive
                   onboard connectivity.
                 </p>
-                <button
-                  type="button"
+                <Link
+                  to="/business-class"
                   className="w-fit rounded-lg bg-luxury-gold px-8 py-4 font-headline font-bold text-midnight-burgundy transition-all hover:brightness-110"
                 >
                   DISCOVER THE SUITE
-                </button>
+                </Link>
               </div>
             </div>
             <div className="relative overflow-hidden rounded-xl border border-luxury-gold/20 bg-midnight-burgundy shadow-lg lg:col-span-4">
@@ -1364,7 +1348,7 @@ export default function Landing() {
                   global lounges.
                 </p>
                 <Link
-                  to="/flights"
+                  to="/fare-benefits"
                   className="group mt-8 inline-flex w-fit items-center gap-2 border-b-2 border-luxury-gold pb-1 font-bold tracking-wide text-luxury-gold"
                 >
                   EXPLORE BENEFITS

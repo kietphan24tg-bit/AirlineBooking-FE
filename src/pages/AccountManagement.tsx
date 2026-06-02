@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import AccountProfileCard from '../components/account/AccountProfileCard';
@@ -67,12 +68,26 @@ export default function AccountManagement() {
   const changePasswordMutation = useMutation({
     mutationFn: authService.changePassword,
     onSuccess: () => {
-      toast.success('Doi mat khau thanh cong. Vui long dang nhap lai.');
+      toast.success('Password changed successfully. Please sign in again.');
       queryClient.clear();
       useAuthStore.getState().clearStore();
       navigate('/login', { replace: true });
     },
   });
+
+  useEffect(() => {
+    if (!countriesQuery.isError) return;
+    toast.error('Unable to load the country list right now.', {
+      id: 'account-countries-error',
+    });
+  }, [countriesQuery.isError]);
+
+  useEffect(() => {
+    if (!overviewQuery.isError) return;
+    toast.error('Unable to load account information.', {
+      id: 'account-overview-error',
+    });
+  }, [overviewQuery.isError]);
 
   const user = overviewQuery.data?.profile ?? null;
 
@@ -102,7 +117,7 @@ export default function AccountManagement() {
       <div className="flex min-h-screen flex-col bg-surface font-body text-on-surface">
         <MarketingNav />
         <main className="mx-auto flex w-full max-w-[1180px] flex-1 items-center justify-center px-6 py-32">
-          <p className="text-sm text-on-surface-variant/80">Dang tai tai khoan...</p>
+          <Loader2 className="h-10 w-10 animate-spin text-primary" strokeWidth={2.2} />
         </main>
         <SiteFooter />
       </div>
@@ -115,13 +130,13 @@ export default function AccountManagement() {
         <MarketingNav />
         <main className="mx-auto flex w-full max-w-[1180px] flex-1 items-center justify-center px-6 py-32">
           <div className="text-center">
-            <p className="text-sm text-on-surface-variant/80">Khong the tai thong tin tai khoan.</p>
+            <p className="text-sm text-on-surface-variant/80">No account data available right now.</p>
             <button
               type="button"
               onClick={() => void overviewQuery.refetch()}
               className="mt-4 rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary transition-all hover:bg-primary hover:text-white"
             >
-              Thu lai
+              Try again
             </button>
           </div>
         </main>
@@ -140,10 +155,10 @@ export default function AccountManagement() {
 
       <main className="mx-auto w-full max-w-[1180px] flex-1 px-6 pb-20 pt-28 md:pt-32">
         <h1 className="font-headline text-[30px] font-black tracking-tight text-dark-charcoal">
-          Tai khoan cua toi
+          My account
         </h1>
         <p className="mb-9 mt-1.5 text-[15px] text-on-surface-variant/80">
-          Quan ly thong tin ca nhan va bao mat tai khoan.
+          Manage your personal information and account security.
         </p>
 
         <div className="grid items-start gap-7 lg:grid-cols-[272px_1fr]">

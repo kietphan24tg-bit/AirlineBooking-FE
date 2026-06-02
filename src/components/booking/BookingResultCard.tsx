@@ -100,8 +100,9 @@ interface ManageAction {
   onClick: () => void;
 }
 
-interface ManageActionNavigationState {
+interface ManageActionRouteContext {
   bookingId: number;
+  primaryFlightId: number | null;
   pnrCode: string;
   lastName: string;
   expiresAt: string | null;
@@ -109,17 +110,29 @@ interface ManageActionNavigationState {
 
 function buildManageActions(
   actions: BookingActions,
+  context: ManageActionRouteContext,
+  existingSearch: string,
   navigate: (path: string) => void
 ): ManageAction[] {
+  const query = new URLSearchParams(existingSearch);
+  query.set('pnr', context.pnrCode);
+  query.set('lastName', context.lastName);
+  if (context.expiresAt) query.set('expiresAt', context.expiresAt);
+  const search = query.toString();
+  const buildPath = (pathname: string) => (search ? `${pathname}?${search}` : pathname);
+
   return [
     {
       key: 'check-in',
-      enabled: actions.canCheckIn,
+      enabled: actions.canCheckIn && context.primaryFlightId != null,
       label: 'Online check-in',
       description: 'Check in online and receive your boarding pass',
       icon: SquareCheckBig,
       iconClass: 'bg-midnight-burgundy stroke-luxury-gold',
-      onClick: () => navigate('/manage-booking/check-in'),
+      onClick: () =>
+        navigate(
+          buildPath(`/manage-booking/check-in/${context.bookingId}/${context.primaryFlightId}`)
+        ),
     },
     {
       key: 'ancillaries',
@@ -128,7 +141,7 @@ function buildManageActions(
       description: 'Baggage, meals',
       icon: PlaneTakeoff,
       iconClass: 'bg-midnight-burgundy stroke-luxury-gold',
-      onClick: () => navigate('/manage-booking/add-services'),
+      onClick: () => navigate(buildPath('/manage-booking/add-services')),
     },
     {
       key: 'seat',
@@ -137,7 +150,7 @@ function buildManageActions(
       description: 'Pick a comfortable seat for your trip',
       icon: Armchair,
       iconClass: 'bg-midnight-burgundy stroke-luxury-gold',
-      onClick: () => navigate('/manage-booking/seat-selection'),
+      onClick: () => navigate(buildPath('/manage-booking/seat-selection')),
     },
     {
       key: 'change-flight',
@@ -146,7 +159,7 @@ function buildManageActions(
       description: 'Change the date, time, or itinerary',
       icon: PlaneTakeoff,
       iconClass: 'bg-midnight-burgundy stroke-luxury-gold',
-      onClick: () => navigate('/manage-booking/change-flight'),
+      onClick: () => navigate(buildPath('/manage-booking/change-flight')),
     },
     {
       key: 'cancel',
@@ -156,7 +169,7 @@ function buildManageActions(
       icon: CircleX,
       iconClass: 'bg-midnight-burgundy stroke-red-300',
       textClass: 'text-on-surface',
-      onClick: () => navigate('/manage-booking/cancel'),
+      onClick: () => navigate(buildPath('/manage-booking/cancel')),
     },
   ];
 }
@@ -291,8 +304,8 @@ function PassengerCard({
 }
 
 export default function BookingResultCard() {
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
   const [showPriceDetail, setShowPriceDetail] = useState(false);
   const bookingLookup = useBookingStore((state) => state.bookingLookup);
 
@@ -302,20 +315,18 @@ export default function BookingResultCard() {
     bookingLookup;
   const price = paymentDetails.price;
   const status = resolveStatusDisplay(booking.status);
-  const manageActionState: ManageActionNavigationState = {
+  const manageActionContext: ManageActionRouteContext = {
     bookingId: booking.bookingId,
+    primaryFlightId: itineraries[0]?.flightId ?? null,
     pnrCode: booking.pnrCode,
     lastName: passengers[0]?.lastName ?? '',
     expiresAt: booking.expiresAt,
   };
-  const manageActions = buildManageActions(actions, (path) =>
-    navigate(
-      {
-        pathname: path,
-        search: location.search,
-      },
-      { state: manageActionState }
-    )
+  const manageActions = buildManageActions(
+    actions,
+    manageActionContext,
+    location.search,
+    (path) => navigate(path)
   );
   const enabledManageActions = manageActions.filter((action) => action.enabled);
 

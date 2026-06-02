@@ -39,26 +39,26 @@ export default function AccountSidebar({ user, onSignOut, onSecurityClick }: Acc
   const items: NavItem[] = [
     {
       key: 'profile',
-      label: 'Hồ sơ cá nhân',
+      label: 'Personal profile',
       icon: User,
       to: '/account',
       active: location.pathname === '/account',
     },
     {
       key: 'trips',
-      label: 'Chuyến đi của tôi',
+      label: 'My trips',
       icon: Plane,
       to: '/trips',
     },
     {
       key: 'security',
-      label: 'Bảo mật',
+      label: 'Security',
       icon: Shield,
       onClick: onSecurityClick,
     },
     {
       key: 'settings',
-      label: 'Tùy chọn',
+      label: 'Settings',
       icon: Settings,
       to: '/account',
     },
@@ -107,7 +107,7 @@ export default function AccountSidebar({ user, onSignOut, onSecurityClick }: Acc
 
         <button type="button" onClick={onSignOut} className={navItemClass(false, true)}>
           <LogOut className={iconClass(false)} strokeWidth={2} />
-          Đăng xuất
+          Log out
         </button>
       </nav>
     </aside>

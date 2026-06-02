@@ -1,4 +1,5 @@
 import api from '../api/axios';
+import { FARE_FAMILY_POLICIES } from '../data/fareBenefits';
 import {
   getMockSeatMapResponse,
   getMockServiceCatalogResponse,
@@ -7,6 +8,10 @@ import {
 } from '../mocks/manageBooking';
 import { getMockReservedSeatsForFlight } from './booking.service';
 import { useBookingStore } from '../stores/useBookingStore';
+import type {
+  FareFamilyCatalogResponseDto,
+  FareFamilyDto,
+} from '../types/fareFamily.types';
 import type {
   CabinClassKey,
   CabinFare,
@@ -124,6 +129,14 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
+type FareFamilyCatalogOptions = {
+  countryCode?: string;
+  currency?: string;
+  signal?: AbortSignal;
+};
+
+const USE_MOCK_FARE_FAMILIES = import.meta.env.VITE_MOCK_FARE_FAMILIES !== 'false';
+
 const CABIN_ORDER: CabinClassKey[] = ['Economy', 'Premium', 'Business', 'First'];
 
 function unwrapData(body: unknown): unknown {
@@ -131,6 +144,12 @@ function unwrapData(body: unknown): unknown {
   const b = body as Record<string, unknown>;
   if ('data' in b && b.data != null) return b.data;
   return body;
+}
+
+function normalizeFareFamilies(raw: unknown): FareFamilyDto[] {
+  const body = unwrapData(raw);
+  if (!Array.isArray(body)) return [];
+  return body.filter((item): item is FareFamilyDto => !!item && typeof item === 'object');
 }
 
 function resolveMockManageVariantForFlights(): ManageBookingMockVariant | null {
@@ -736,6 +755,31 @@ function buildMockCalendarSearchResult(
   };
 }
 
+export async function getFareFamiliesMapped(
+  options?: FareFamilyCatalogOptions
+): Promise<FareFamilyDto[]> {
+  if (USE_MOCK_FARE_FAMILIES) {
+    return FARE_FAMILY_POLICIES;
+  }
+
+  try {
+    const res = await api.get<FareFamilyCatalogResponseDto | FareFamilyDto[]>(
+      '/api/flights/fare-families',
+      {
+        params: {
+          countryCode: options?.countryCode,
+          currency: options?.currency,
+        },
+        signal: options?.signal,
+      }
+    );
+    const fareFamilies = normalizeFareFamilies(res.data);
+    return fareFamilies.length > 0 ? fareFamilies : FARE_FAMILY_POLICIES;
+  } catch {
+    return FARE_FAMILY_POLICIES;
+  }
+}
+
 export async function searchFlightsMapped(
   criteria: FlightSearchCriteria,
   filters: FlightSearchFilters,
@@ -986,6 +1030,7 @@ function normalizeServiceOption(
 }
 
 export const flightService = {
+  getFareFamilies: getFareFamiliesMapped,
   searchCalendar: searchCalendarMapped,
   searchFlights: searchFlightsMapped,
   revalidateFare: revalidateFareMapped,

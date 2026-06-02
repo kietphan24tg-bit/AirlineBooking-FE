@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import SiteFooter from '../components/layout/SiteFooter';
 import SiteHeader from '../components/layout/SiteHeader';
 import {
@@ -278,18 +279,6 @@ function PreviewSummaryCard({
         <div className="flex items-center gap-2 rounded-xl border border-surface-container-high bg-surface-low px-4 py-5 text-sm text-on-surface-variant">
           <LoaderCircle className="h-4 w-4 animate-spin text-primary" />
           Updating preview...
-        </div>
-      ) : null}
-
-      {previewError ? (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {previewError}
-        </div>
-      ) : null}
-
-      {confirmError ? (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {confirmError}
         </div>
       ) : null}
 
@@ -1046,9 +1035,10 @@ export default function CancelFlight() {
         const options = await bookingService.getManageOptions(lookup.booking.bookingId);
         setManageOptions(options);
       } catch (error) {
-        setErrorMessage(
-          error instanceof Error ? error.message : 'Unable to load the sample booking.'
-        );
+        const message =
+          error instanceof Error ? error.message : 'Unable to load the sample booking.';
+        setErrorMessage(message);
+        toast.error(message);
       } finally {
         setBootstrapping(false);
       }
@@ -1148,9 +1138,10 @@ export default function CancelFlight() {
       } catch (error) {
         if (requestSeq !== previewRequestSeqRef.current) return;
         setPreview(null);
-        setPreviewError(
-          error instanceof Error ? error.message : 'Unable to preview the cancellation.'
-        );
+        const message =
+          error instanceof Error ? error.message : 'Unable to preview the cancellation.';
+        setPreviewError(message);
+        toast.error(message);
       } finally {
         if (requestSeq === previewRequestSeqRef.current) {
           setPreviewLoading(false);
@@ -1184,9 +1175,10 @@ export default function CancelFlight() {
       setConfirmedCancellation(response);
       setStep(3);
     } catch (error) {
-      setConfirmError(
-        error instanceof Error ? error.message : 'Unable to confirm the cancellation.'
-      );
+      const message =
+        error instanceof Error ? error.message : 'Unable to confirm the cancellation.';
+      setConfirmError(message);
+      toast.error(message);
     } finally {
       setConfirmLoading(false);
     }
@@ -1215,7 +1207,7 @@ export default function CancelFlight() {
           <div className="glass-panel w-full rounded-2xl border border-surface-container-high p-8 text-center shadow-sm">
             <h1 className="font-headline text-2xl font-black text-on-surface">No booking data</h1>
             <p className="mt-3 text-sm text-on-surface-variant">
-              {errorMessage ?? 'Return to Manage Booking and find a booking before canceling.'}
+              Return to Manage Booking and find a booking before canceling.
             </p>
             <button
               type="button"

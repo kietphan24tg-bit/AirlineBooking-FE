@@ -1,4 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import Select from 'react-select';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -6,12 +8,13 @@ import AuthLayout from '../components/auth/AuthLayout';
 import Button from '../components/ui/Button';
 import FieldLabel from '../components/ui/FieldLabel';
 import TextInput from '../components/ui/TextInput';
-import { applyBackendFieldErrors } from '../utils/formError';
 import {
-  nationalityOptions,
-  registerSchema,
-  type RegisterFormValues,
-} from '../validations/auth.schema';
+  countryService,
+  DEFAULT_NATIONALITY_CODE,
+  FALLBACK_COUNTRY_OPTIONS,
+} from '../services/country.service';
+import { applyBackendFieldErrors } from '../utils/formError';
+import { registerSchema, type RegisterFormValues } from '../validations/auth.schema';
 
 const selectStyles = {
   control: (base: Record<string, unknown>) => ({
@@ -42,13 +45,22 @@ const selectStyles = {
 };
 
 export default function Register() {
+  const countriesQuery = useQuery({
+    queryKey: ['countries'],
+    queryFn: () => countryService.fetchCountryOptions(),
+    staleTime: 30 * 24 * 60 * 60 * 1000,
+  });
+  const nationalityOptions = countriesQuery.data ?? FALLBACK_COUNTRY_OPTIONS;
+
+  const [phonePrefix, setPhonePrefix] = useState<string>('');
+
   const {
     control,
     register,
     handleSubmit,
-    trigger,
     clearErrors,
     setError,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -58,12 +70,21 @@ export default function Register() {
       lastName: '',
       acceptTerms: true,
       phone: '',
-      nationality: 'VN',
+      nationality: DEFAULT_NATIONALITY_CODE,
       password: '',
       confirmPassword: '',
     },
   });
   const registerAccount = useAuthStore((state) => state.register);
+
+  // Set initial dial code for default nationality
+  useEffect(() => {
+    const defaultCountry = nationalityOptions.find(c => c.value === DEFAULT_NATIONALITY_CODE);
+    if (defaultCountry?.dialCode) {
+      setPhonePrefix(defaultCountry.dialCode);
+      setValue('phone', defaultCountry.dialCode + ' ');
+    }
+  }, [nationalityOptions, setValue]);
 
   const onSubmit = async (values: RegisterFormValues) => {
     clearErrors('root.serverError');
@@ -93,8 +114,8 @@ export default function Register() {
 
   return (
     <AuthLayout
-      title="Đăng Ký"
-      subtitle="Tạo tài khoản để bắt đầu hành trình sang trọng của bạn."
+      title="Sign Up"
+      subtitle="Create an account to begin your luxury journey."
       activeTab="register"
     >
       <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)}>
@@ -104,7 +125,7 @@ export default function Register() {
           </p>
         )}
         <div>
-          <FieldLabel htmlFor="register-email">Địa chỉ Email</FieldLabel>
+          <FieldLabel htmlFor="register-email">Email Address</FieldLabel>
           <TextInput
             id="register-email"
             type="email"
@@ -121,11 +142,11 @@ export default function Register() {
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <FieldLabel htmlFor="register-first-name">Tên</FieldLabel>
+            <FieldLabel htmlFor="register-first-name">First Name</FieldLabel>
             <TextInput
               id="register-first-name"
               type="text"
-              placeholder="Tên"
+              placeholder="First name"
               hasError={!!errors.firstName}
               aria-describedby={errors.firstName ? 'register-first-name-error' : undefined}
               {...register('firstName')}
@@ -137,11 +158,11 @@ export default function Register() {
             )}
           </div>
           <div>
-            <FieldLabel htmlFor="register-last-name">Họ</FieldLabel>
+            <FieldLabel htmlFor="register-last-name">Last Name</FieldLabel>
             <TextInput
               id="register-last-name"
               type="text"
-              placeholder="Họ"
+              placeholder="Last name"
               hasError={!!errors.lastName}
               aria-describedby={errors.lastName ? 'register-last-name-error' : undefined}
               {...register('lastName')}
@@ -154,11 +175,53 @@ export default function Register() {
           </div>
         </div>
         <div>
-          <FieldLabel htmlFor="register-phone">Số điện thoại</FieldLabel>
+          <FieldLabel htmlFor="register-nationality">Nationality</FieldLabel>
+          <Controller
+            name="nationality"
+            control={control}
+            render={({ field }) => (
+              <Select
+                inputId="register-nationality"
+                options={nationalityOptions}
+                placeholder={countriesQuery.isLoading ? 'Loading countries...' : 'Select country'}
+                isLoading={countriesQuery.isLoading}
+                isDisabled={countriesQuery.isLoading}
+                styles={selectStyles}
+                value={
+                  nationalityOptions.find((country) => country.value === field.value) ?? null
+                }
+                onChange={(option) => {
+                  const selectedValue = option?.value ?? DEFAULT_NATIONALITY_CODE;
+                  field.onChange(selectedValue);
+
+                  // Update phone prefix when country changes
+                  const selectedCountry = nationalityOptions.find(c => c.value === selectedValue);
+                  if (selectedCountry?.dialCode) {
+                    setPhonePrefix(selectedCountry.dialCode);
+                    // Replace the entire phone value with new dial code
+                    setValue('phone', selectedCountry.dialCode + ' ', { shouldValidate: false });
+                    // Clear any existing phone errors since we're resetting the field
+                    clearErrors('phone');
+                  } else {
+                    // Country has no dial code, clear prefix and phone
+                    setPhonePrefix('');
+                    setValue('phone', '', { shouldValidate: false });
+                    clearErrors('phone');
+                  }
+                }}
+              />
+            )}
+          />
+          {errors.nationality && (
+            <p className="mt-1 text-xs text-red-500">{errors.nationality.message}</p>
+          )}
+        </div>
+        <div>
+          <FieldLabel htmlFor="register-phone">Phone Number</FieldLabel>
           <TextInput
             id="register-phone"
             type="tel"
-            placeholder="Nhập số điện thoại"
+            placeholder={phonePrefix ? `${phonePrefix} 901234567` : 'Enter phone number'}
             hasError={!!errors.phone}
             aria-describedby={errors.phone ? 'register-phone-error' : undefined}
             {...register('phone')}
@@ -170,30 +233,7 @@ export default function Register() {
           )}
         </div>
         <div>
-          <FieldLabel htmlFor="register-nationality">Quốc tịch</FieldLabel>
-          <Controller
-            name="nationality"
-            control={control}
-            render={({ field }) => (
-              <Select
-                inputId="register-nationality"
-                options={nationalityOptions}
-                placeholder="Chọn quốc gia"
-                styles={selectStyles}
-                value={nationalityOptions.find((country) => country.value === field.value) ?? null}
-                onChange={(option) => {
-                  field.onChange(option?.value ?? 'VN');
-                  void trigger('phone');
-                }}
-              />
-            )}
-          />
-          {errors.nationality && (
-            <p className="mt-1 text-xs text-red-500">{errors.nationality.message}</p>
-          )}
-        </div>
-        <div>
-          <FieldLabel htmlFor="register-password">Mật khẩu</FieldLabel>
+          <FieldLabel htmlFor="register-password">Password</FieldLabel>
           <TextInput
             id="register-password"
             type="password"
@@ -209,7 +249,7 @@ export default function Register() {
           )}
         </div>
         <div>
-          <FieldLabel htmlFor="register-confirm-password">Xác nhận mật khẩu</FieldLabel>
+          <FieldLabel htmlFor="register-confirm-password">Confirm Password</FieldLabel>
           <TextInput
             id="register-confirm-password"
             type="password"
@@ -227,7 +267,7 @@ export default function Register() {
           )}
         </div>
         <Button type="submit" className="mt-3" disabled={isSubmitting}>
-          Đăng ký
+          {isSubmitting ? 'Creating account…' : 'Sign Up'}
         </Button>
       </form>
     </AuthLayout>

@@ -1,5 +1,7 @@
 import { ArrowRight, Ticket, User } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import BookingResultCard from '../components/booking/BookingResultCard';
 import MarketingNav from '../components/layout/MarketingNav';
 import SiteFooter from '../components/layout/SiteFooter';
@@ -8,10 +10,13 @@ import {
   bookingService,
   resetMockManageBookingVariant,
   resolveMockManageBookingVariant,
+  resolveManageBookingRouteSeed,
 } from '../services/booking.service';
 import { useBookingStore } from '../stores/useBookingStore';
 
 export default function ManageBooking() {
+  const location = useLocation();
+  const { id: routeBookingId } = useParams<{ id?: string }>();
   const [pnr, setPnr] = useState('');
   const [name, setName] = useState('');
   const [showResult, setShowResult] = useState(false);
@@ -24,11 +29,52 @@ export default function ManageBooking() {
   const clearBooking = useBookingStore((state) => state.clearBooking);
 
   const autoSearchedRef = useRef(false);
+  const routeParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const rawRoutePnrCode = routeParams.get('pnr') ?? '';
+  const rawRouteLastName = routeParams.get('lastName') ?? '';
+  const shouldAutoLoadMock = routeParams.get('mockManageBooking') === '1';
+  const shouldResolveRouteSeed =
+    routeBookingId != null || Boolean(rawRoutePnrCode || rawRouteLastName) || shouldAutoLoadMock;
+  const routeSeed = useMemo(
+    () =>
+      shouldResolveRouteSeed
+        ? resolveManageBookingRouteSeed(routeBookingId ?? null, rawRoutePnrCode)
+        : null,
+    [rawRoutePnrCode, routeBookingId, shouldResolveRouteSeed]
+  );
+  const routePnrCode = routeSeed?.pnrCode ?? rawRoutePnrCode;
+  const routeLastName = routeSeed?.lastName ?? rawRouteLastName;
+  const routeTargetBookingId = routeSeed?.bookingId ?? (routeBookingId ? Number(routeBookingId) : null);
+  const hasDirectLookupSeed = routeTargetBookingId != null || Boolean(routePnrCode || routeLastName);
+
+  function showErrorToast(message: string) {
+    toast.error(message, {
+      id: 'manage-booking-error',
+    });
+  }
+
+  function resetSearchForm() {
+    clearBooking();
+    setPnr('');
+    setName('');
+    setShowResult(false);
+    setSearching(false);
+    setErrorMessage(null);
+  }
 
   useEffect(() => {
+    if (hasDirectLookupSeed) return;
+
+    if (!shouldAutoLoadMock) {
+      setMockManageBookingMode(false);
+      resetSearchForm();
+      return;
+    }
+
     const mockVariant = resolveMockManageBookingVariant();
     if (!mockVariant) {
       setMockManageBookingMode(false);
+      resetSearchForm();
       return;
     }
 
@@ -39,36 +85,102 @@ export default function ManageBooking() {
     if (autoSearchedRef.current) return;
     autoSearchedRef.current = true;
 
-    setPnr('ABC123');
-    setName('Nguyen');
+    const seededPnr = routeSeed?.pnrCode ?? 'ABC123';
+    const seededLastName = routeSeed?.lastName ?? 'Nguyen';
+    const seededBookingId = routeTargetBookingId ?? routeSeed?.bookingId ?? null;
+
+    setPnr(seededPnr);
+    setName(seededLastName);
     setSearching(true);
     setErrorMessage(null);
 
     void (async () => {
       try {
         const lookup = await bookingService.lookupBooking({
-          pnrCode: 'ABC123',
-          lastName: 'Nguyen',
+          pnrCode: seededPnr,
+          lastName: seededLastName,
         });
-        setLookupCriteria({ pnrCode: 'ABC123', lastName: 'Nguyen' });
+        setLookupCriteria({ pnrCode: seededPnr, lastName: seededLastName });
         setBookingLookup(lookup);
-        const options = await bookingService.getManageOptions(lookup.booking.bookingId);
+        const options = await bookingService.getManageOptions(seededBookingId ?? lookup.booking.bookingId);
         setManageOptions(options);
         setShowResult(true);
       } catch (error) {
-        setErrorMessage(
-          error instanceof Error ? error.message : 'Unable to load the sample booking data.'
-        );
+        const message =
+          error instanceof Error ? error.message : 'Unable to load the sample booking data.';
+        setErrorMessage(message);
+        showErrorToast(message);
       } finally {
         setSearching(false);
       }
     })();
   }, [
     clearBooking,
+    hasDirectLookupSeed,
+    routeSeed?.bookingId,
+    routeSeed?.lastName,
+    routeSeed?.pnrCode,
+    routeTargetBookingId,
+    shouldAutoLoadMock,
     setBookingLookup,
     setLookupCriteria,
     setManageOptions,
     setMockManageBookingMode,
+  ]);
+
+  useEffect(() => {
+    if (autoSearchedRef.current) return;
+    if (!routePnrCode || !routeLastName) {
+      if (routeTargetBookingId != null) {
+        const message =
+          'Missing PNR or last name in the URL. Open this booking from My Trips or search manually.';
+        setErrorMessage(message);
+        showErrorToast(message);
+      }
+      return;
+    }
+    const pnrCode = routePnrCode;
+    const lastName = routeLastName;
+    const bookingId = routeTargetBookingId;
+
+    autoSearchedRef.current = true;
+    setPnr(pnrCode);
+    setName(lastName);
+    setSearching(true);
+    setErrorMessage(null);
+
+    void (async () => {
+      try {
+        const lookup = await bookingService.lookupBooking({
+          pnrCode,
+          lastName,
+        });
+        setLookupCriteria({
+          pnrCode,
+          lastName,
+        });
+        setBookingLookup(lookup);
+        const options = await bookingService.getManageOptions(
+          bookingId ?? lookup.booking.bookingId
+        );
+        setManageOptions(options);
+        setShowResult(true);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Unable to load booking information.';
+        setErrorMessage(message);
+        showErrorToast(message);
+      } finally {
+        setSearching(false);
+      }
+    })();
+  }, [
+    routeLastName,
+    routePnrCode,
+    routeTargetBookingId,
+    setBookingLookup,
+    setLookupCriteria,
+    setManageOptions,
   ]);
 
   const onSearch = async (e: React.FormEvent) => {
@@ -76,7 +188,7 @@ export default function ManageBooking() {
     const pnrTrimmed = pnr.trim();
     const nameTrimmed = name.trim();
     if (!pnrTrimmed || !nameTrimmed) {
-      alert('Please enter the booking reference (PNR) and the passenger last name.');
+      showErrorToast('Please enter the booking reference (PNR) and the passenger last name.');
       return;
     }
 
@@ -97,16 +209,22 @@ export default function ManageBooking() {
       try {
         const options = await bookingService.getManageOptions(lookup.booking.bookingId);
         setManageOptions(options);
-      } catch {
+      } catch (error) {
         setManageOptions(null);
+        showErrorToast(
+          error instanceof Error
+            ? error.message
+            : 'Unable to load booking actions right now. Please try again.'
+        );
       }
       setShowResult(true);
     } catch (error) {
       setManageOptions(null);
       setShowResult(false);
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Booking information could not be found.'
-      );
+      const message =
+        error instanceof Error ? error.message : 'Booking information could not be found.';
+      setErrorMessage(message);
+      showErrorToast(message);
     } finally {
       setSearching(false);
     }
@@ -127,7 +245,7 @@ export default function ManageBooking() {
           </div>
           {showResult ? (
             <button
-              onClick={() => setShowResult(false)}
+              onClick={resetSearchForm}
               className="flex h-full w-50 items-center justify-center gap-2 rounded-lg bg-midnight-burgundy py-4 font-headline font-bold text-luxury-gold transition-all hover:brightness-110 active:scale-95"
             >
               Search another booking
@@ -195,9 +313,6 @@ export default function ManageBooking() {
                 <ArrowRight className="h-5 w-5" strokeWidth={2} />
               </button>
             </div>
-            {errorMessage ? (
-              <p className="px-6 pb-3 text-sm font-medium text-red-600">{errorMessage}</p>
-            ) : null}
           </form>
         ) : (
           <BookingResultCard />

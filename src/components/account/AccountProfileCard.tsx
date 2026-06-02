@@ -24,7 +24,7 @@ function ProfileField({ label, value }: FieldProps) {
       <p
         className={`text-[15px] font-semibold ${empty ? 'font-medium italic text-[#b0aaa2]' : 'text-dark-charcoal'}`}
       >
-        {empty ? 'Chưa cập nhật' : value}
+        {empty ? 'Not updated' : value}
       </p>
     </div>
   );
@@ -46,10 +46,10 @@ export default function AccountProfileCard({
           </div>
           <div>
             <h2 className="font-headline text-[17px] font-bold text-dark-charcoal">
-              Thông tin cá nhân
+              Personal information
             </h2>
             <p className="mt-0.5 text-xs text-on-surface-variant/80">
-              Dùng cho việc đặt vé và xuất vé điện tử.
+              Used for booking and electronic ticket issuance.
             </p>
           </div>
         </div>
@@ -59,18 +59,18 @@ export default function AccountProfileCard({
           className="inline-flex items-center gap-1.5 rounded-xl border-[1.5px] border-primary bg-transparent px-4 py-2 text-[13px] font-semibold text-primary transition-all hover:bg-primary hover:text-white"
         >
           <SquarePen className="h-4 w-4" strokeWidth={2} />
-          Chỉnh sửa
+          Edit
         </button>
       </div>
 
       <div className="grid gap-6 px-6 py-6 sm:grid-cols-2 sm:gap-x-9 sm:px-7 sm:py-7">
-        <ProfileField label="Họ" value={user.lastName} />
-        <ProfileField label="Tên đệm & tên" value={user.firstName} />
+        <ProfileField label="Last name" value={user.lastName} />
+        <ProfileField label="Middle & first name" value={user.firstName} />
         <ProfileField label="Email" value={user.email} />
-        <ProfileField label="Số điện thoại" value={user.phone ?? null} />
-        <ProfileField label="Ngày sinh" value={formatDobLabel(user.dob)} />
-        <ProfileField label="Quốc tịch" value={nationalityLabel} />
-        <ProfileField label="Số giấy tờ tùy thân" value={maskedId} />
+        <ProfileField label="Phone number" value={user.phone ?? null} />
+        <ProfileField label="Date of birth" value={formatDobLabel(user.dob)} />
+        <ProfileField label="Nationality" value={nationalityLabel} />
+        <ProfileField label="ID number" value={maskedId} />
       </div>
     </section>
   );

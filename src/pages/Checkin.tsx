@@ -22,7 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import AircraftSeatsMap, {
   type SeatSelectionValue,
   DetailPanel,
@@ -31,7 +31,7 @@ import AircraftSeatsMap, {
 } from '../components/booking/AircraftSeatsMap';
 import SiteFooter from '../components/layout/SiteFooter';
 import SiteHeader from '../components/layout/SiteHeader';
-import { bookingService } from '../services/booking.service';
+import { bookingService, resolveManageBookingRouteSeed } from '../services/booking.service';
 import { flightService } from '../services/flight.service';
 import { useBookingStore } from '../stores/useBookingStore';
 import type {
@@ -94,13 +94,6 @@ interface SeatFlightProgress {
   eligibleCount: number;
   missingCount: number;
   complete: boolean;
-}
-
-interface CheckinNavigationState {
-  bookingId?: number;
-  pnrCode?: string;
-  lastName?: string;
-  expiresAt?: string | null;
 }
 
 interface BookingDetailFlightItem {
@@ -2680,14 +2673,28 @@ function CheckinSuccessExperience({
 export default function Checkin() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { bookingId: routeBookingIdParam, flightId: routeFlightIdParam } = useParams<{
+    bookingId?: string;
+    flightId?: string;
+  }>();
   const queryClient = useQueryClient();
   const bookingLookup = useBookingStore((state) => state.bookingLookup);
   const lookupCriteria = useBookingStore((state) => state.lookupCriteria);
   const manageOptions = useBookingStore((state) => state.manageOptions);
   const setManageOptions = useBookingStore((state) => state.setManageOptions);
-  const navState = (location.state as CheckinNavigationState | null) ?? null;
-  const manageBookingId =
-    manageOptions?.bookingId ?? bookingLookup?.booking?.bookingId ?? navState?.bookingId ?? null;
+  const setBookingLookup = useBookingStore((state) => state.setBookingLookup);
+  const setLookupCriteria = useBookingStore((state) => state.setLookupCriteria);
+  const routeSearch = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const routeSeed = useMemo(
+    () => resolveManageBookingRouteSeed(routeBookingIdParam ?? null, routeSearch.get('pnr')),
+    [routeBookingIdParam, routeSearch]
+  );
+  const routeBookingId = routeSeed?.bookingId ?? (routeBookingIdParam ? Number(routeBookingIdParam) : null);
+  const routeFlightId = routeFlightIdParam ? Number(routeFlightIdParam) : routeSeed?.primaryFlightId ?? null;
+  const routePnrCode = routeSearch.get('pnr') ?? routeSeed?.pnrCode ?? '';
+  const routeLastName = routeSearch.get('lastName') ?? routeSeed?.lastName ?? '';
+  const routeExpiresAt = routeSearch.get('expiresAt') ?? routeSeed?.expiresAt ?? null;
+  const manageBookingId = routeBookingId ?? manageOptions?.bookingId ?? bookingLookup?.booking?.bookingId ?? null;
 
   const manageOptionsQuery = useQuery({
     queryKey: ['checkin-manage-options', manageBookingId],
@@ -2701,6 +2708,36 @@ export default function Checkin() {
       setManageOptions(manageOptionsQuery.data);
     }
   }, [manageOptionsQuery.data, setManageOptions]);
+
+  useEffect(() => {
+    if (!routePnrCode || !routeLastName) return;
+    if (bookingLookup?.booking?.pnrCode === routePnrCode && bookingLookup.passengers.length > 0) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const lookup = await bookingService.lookupBooking({
+          pnrCode: routePnrCode,
+          lastName: routeLastName,
+        });
+        setLookupCriteria({
+          pnrCode: routePnrCode,
+          lastName: routeLastName,
+        });
+        setBookingLookup(lookup);
+      } catch {
+        // Keep the screen functional from manage-options data even when lookup cannot be restored.
+      }
+    })();
+  }, [
+    bookingLookup?.booking?.pnrCode,
+    bookingLookup?.passengers.length,
+    routeLastName,
+    routePnrCode,
+    setBookingLookup,
+    setLookupCriteria,
+  ]);
 
   const flights = useMemo<DerivedFlight[]>(() => {
     if (manageOptions?.itineraries?.length) {
@@ -2815,19 +2852,19 @@ export default function Checkin() {
 
   const booking = useMemo<CheckinBookingSummary>(
     () => ({
-      pnr: lookupCriteria?.pnrCode ?? bookingLookup?.booking?.pnrCode ?? navState?.pnrCode ?? '',
-      lastName: lookupCriteria?.lastName ?? navState?.lastName ?? '',
+      pnr: lookupCriteria?.pnrCode ?? bookingLookup?.booking?.pnrCode ?? routePnrCode ?? '',
+      lastName: lookupCriteria?.lastName ?? routeLastName ?? '',
       totalPassengers: passengers.length,
-      expiresAt: bookingLookup?.booking?.expiresAt ?? navState?.expiresAt ?? null,
+      expiresAt: bookingLookup?.booking?.expiresAt ?? routeExpiresAt ?? null,
     }),
     [
       lookupCriteria?.lastName,
       lookupCriteria?.pnrCode,
       bookingLookup?.booking?.expiresAt,
       bookingLookup?.booking?.pnrCode,
-      navState?.expiresAt,
-      navState?.lastName,
-      navState?.pnrCode,
+      routeExpiresAt,
+      routeLastName,
+      routePnrCode,
       passengers.length,
     ]
   );
@@ -2864,11 +2901,14 @@ export default function Checkin() {
       const validIds = new Set(flights.map((flight) => flight.id));
       const next = new Set([...prev].filter((id) => validIds.has(id)));
       if (next.size > 0) return next;
+      if (routeFlightId != null && validIds.has(String(routeFlightId))) {
+        return new Set([String(routeFlightId)]);
+      }
       const firstOpen = flights.find((flight) => flight.checkInWindow.status === 'OPEN');
       if (firstOpen) return new Set([firstOpen.id]);
       return flights[0] ? new Set([flights[0].id]) : new Set();
     });
-  }, [flights]);
+  }, [flights, routeFlightId]);
 
   const selectedFlightItems = flights.filter((flight) => selectedFlights.has(flight.id));
   const primaryFlight = selectedFlightItems[0] ?? flights[0] ?? null;

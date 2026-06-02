@@ -14,6 +14,9 @@ import ManageBookingAddExtras from '../pages/ManageBookingAddExtras';
 import TripHistory from '../pages/TripHistory';
 import ManageBooking from '../pages/ManageBooking';
 import Experience from '../pages/Experience';
+import FareBenefits from '../pages/FareBenefits';
+import BusinessClass from '../pages/BusinessClass';
+import Destinations from '../pages/Destinations';
 import CheckoutResult from '../pages/CheckoutResult';
 import Checkin from '../pages/Checkin';
 import CancelFlight from '../pages/CancelFlight';
@@ -35,6 +38,18 @@ const AppRouter = createBrowserRouter([
   {
     path: '/experience',
     element: <Experience />,
+  },
+  {
+    path: '/destinations',
+    element: <Destinations />,
+  },
+  {
+    path: '/fare-benefits',
+    element: <FareBenefits />,
+  },
+  {
+    path: '/business-class',
+    element: <BusinessClass />,
   },
   {
     path: '/flights',
@@ -94,6 +109,10 @@ const AppRouter = createBrowserRouter([
   },
   {
     path: '/manage-booking/check-in',
+    element: <Checkin />,
+  },
+  {
+    path: '/manage-booking/check-in/:bookingId/:flightId',
     element: <Checkin />,
   },
   {

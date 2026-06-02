@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft,
   ArrowRight,
   Check,
   CheckCircle2,
@@ -14,7 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import PaymentCard from '../components/booking/PaymentCard';
-import MarketingNav from '../components/layout/MarketingNav';
+import SiteHeader from '../components/layout/SiteHeader';
 import SiteFooter from '../components/layout/SiteFooter';
 import AircraftSeatsMap, {
   type AssignedSeatMeta,
@@ -706,6 +705,7 @@ export default function ManageBookingSeatSelection() {
   };
 
   const pnr = bookingLookup?.booking?.pnrCode ?? '—';
+  const statusLabel = bookingLookup?.booking?.statusLabel || 'Confirmed';
 
   const closeConfirmFlow = () => {
     setConfirmModalOpen(false);
@@ -1142,57 +1142,36 @@ export default function ManageBookingSeatSelection() {
   if (manageBookingId == null) {
     return (
       <div className="min-h-screen bg-surface">
-        <MarketingNav active="manage" />
+        <SiteHeader />
       </div>
     );
   }
 
   return (
     <div className="relative min-h-screen bg-surface text-on-surface antialiased">
-      <MarketingNav active="manage" />
-      <main className="mx-auto mt-30 w-full max-w-400 px-6 pb-24 md:px-8">
-        <nav
-          aria-label="Breadcrumb"
-          className="mb-4 flex items-center gap-2 text-sm text-on-surface-variant"
-        >
-          <button
-            type="button"
-            onClick={() => navigate('/manage-booking')}
-            className="font-medium hover:text-midnight-burgundy"
-          >
-            Manage Booking
-          </button>
-          <span className="text-on-surface-variant/60">›</span>
-          <span className="font-bold text-midnight-burgundy">Choose seats</span>
-        </nav>
+      <SiteHeader />
+      <main className="mx-auto min-h-svh w-full max-w-400 px-6 pb-24 pt-24 sm:pt-28 md:px-8">
+        <div className="mb-8">
+          <div className="mb-2 text-[0.72rem] font-black uppercase tracking-[0.22em] text-midnight-burgundy">
+            Choose seats
+          </div>
+          <h1 className="font-headline text-3xl font-black tracking-tight text-on-surface md:text-4xl">
+            Choose your seats
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-on-surface-variant">
+            Pick a seat for every passenger on each flight. Seat surcharges are settled at the end.
+          </p>
+        </div>
 
-        <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h1 className="font-headline text-3xl font-black text-on-surface md:text-5xl">
-              Choose seats
-            </h1>
-            <p className="mt-2 max-w-xl text-on-surface-variant">
-              Pick a seat for every passenger on each flight. Seat surcharges are settled at the
-              end.
-            </p>
-          </div>
-          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-            <div className="rounded-xl border border-outline-variant/40 bg-surface-lowest px-4 py-2.5">
-              <p className="font-label text-[0.6875rem] font-bold uppercase tracking-widest text-on-surface-variant">
-                Booking Ref (PNR)
-              </p>
-              <p className="font-headline text-lg font-black text-midnight-burgundy">{pnr}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigate('/manage-booking')}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant/40 bg-surface-lowest px-4 py-3 text-sm font-bold text-midnight-burgundy transition-colors hover:border-midnight-burgundy/40"
-            >
-              <ArrowLeft className="h-4 w-4" strokeWidth={2.25} />
-              Back to manage
-            </button>
-          </div>
-        </header>
+        <div className="mb-6 flex flex-wrap items-center gap-3 text-sm text-on-surface-variant">
+          <span className="font-medium">Booking reference:</span>
+          <span className="rounded-full border border-luxury-gold/20 bg-white px-3 py-1 font-black tracking-[0.16em] text-midnight-burgundy">
+            {pnr}
+          </span>
+          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+            {statusLabel}
+          </span>
+        </div>
 
         <section className="mb-6 rounded-2xl border border-outline-variant/30 bg-surface-lowest p-3 shadow-sm">
           <div className="grid gap-3 sm:grid-cols-2">

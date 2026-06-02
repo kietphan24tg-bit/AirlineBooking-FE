@@ -445,6 +445,11 @@ export default function FlightResults() {
         ? 'Search failed'
         : null;
 
+  useEffect(() => {
+    if (!searchError) return;
+    toast.error(searchError, { id: 'flight-results-search-error' });
+  }, [searchError]);
+
   const availableOutboundRange = useMemo(
     () =>
       deriveLegPriceRange(priceRangeQuery.data?.outbound ?? []) ??
@@ -757,17 +762,6 @@ export default function FlightResults() {
                     <FlightResultCardSkeleton key={index} />
                   ))}
                 </section>
-              ) : searchError ? (
-                <div className="rounded-xl border border-error/30 bg-error/5 p-6 text-center">
-                  <p className="mb-3 text-on-surface">{searchError}</p>
-                  <button
-                    type="button"
-                    onClick={() => void searchQuery.refetch()}
-                    className="rounded-xl bg-primary px-6 py-2 text-sm font-bold text-on-primary"
-                  >
-                    Retry
-                  </button>
-                </div>
               ) : (
                 <>
                   <section>

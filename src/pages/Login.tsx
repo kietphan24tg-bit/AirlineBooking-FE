@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import axios from 'axios';
 import { useForm } from 'react-hook-form';
-import { Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -43,7 +43,6 @@ export default function Login() {
     defaultValues: {
       email: '',
       password: '',
-      remember: false,
     },
   });
   const signIn = useAuthStore((state) => state.signIn);
@@ -52,8 +51,6 @@ export default function Login() {
     register: registerForgot,
     handleSubmit: handleSubmitForgot,
     reset: resetForgot,
-    setError: setForgotError,
-    clearErrors: clearForgotErrors,
     formState: { errors: forgotErrors, isSubmitting: forgotSubmitting },
   } = useForm<PasswordResetRequestFormValues>({
     resolver: zodResolver(passwordResetRequestSchema),
@@ -71,21 +68,37 @@ export default function Login() {
   };
 
   const onForgotSubmit = async (values: PasswordResetRequestFormValues) => {
-    clearForgotErrors('root.serverError');
     try {
       await authService.requestPasswordReset({ email: values.email.trim() });
-      toast.success('Nếu email tồn tại, bạn sẽ nhận hướng dẫn đặt lại mật khẩu.');
+      toast.success('If the email exists, you will receive password reset instructions.');
       resetForgot();
       setForgotOpen(false);
     } catch (error) {
-      applyBackendFieldErrors<PasswordResetRequestFormValues>(error, setForgotError, ['email']);
+      if (axios.isAxiosError(error) && error.code === 'ECONNABORTED') {
+        toast.error('Request timed out. Email service may be unavailable. Please try again later.');
+      } else if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data as
+          | { error?: { code?: string; message?: string } }
+          | undefined;
+        const code = apiError?.error?.code;
+        const apiMessage = apiError?.error?.message;
+        if (code === 'TOO_MANY_PASSWORD_RESET_REQUESTS') {
+          toast.error('Too many reset attempts. Please wait about 15 minutes and try again.');
+        } else if (code === 'PASSWORD_RESET_EMAIL_FAILED') {
+          toast.error('Unable to send reset email. Please try again later.');
+        } else {
+          toast.error(apiMessage || 'Unable to send password reset instructions. Please try again.');
+        }
+      } else {
+        toast.error('Unable to send password reset instructions. Please try again.');
+      }
     }
   };
 
   return (
     <AuthLayout
-      title="Đăng Nhập"
-      subtitle="Chào mừng bạn trở lại với bầu trời của riêng mình."
+      title="Sign In"
+      subtitle="Welcome back to your private sky."
       activeTab="login"
     >
       <form className="flex flex-col gap-5" onSubmit={handleSubmit(onSubmit)}>
@@ -95,7 +108,7 @@ export default function Login() {
           </p>
         )}
         <div>
-          <FieldLabel htmlFor="login-email">Địa chỉ Email</FieldLabel>
+          <FieldLabel htmlFor="login-email">Email Address</FieldLabel>
           <TextInput
             id="login-email"
             type="email"
@@ -113,7 +126,7 @@ export default function Login() {
         <div>
           <div className="mb-1 flex items-end justify-between">
             <FieldLabel htmlFor="login-password" className="mb-0">
-              Mật khẩu
+              Password
             </FieldLabel>
             <button
               type="button"
@@ -123,7 +136,7 @@ export default function Login() {
                 setForgotOpen(true);
               }}
             >
-              Quên mật khẩu?
+              Forgot password?
             </button>
           </div>
           <TextInput
@@ -140,65 +153,21 @@ export default function Login() {
             </p>
           )}
         </div>
-        <label className="flex items-center gap-2 text-sm text-on-surface-variant">
-          <input
-            type="checkbox"
-            className="h-4 w-4 cursor-pointer accent-primary"
-            {...register('remember')}
-          />
-          Duy trì đăng nhập trên thiết bị này
-        </label>
         <Button type="submit" disabled={isSubmitting}>
-          Tiếp tục hành trình
+          {isSubmitting ? 'Signing in…' : 'Continue your journey'}
         </Button>
-
-        <div className="relative py-4 text-center">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-outline-variant/30" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase tracking-widest">
-            <span className="bg-surface-container-lowest px-4 text-on-surface-variant">
-              Hoặc tiếp tục với
-            </span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-auto! border border-outline-variant/30"
-            icon={
-              <img
-                alt="Google"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUn0nbvARamZwA1rj5iE0shrex_jevt3q5Bb11xT-HZ06xQOxI0Jsk-B3c6wPDU7uVbd1I2haU3lF3D6095w1GIwLnWo0dlMqQOMui51AlxflouXX3wEwEwzDU_ywvdUwnRPz0lWbiyHXSxluExVrPMbiehgi5XPWd-GHp3dx2ItCeOJRjRByXKIhNM1-lBhIgpBbYSfbmSvK0DFjeJdhL8BauGjqFljDS_j9pOOt70YGPPQy3jMt4aRdvKFauRjlKparmf67JFt9E"
-                className="h-5 w-5"
-              />
-            }
-          >
-            Google
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-auto! border border-outline-variant/30"
-            icon={<Smartphone className="h-5 w-5 text-on-surface" aria-hidden strokeWidth={1.75} />}
-          >
-            Apple
-          </Button>
-        </div>
       </form>
 
       {forgotOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8"
+          className="fixed inset-0 z-50 flex h-[100dvh] min-h-[100dvh] items-center justify-center px-4 py-8"
           role="dialog"
           aria-modal="true"
           aria-labelledby="forgot-password-title"
         >
           <button
             type="button"
-            aria-label="Đóng hộp thoại"
+            aria-label="Close dialog"
             className="absolute inset-0 cursor-default border-0 bg-black/45 p-0"
             onClick={() => setForgotOpen(false)}
           />
@@ -207,22 +176,17 @@ export default function Login() {
               id="forgot-password-title"
               className="font-headline text-xl font-bold tracking-[-0.02em] text-on-surface"
             >
-              Quên mật khẩu
+              Forgot password
             </h2>
             <p className="mt-2 text-sm text-on-surface-variant">
-              Nhập email đã đăng ký. Chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu.
+              Enter your registered email. We will send password reset instructions.
             </p>
             <form
               className="mt-6 flex flex-col gap-4"
               onSubmit={handleSubmitForgot(onForgotSubmit)}
             >
-              {forgotErrors.root?.serverError && (
-                <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
-                  {forgotErrors.root.serverError.message}
-                </p>
-              )}
               <div>
-                <FieldLabel htmlFor="forgot-email">Địa chỉ Email</FieldLabel>
+                <FieldLabel htmlFor="forgot-email">Email Address</FieldLabel>
                 <TextInput
                   id="forgot-email"
                   type="email"
@@ -239,10 +203,10 @@ export default function Login() {
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <Button type="button" variant="ghost" onClick={() => setForgotOpen(false)}>
-                  Hủy
+                  Cancel
                 </Button>
                 <Button type="submit" disabled={forgotSubmitting}>
-                  Gửi yêu cầu
+                  {forgotSubmitting ? 'Sending…' : 'Send request'}
                 </Button>
               </div>
             </form>

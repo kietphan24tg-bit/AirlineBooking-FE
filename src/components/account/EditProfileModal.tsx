@@ -35,13 +35,13 @@ const selectStyles = {
 };
 
 const editProfileSchema = z.object({
-  lastName: z.string().trim().min(1, 'Họ không được để trống.'),
-  firstName: z.string().trim().min(1, 'Tên không được để trống.'),
+  lastName: z.string().trim().min(1, 'Last name is required.'),
+  firstName: z.string().trim().min(1, 'First name is required.'),
   dob: z.string().optional(),
   nationality: z
     .string()
     .trim()
-    .regex(/^[A-Za-z]{2}$/, 'Quốc tịch phải là mã ISO 2 chữ cái.'),
+    .regex(/^[A-Za-z]{2}$/, 'Nationality must be a 2-letter ISO code.'),
   identifyNumber: z.string().trim().optional(),
 });
 
@@ -117,10 +117,10 @@ export default function EditProfileModal({ open, user, onClose, onSave }: EditPr
         nationality: values.nationality.trim().toUpperCase(),
         identifyNumber: values.identifyNumber?.trim() ? values.identifyNumber.trim() : null,
       });
-      toast.success('Cập nhật hồ sơ thành công.');
+      toast.success('Profile updated successfully.');
       onClose();
     } catch {
-      toast.error('Không thể cập nhật hồ sơ. Vui lòng thử lại.');
+      toast.error('Unable to update profile. Please try again.');
     }
   });
 
@@ -154,17 +154,17 @@ export default function EditProfileModal({ open, user, onClose, onSave }: EditPr
               id="edit-profile-title"
               className="font-headline text-xl font-bold text-dark-charcoal"
             >
-              Chỉnh sửa hồ sơ
+              Edit profile
             </h2>
             <p className="mt-1 text-sm text-on-surface-variant/80">
-              Email và số điện thoại không thể thay đổi tại đây.
+              Email and phone number cannot be changed here.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-full p-1 text-on-surface-variant/80 transition-colors hover:bg-surface"
-            aria-label="Đóng"
+            aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
@@ -173,7 +173,7 @@ export default function EditProfileModal({ open, user, onClose, onSave }: EditPr
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <FieldLabel htmlFor="edit-last-name">Họ</FieldLabel>
+              <FieldLabel htmlFor="edit-last-name">Last name</FieldLabel>
               <TextInput
                 id="edit-last-name"
                 hasError={!!errors.lastName}
@@ -184,7 +184,7 @@ export default function EditProfileModal({ open, user, onClose, onSave }: EditPr
               ) : null}
             </div>
             <div>
-              <FieldLabel htmlFor="edit-first-name">Tên đệm & tên</FieldLabel>
+              <FieldLabel htmlFor="edit-first-name">Middle & first name</FieldLabel>
               <TextInput
                 id="edit-first-name"
                 hasError={!!errors.firstName}
@@ -197,12 +197,12 @@ export default function EditProfileModal({ open, user, onClose, onSave }: EditPr
           </div>
 
           <div>
-            <FieldLabel htmlFor="edit-dob">Ngày sinh</FieldLabel>
+            <FieldLabel htmlFor="edit-dob">Date of birth</FieldLabel>
             <TextInput id="edit-dob" type="date" hasError={!!errors.dob} {...register('dob')} />
           </div>
 
           <div>
-            <FieldLabel htmlFor="edit-nationality">Quốc tịch</FieldLabel>
+            <FieldLabel htmlFor="edit-nationality">Nationality</FieldLabel>
             <Controller
               name="nationality"
               control={control}
@@ -211,7 +211,7 @@ export default function EditProfileModal({ open, user, onClose, onSave }: EditPr
                   inputId="edit-nationality"
                   options={nationalityOptions}
                   styles={selectStyles}
-                  placeholder="Chọn quốc tịch"
+                  placeholder="Select nationality"
                   value={
                     nationalityOptions.find((country) => country.value === field.value) ?? null
                   }
@@ -225,7 +225,7 @@ export default function EditProfileModal({ open, user, onClose, onSave }: EditPr
           </div>
 
           <div>
-            <FieldLabel htmlFor="edit-identify-number">Số giấy tờ tùy thân</FieldLabel>
+            <FieldLabel htmlFor="edit-identify-number">ID number</FieldLabel>
             <TextInput
               id="edit-identify-number"
               hasError={!!errors.identifyNumber}
@@ -239,14 +239,14 @@ export default function EditProfileModal({ open, user, onClose, onSave }: EditPr
               onClick={onClose}
               className="flex-1 rounded-xl border border-outline-variant/40 px-4 py-2.5 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface"
             >
-              Hủy
+              Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
               className="flex-1 rounded-xl bg-linear-to-br from-primary to-primary-container px-4 py-2.5 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(125,6,51,0.16)] transition-all hover:brightness-105 disabled:opacity-60"
             >
-              {isSubmitting ? 'Đang lưu…' : 'Lưu thay đổi'}
+              {isSubmitting ? 'Saving...' : 'Save changes'}
             </button>
           </div>
         </form>

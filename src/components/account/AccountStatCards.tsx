@@ -38,9 +38,9 @@ export default function AccountStatCards({
   loading,
 }: AccountStatCardsProps) {
   const stats: StatConfig[] = [
-    { label: 'Chuyến đã bay', value: completedTrips, icon: Plane },
-    { label: 'Chuyến sắp tới', value: upcomingTrips, icon: CalendarCheck },
-    { label: 'Sân bay thường dùng', value: frequentAirports, icon: MapPin },
+    { label: 'Flights flown', value: completedTrips, icon: Plane },
+    { label: 'Upcoming flights', value: upcomingTrips, icon: CalendarCheck },
+    { label: 'Frequent airports', value: frequentAirports, icon: MapPin },
   ];
 
   return (

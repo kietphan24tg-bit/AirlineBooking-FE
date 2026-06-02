@@ -60,7 +60,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       set({ loading: true });
       const res = await authService.fetchMe();
-      const user = normalizeUser(res.user ?? res);
+      const payload =
+        res && typeof res === 'object' && 'user' in res
+          ? (res as { user?: unknown }).user ?? res
+          : res;
+      const user = normalizeUser(payload);
       if (user) set({ user });
     } catch (error) {
       console.error(error);

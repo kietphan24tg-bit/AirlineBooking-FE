@@ -1,12 +1,13 @@
 import { Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import AuthNavAction from './AuthNavAction';
 
 export type MarketingNavLinkId =
+  | 'none'
   | 'book'
   | 'explore'
   | 'experience'
-  | 'loyalty'
   | 'manage'
   | 'mytrips';
 
@@ -40,7 +41,7 @@ export default function MarketingNav({ active = 'book', showSignIn = true }: Mar
   }, []);
 
   const item = (id: MarketingNavLinkId, label: string, to: string) => {
-    const isActive = active === id;
+    const isActive = active !== 'none' && active === id;
     return (
       <Link
         to={to}
@@ -80,7 +81,6 @@ export default function MarketingNav({ active = 'book', showSignIn = true }: Mar
             {item('book', 'Home', '/')}
             {item('manage', 'Manage', '/manage-booking')}
             {item('experience', 'Experience', '/experience')}
-            {item('loyalty', 'Loyalty', '/')}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-4">
@@ -92,15 +92,11 @@ export default function MarketingNav({ active = 'book', showSignIn = true }: Mar
             <span className="hidden sm:inline md:hidden">Trips</span>
             <span className="sm:hidden md:inline">My Trips</span>
           </Link>
-          {showSignIn ? (
-            <Link
-              to="/login"
-              onClick={() => setMobileMenuOpen(false)}
-              className="rounded-lg bg-luxury-gold px-3 py-2 font-headline text-[0.7rem] font-bold tracking-tight text-midnight-burgundy transition-all hover:brightness-110 active:scale-95 sm:px-4 md:px-6 md:py-2.5 md:text-xs"
-            >
-              Sign In
-            </Link>
-          ) : null}
+          <AuthNavAction
+            showSignIn={showSignIn}
+            onNavigate={() => setMobileMenuOpen(false)}
+            signInClassName="rounded-lg bg-luxury-gold px-3 py-2 font-headline text-[0.7rem] font-bold tracking-tight text-midnight-burgundy transition-all hover:brightness-110 active:scale-95 sm:px-4 md:px-6 md:py-2.5 md:text-xs"
+          />
         </div>
       </div>
       <div
@@ -113,7 +109,6 @@ export default function MarketingNav({ active = 'book', showSignIn = true }: Mar
           {item('book', 'Book', '/')}
           {item('manage', 'Manage', '/manage-booking')}
           {item('experience', 'Experience', '/')}
-          {item('loyalty', 'Loyalty', '/')}
         </div>
       </div>
     </nav>

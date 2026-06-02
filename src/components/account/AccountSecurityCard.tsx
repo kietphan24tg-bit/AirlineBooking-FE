@@ -15,9 +15,9 @@ export default function AccountSecurityCard({ onChangePassword }: AccountSecurit
           <Lock className="h-[19px] w-[19px]" strokeWidth={2} />
         </div>
         <div>
-          <h2 className="font-headline text-[17px] font-bold text-dark-charcoal">Bảo mật</h2>
+          <h2 className="font-headline text-[17px] font-bold text-dark-charcoal">Security</h2>
           <p className="mt-0.5 text-xs text-on-surface-variant/80">
-            Cập nhật mật khẩu đăng nhập của bạn.
+            Update your sign-in password.
           </p>
         </div>
       </div>
@@ -25,7 +25,7 @@ export default function AccountSecurityCard({ onChangePassword }: AccountSecurit
       <div className="grid gap-6 px-6 py-6 sm:grid-cols-2 sm:items-end sm:gap-x-9 sm:px-7 sm:py-7">
         <div>
           <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.07em] text-on-surface-variant/80">
-            Mật khẩu
+            Password
           </p>
           <p className="text-[15px] font-semibold tracking-widest text-dark-charcoal">••••••••••</p>
         </div>
@@ -36,7 +36,7 @@ export default function AccountSecurityCard({ onChangePassword }: AccountSecurit
             className="inline-flex items-center gap-1.5 rounded-xl border-[1.5px] border-primary bg-transparent px-4 py-2 text-[13px] font-semibold text-primary transition-all hover:bg-primary hover:text-white"
           >
             <Lock className="h-4 w-4" strokeWidth={2} />
-            Đổi mật khẩu
+            Change password
           </button>
         </div>
       </div>

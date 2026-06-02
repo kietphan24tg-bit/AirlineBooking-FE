@@ -18,20 +18,20 @@ export default function AccountRecentAirportsCard({
         </div>
         <div>
           <h2 className="font-headline text-[17px] font-bold text-dark-charcoal">
-            Sân bay thường dùng
+            Frequent airports
           </h2>
           <p className="mt-0.5 text-xs text-on-surface-variant/80">
-            Gợi ý dựa trên lịch sử tìm kiếm và đặt vé.
+            Suggestions based on your search and booking history.
           </p>
         </div>
       </div>
 
       <div className="px-6 py-6 sm:px-7 sm:py-7">
         {loading ? (
-          <p className="text-sm text-on-surface-variant/80">Đang tải…</p>
+          <p className="text-sm text-on-surface-variant/80">Loading...</p>
         ) : airports.length === 0 ? (
           <p className="text-sm italic text-on-surface-variant/80">
-            Chưa có sân bay nào trong lịch sử tìm kiếm.
+            No airports in your search history yet.
           </p>
         ) : (
           <div className="flex flex-wrap gap-2.5">

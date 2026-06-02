@@ -37,6 +37,8 @@ function isPublicRequest(url: string | undefined): boolean {
     url.includes('/api/flights/search-calendar?') ||
     url.startsWith('/api/flights/revalidate-fare') ||
     url.includes('/api/flights/revalidate-fare?') ||
+    url.startsWith('/api/flights/fare-families') ||
+    url.includes('/api/flights/fare-families?') ||
     url.startsWith('/api/flights/revalidate-itinerary') ||
     url.includes('/api/flights/revalidate-itinerary?')
   );

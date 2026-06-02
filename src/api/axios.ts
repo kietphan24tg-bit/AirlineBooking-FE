@@ -1,33 +1,58 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authService } from '../services/auth.service';
+import { getClientTimezone } from '../utils/clientTimezone';
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: number;
 };
 
-const baseURL = String(import.meta.env.BE_URL || import.meta.env.VITE_API_URL || '').replace(
+const rawBase = String(import.meta.env.BE_URL || import.meta.env.VITE_API_URL || '').replace(
   /\/$/,
   ''
 );
 
-if (import.meta.env.DEV && !baseURL) {
+/** Dev: relative `/api` so Vite proxies to `rawBase` (avoids CORS). Prod: absolute `rawBase`. */
+const baseURL = import.meta.env.DEV && rawBase ? '' : rawBase || undefined;
+
+if (import.meta.env.DEV && !rawBase) {
   console.warn(
-    '[api] Thiếu BE_URL hoặc VITE_API_URL — axios sẽ gọi nhầm lên dev server, đăng nhập sẽ thất bại. Thêm BE_URL vào .env và khởi động lại Vite.'
+    '[api] Missing BE_URL or VITE_API_URL — no /api proxy. Add BE_URL to .env and restart Vite.'
   );
 }
 
 const api = axios.create({
-  baseURL: baseURL || undefined,
+  baseURL,
   withCredentials: true,
 });
 
-// Add token to request header
+function isPublicRequest(url: string | undefined): boolean {
+  if (!url) return false;
+  return (
+    url.startsWith('/api/services') ||
+    url.includes('/api/services?') ||
+    url.startsWith('/api/flights/search') ||
+    url.includes('/api/flights/search?') ||
+    url.startsWith('/api/flights/search-calendar') ||
+    url.includes('/api/flights/search-calendar?') ||
+    url.startsWith('/api/flights/revalidate-fare') ||
+    url.includes('/api/flights/revalidate-fare?') ||
+    url.startsWith('/api/flights/fare-families') ||
+    url.includes('/api/flights/fare-families?') ||
+    url.startsWith('/api/flights/revalidate-itinerary') ||
+    url.includes('/api/flights/revalidate-itinerary?')
+  );
+}
+
+// Auth + client timezone (backend uses X-Timezone for market/locale logic)
 api.interceptors.request.use((config) => {
   const accessToken = useAuthStore.getState().accessToken;
-  if (accessToken) {
+  if (accessToken && !isPublicRequest(config.url)) {
     config.headers.Authorization = `Bearer ${accessToken}`;
+  } else if (isPublicRequest(config.url)) {
+    delete config.headers.Authorization;
   }
+  config.headers['X-Timezone'] = getClientTimezone();
   return config;
 });
 

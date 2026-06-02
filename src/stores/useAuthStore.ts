@@ -3,21 +3,26 @@ import { authService } from '../services/auth.service';
 import type { User } from '../types/user.type';
 import { toast } from 'sonner';
 import type { AuthStore } from '../types/useAuthStore.type';
+import { normalizeUser } from '../utils/normalizeUser';
+import { useBookingStore } from './useBookingStore';
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
   accessToken: null,
   user: null,
   loading: false,
   setAccessToken: (token: string | null) => set({ accessToken: token }),
-  clearStore: () => set({ user: null, accessToken: null }),
+  clearStore: () => {
+    useBookingStore.getState().clearBooking();
+    set({ user: null, accessToken: null });
+  },
   register: async (payload) => {
     try {
       set({ loading: true });
       await authService.signUp(payload);
-      toast.success('Đăng ký thành công!');
+      toast.success('Registration successful!');
     } catch (error) {
       console.error(error);
-      toast.error('Đăng ký thất bại. Vui lòng thử lại.');
+      toast.error('Registration failed. Please try again.');
       throw error;
     } finally {
       set({ loading: false });
@@ -27,15 +32,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       set({ loading: true });
       const res = await authService.signIn({ email, password });
-      const userPayload = res.user as User | null;
+      const userPayload = normalizeUser(res.user) ?? (res.user as User | null);
       set({ user: userPayload ?? null, accessToken: res.accessToken ?? null });
       if (res.accessToken && !res.user) {
         await get().fetchMe();
       }
-      toast.success('Đăng nhập thành công!');
+      toast.success('Signed in successfully!');
     } catch (error) {
       console.error(error);
-      toast.error('Đăng nhập thất bại. Vui lòng thử lại.');
+      toast.error('Sign in failed. Please try again.');
       throw error;
     } finally {
       set({ loading: false });
@@ -55,14 +60,19 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       set({ loading: true });
       const res = await authService.fetchMe();
-      set({ user: (res.user ?? res) as User });
+      const payload =
+        res && typeof res === 'object' && 'user' in res
+          ? (res as { user?: unknown }).user ?? res
+          : res;
+      const user = normalizeUser(payload);
+      if (user) set({ user });
     } catch (error) {
       console.error(error);
     } finally {
       set({ loading: false });
     }
   },
-  refresh: async () => {
+  refresh: async (options) => {
     try {
       set({ loading: true });
       const res = await authService.refresh();
@@ -72,9 +82,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       }
     } catch (error) {
       console.error(error);
-      toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
-      get().clearStore();
-      window.location.href = '/login';
+      if (!options?.silent) {
+        toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
+      }
+      if (options?.silent) {
+        set({ user: null, accessToken: null });
+      } else {
+        get().clearStore();
+      }
+      if (!options?.silent) {
+        window.location.href = '/login';
+      }
     } finally {
       set({ loading: false });
     }

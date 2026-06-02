@@ -3,16 +3,24 @@ import App from '../App';
 import AccountManagement from '../pages/AccountManagement';
 import Checkout from '../pages/Checkout';
 import FlightResults from '../pages/FlightResults';
-import Home from '../pages/Home';
 import Landing from '../pages/Landing';
 import Login from '../pages/Login';
 import PassengerInfo from '../pages/PassengerInfo';
 import PasswordResetConfirm from '../pages/PasswordResetConfirm';
 import Register from '../pages/Register';
 import SeatSelection from '../pages/SeatSelection';
+import ManageBookingSeatSelection from '../pages/ManageBookingSeatSelection';
+import ManageBookingAddExtras from '../pages/ManageBookingAddExtras';
 import TripHistory from '../pages/TripHistory';
-import ProtectedRoute from './ProtectedRoute';
 import ManageBooking from '../pages/ManageBooking';
+import Experience from '../pages/Experience';
+import FareBenefits from '../pages/FareBenefits';
+import BusinessClass from '../pages/BusinessClass';
+import Destinations from '../pages/Destinations';
+import CheckoutResult from '../pages/CheckoutResult';
+import Checkin from '../pages/Checkin';
+import CancelFlight from '../pages/CancelFlight';
+import ChangeFlight from '../pages/ChangeFlight';
 
 const AppRouter = createBrowserRouter([
   {
@@ -28,6 +36,22 @@ const AppRouter = createBrowserRouter([
     element: <Register />,
   },
   {
+    path: '/experience',
+    element: <Experience />,
+  },
+  {
+    path: '/destinations',
+    element: <Destinations />,
+  },
+  {
+    path: '/fare-benefits',
+    element: <FareBenefits />,
+  },
+  {
+    path: '/business-class',
+    element: <BusinessClass />,
+  },
+  {
     path: '/flights',
     element: <FlightResults />,
   },
@@ -40,8 +64,36 @@ const AppRouter = createBrowserRouter([
     element: <PassengerInfo />,
   },
   {
+    path: '/booking/passengers/seats',
+    element: <SeatSelection />,
+  },
+  {
     path: '/booking/checkout',
     element: <Checkout />,
+  },
+  {
+    path: '/booking/checkout/result',
+    element: <CheckoutResult />,
+  },
+  {
+    path: '/booking/checkout/success',
+    element: <CheckoutResult />,
+  },
+  {
+    path: '/booking/checkout/failed',
+    element: <CheckoutResult />,
+  },
+  {
+    path: '/payment/cancel',
+    element: <CheckoutResult />,
+  },
+  {
+    path: '/payment/failed',
+    element: <CheckoutResult />,
+  },
+  {
+    path: '/payment/success',
+    element: <CheckoutResult />,
   },
   {
     path: '/trips',
@@ -56,37 +108,36 @@ const AppRouter = createBrowserRouter([
     element: <ManageBooking />,
   },
   {
-    element: <ProtectedRoute />,
-    children: [
-      {
-        path: '/app',
-        element: <App />,
-      },
-      {
-        path: '/home',
-        element: <Home />,
-      },
-      {
-        path: '/booking/passengers',
-        element: <PassengerInfo />,
-      },
-      {
-        path: '/booking/passengers/seats',
-        element: <SeatSelection />,
-      },
-      {
-        path: '/booking/checkout',
-        element: <Checkout />,
-      },
-      {
-        path: '/account',
-        element: <AccountManagement />,
-      },
-      {
-        path: '/trips',
-        element: <TripHistory />,
-      },
-    ],
+    path: '/manage-booking/check-in',
+    element: <Checkin />,
+  },
+  {
+    path: '/manage-booking/check-in/:bookingId/:flightId',
+    element: <Checkin />,
+  },
+  {
+    path: '/manage-booking/seat-selection',
+    element: <ManageBookingSeatSelection />,
+  },
+  {
+    path: '/manage-booking/add-services',
+    element: <ManageBookingAddExtras />,
+  },
+  {
+    path: '/manage-booking/cancel',
+    element: <CancelFlight />,
+  },
+  {
+    path: '/manage-booking/change-flight',
+    element: <ChangeFlight />,
+  },
+  {
+    path: '/app',
+    element: <App />,
+  },
+  {
+    path: '/account',
+    element: <AccountManagement />,
   },
 ]);
 

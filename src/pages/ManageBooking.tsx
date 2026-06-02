@@ -6,12 +6,7 @@ import BookingResultCard from '../components/booking/BookingResultCard';
 import MarketingNav from '../components/layout/MarketingNav';
 import SiteFooter from '../components/layout/SiteFooter';
 import TextInput from '../components/ui/TextInput';
-import {
-  bookingService,
-  resetMockManageBookingVariant,
-  resolveMockManageBookingVariant,
-  resolveManageBookingRouteSeed,
-} from '../services/booking.service';
+import { bookingService, resolveManageBookingRouteSeed } from '../services/booking.service';
 import { useBookingStore } from '../stores/useBookingStore';
 
 export default function ManageBooking() {
@@ -32,9 +27,7 @@ export default function ManageBooking() {
   const routeParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const rawRoutePnrCode = routeParams.get('pnr') ?? '';
   const rawRouteLastName = routeParams.get('lastName') ?? '';
-  const shouldAutoLoadMock = routeParams.get('mockManageBooking') === '1';
-  const shouldResolveRouteSeed =
-    routeBookingId != null || Boolean(rawRoutePnrCode || rawRouteLastName) || shouldAutoLoadMock;
+  const shouldResolveRouteSeed = routeBookingId != null || Boolean(rawRoutePnrCode || rawRouteLastName);
   const routeSeed = useMemo(
     () =>
       shouldResolveRouteSeed
@@ -44,8 +37,8 @@ export default function ManageBooking() {
   );
   const routePnrCode = routeSeed?.pnrCode ?? rawRoutePnrCode;
   const routeLastName = routeSeed?.lastName ?? rawRouteLastName;
-  const routeTargetBookingId = routeSeed?.bookingId ?? (routeBookingId ? Number(routeBookingId) : null);
-  const hasDirectLookupSeed = routeTargetBookingId != null || Boolean(routePnrCode || routeLastName);
+  const routeTargetBookingId =
+    routeSeed?.bookingId ?? (routeBookingId ? Number(routeBookingId) : null);
 
   function showErrorToast(message: string) {
     toast.error(message, {
@@ -63,70 +56,8 @@ export default function ManageBooking() {
   }
 
   useEffect(() => {
-    if (hasDirectLookupSeed) return;
-
-    if (!shouldAutoLoadMock) {
-      setMockManageBookingMode(false);
-      resetSearchForm();
-      return;
-    }
-
-    const mockVariant = resolveMockManageBookingVariant();
-    if (!mockVariant) {
-      setMockManageBookingMode(false);
-      resetSearchForm();
-      return;
-    }
-
-    setMockManageBookingMode(true);
-    resetMockManageBookingVariant(mockVariant);
-    clearBooking();
-
-    if (autoSearchedRef.current) return;
-    autoSearchedRef.current = true;
-
-    const seededPnr = routeSeed?.pnrCode ?? 'ABC123';
-    const seededLastName = routeSeed?.lastName ?? 'Nguyen';
-    const seededBookingId = routeTargetBookingId ?? routeSeed?.bookingId ?? null;
-
-    setPnr(seededPnr);
-    setName(seededLastName);
-    setSearching(true);
-    setErrorMessage(null);
-
-    void (async () => {
-      try {
-        const lookup = await bookingService.lookupBooking({
-          pnrCode: seededPnr,
-          lastName: seededLastName,
-        });
-        setLookupCriteria({ pnrCode: seededPnr, lastName: seededLastName });
-        setBookingLookup(lookup);
-        const options = await bookingService.getManageOptions(seededBookingId ?? lookup.booking.bookingId);
-        setManageOptions(options);
-        setShowResult(true);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Unable to load the sample booking data.';
-        setErrorMessage(message);
-        showErrorToast(message);
-      } finally {
-        setSearching(false);
-      }
-    })();
-  }, [
-    clearBooking,
-    hasDirectLookupSeed,
-    routeSeed?.bookingId,
-    routeSeed?.lastName,
-    routeSeed?.pnrCode,
-    routeTargetBookingId,
-    shouldAutoLoadMock,
-    setBookingLookup,
-    setLookupCriteria,
-    setManageOptions,
-    setMockManageBookingMode,
-  ]);
+    setMockManageBookingMode(false);
+  }, [setMockManageBookingMode]);
 
   useEffect(() => {
     if (autoSearchedRef.current) return;

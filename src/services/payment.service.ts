@@ -379,28 +379,12 @@ export async function getPaymentMethods(
   bookingId: string | number,
   options?: { onlySupported?: boolean }
 ): Promise<PaymentMethodsResponse> {
-  if (shouldUseMockSeatChangePayment() || shouldUseMockPaymentResult()) {
-    return Promise.resolve(MOCK_PAYMENT_METHODS);
-  }
   const onlySupported = options?.onlySupported ?? false;
-  try {
-    const res = await api.get<ApiEnvelope<PaymentMethodsResponse>>('/api/payment-methods', {
-      params: { bookingId, onlySupported },
-      timeout: PAYMENT_METHODS_TIMEOUT_MS,
-    });
-    const data = res.data.data;
-    const hasMethods =
-      data.groups?.some((group) => Array.isArray(group.methods) && group.methods.length > 0) ??
-      false;
-    if (hasMethods) return data;
-    if (shouldAutoFallbackToSeatChangeMock()) return MOCK_PAYMENT_METHODS;
-    return data;
-  } catch (error) {
-    if (shouldAutoFallbackToSeatChangeMock()) {
-      return MOCK_PAYMENT_METHODS;
-    }
-    throw error;
-  }
+  const res = await api.get<ApiEnvelope<PaymentMethodsResponse>>('/api/payment-methods', {
+    params: { bookingId, onlySupported },
+    timeout: PAYMENT_METHODS_TIMEOUT_MS,
+  });
+  return res.data.data;
 }
 
 /**
@@ -422,122 +406,44 @@ export async function createPaymentLink(
 export async function createSeatChangePaymentLink(
   payload: CreateSeatChangePaymentRequest
 ): Promise<CreatePaymentResponse> {
-  if (shouldUseMockSeatChangePayment()) {
-    return Promise.resolve(createMockSeatChangePaymentResponse(payload));
-  }
-  if (shouldUseMockPaymentResult()) {
-    return Promise.resolve(
-      getMockCreatePaymentResponse({ bookingId: payload.bookingId, method: payload.method })
-    );
-  }
-  try {
-    const res = await api.post<ApiEnvelope<CreatePaymentResponse> | CreatePaymentResponse>(
-      '/api/seat-change-payments',
-      payload,
-      { timeout: SEAT_CHANGE_PAYMENT_TIMEOUT_MS }
-    );
-    return unwrapApiEnvelope(res.data);
-  } catch (error) {
-    if (shouldAutoFallbackToSeatChangeMock()) {
-      return createMockSeatChangePaymentResponse(payload);
-    }
-    throw error;
-  }
+  const res = await api.post<ApiEnvelope<CreatePaymentResponse> | CreatePaymentResponse>(
+    '/api/seat-change-payments',
+    payload,
+    { timeout: SEAT_CHANGE_PAYMENT_TIMEOUT_MS }
+  );
+  return unwrapApiEnvelope(res.data);
 }
 
 export async function createServiceChangePaymentLink(
   payload: CreateServiceChangePaymentRequest
 ): Promise<CreatePaymentResponse> {
-  if (shouldUseMockSeatChangePayment()) {
-    return Promise.resolve(
-      createMockSeatChangePaymentResponse({
-        bookingId: payload.bookingId,
-        seatChangeSettlementId: payload.serviceChangeSettlementId,
-        method: payload.method,
-      })
-    );
-  }
-  if (shouldUseMockPaymentResult()) {
-    return Promise.resolve(
-      getMockCreatePaymentResponse({ bookingId: payload.bookingId, method: payload.method })
-    );
-  }
-  try {
-    const res = await api.post<ApiEnvelope<CreatePaymentResponse> | CreatePaymentResponse>(
-      '/api/service-change-payments',
-      payload,
-      { timeout: SEAT_CHANGE_PAYMENT_TIMEOUT_MS }
-    );
-    return unwrapApiEnvelope(res.data);
-  } catch (error) {
-    if (shouldAutoFallbackToSeatChangeMock()) {
-      return createMockSeatChangePaymentResponse({
-        bookingId: payload.bookingId,
-        seatChangeSettlementId: payload.serviceChangeSettlementId,
-        method: payload.method,
-      });
-    }
-    throw error;
-  }
+  const res = await api.post<ApiEnvelope<CreatePaymentResponse> | CreatePaymentResponse>(
+    '/api/service-change-payments',
+    payload,
+    { timeout: SEAT_CHANGE_PAYMENT_TIMEOUT_MS }
+  );
+  return unwrapApiEnvelope(res.data);
 }
 
 export async function createFlightChangePaymentLink(
   payload: CreateFlightChangePaymentRequest
 ): Promise<CreatePaymentResponse> {
-  if (shouldUseMockSeatChangePayment()) {
-    return Promise.resolve(
-      createMockSeatChangePaymentResponse({
-        bookingId: payload.bookingId,
-        seatChangeSettlementId: payload.flightChangeSettlementId,
-        method: payload.method,
-      })
-    );
-  }
-  if (shouldUseMockPaymentResult()) {
-    return Promise.resolve(
-      getMockCreatePaymentResponse({ bookingId: payload.bookingId, method: payload.method })
-    );
-  }
-  try {
-    const res = await api.post<ApiEnvelope<CreatePaymentResponse> | CreatePaymentResponse>(
-      '/api/flight-change-payments',
-      payload,
-      { timeout: SEAT_CHANGE_PAYMENT_TIMEOUT_MS }
-    );
-    return unwrapApiEnvelope(res.data);
-  } catch (error) {
-    if (shouldAutoFallbackToSeatChangeMock()) {
-      return createMockSeatChangePaymentResponse({
-        bookingId: payload.bookingId,
-        seatChangeSettlementId: payload.flightChangeSettlementId,
-        method: payload.method,
-      });
-    }
-    throw error;
-  }
+  const res = await api.post<ApiEnvelope<CreatePaymentResponse> | CreatePaymentResponse>(
+    '/api/flight-change-payments',
+    payload,
+    { timeout: SEAT_CHANGE_PAYMENT_TIMEOUT_MS }
+  );
+  return unwrapApiEnvelope(res.data);
 }
 
 /**
  * GET /api/payments/{paymentId} — check payment status.
  */
 export async function getPaymentStatus(paymentId: string | number): Promise<GetPaymentResponse> {
-  if (shouldUseMockSeatChangePayment()) {
-    return Promise.resolve(getMockSeatChangePaymentStatusResponse(paymentId));
-  }
-  if (shouldUseMockPaymentResult()) {
-    return Promise.resolve(getMockPaymentStatusResponse(paymentId));
-  }
-  try {
-    const res = await api.get<
-      ApiEnvelope<GetPaymentResponse | PaymentEntity> | GetPaymentResponse | PaymentEntity
-    >(`/api/payments/${paymentId}`, { timeout: SEAT_CHANGE_PAYMENT_TIMEOUT_MS });
-    return normalizePaymentStatus(unwrapApiEnvelope(res.data));
-  } catch (error) {
-    if (shouldAutoFallbackToSeatChangeMock() && getStoredMockSeatChangePaymentState(paymentId)) {
-      return getMockSeatChangePaymentStatusResponse(paymentId);
-    }
-    throw error;
-  }
+  const res = await api.get<
+    ApiEnvelope<GetPaymentResponse | PaymentEntity> | GetPaymentResponse | PaymentEntity
+  >(`/api/payments/${paymentId}`, { timeout: SEAT_CHANGE_PAYMENT_TIMEOUT_MS });
+  return normalizePaymentStatus(unwrapApiEnvelope(res.data));
 }
 
 /**
@@ -547,25 +453,12 @@ export async function cancelPayment(
   paymentId: string | number,
   reason = 'User cancelled payment'
 ): Promise<CancelPaymentResponse> {
-  if (shouldUseMockSeatChangePayment()) {
-    return Promise.resolve(getMockCancelPaymentResponse(paymentId));
-  }
-  if (shouldUseMockPaymentResult()) {
-    return Promise.resolve(getMockCancelPaymentResponse(paymentId));
-  }
-  try {
-    const res = await api.post<ApiEnvelope<CancelPaymentResponse> | CancelPaymentResponse>(
-      `/api/payments/${paymentId}/cancel`,
-      { reason },
-      { timeout: SEAT_CHANGE_PAYMENT_TIMEOUT_MS }
-    );
-    return unwrapApiEnvelope(res.data);
-  } catch (error) {
-    if (shouldAutoFallbackToSeatChangeMock() && getStoredMockSeatChangePaymentState(paymentId)) {
-      return getMockCancelPaymentResponse(paymentId);
-    }
-    throw error;
-  }
+  const res = await api.post<ApiEnvelope<CancelPaymentResponse> | CancelPaymentResponse>(
+    `/api/payments/${paymentId}/cancel`,
+    { reason },
+    { timeout: SEAT_CHANGE_PAYMENT_TIMEOUT_MS }
+  );
+  return unwrapApiEnvelope(res.data);
 }
 
 /**

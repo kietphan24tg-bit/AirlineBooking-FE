@@ -42,10 +42,6 @@ import type {
 } from '../types/booking.types';
 import type { PaymentMethod } from '../types/payment.types';
 import type { CreatePaymentResponse, PaymentStatus } from '../types/payment-create.types';
-import {
-  resetMockManageBookingVariant,
-  resolveMockManageBookingVariant,
-} from '../services/booking.service';
 
 type ItineraryItem = BookingManageOptionsResponse['itineraries'][number];
 type ManagePassenger = BookingManageOptionsResponse['passengers'][number];
@@ -351,10 +347,8 @@ export default function ManageBookingSeatSelection() {
 
   useEffect(() => {
     if (manageBookingId == null) return;
-    const variant = resolveMockManageBookingVariant();
     setManageOptions(null);
     originalAssignmentsRef.current = null;
-    if (variant) resetMockManageBookingVariant(variant);
     queryClient.removeQueries({ queryKey: ['manage-options', manageBookingId], exact: true });
     queryClient.removeQueries({ queryKey: ['seat-map'] });
     setEntryReady(true);

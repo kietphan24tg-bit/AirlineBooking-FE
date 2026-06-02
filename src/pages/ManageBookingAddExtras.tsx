@@ -22,11 +22,6 @@ import SiteFooter from '../components/layout/SiteFooter';
 import { bookingService } from '../services/booking.service';
 import { flightService } from '../services/flight.service';
 import {
-  commitMockManageBookingVariant,
-  resetMockManageBookingVariant,
-  resolveMockManageBookingVariant,
-} from '../services/booking.service';
-import {
   cancelPayment,
   createServiceChangePaymentLink,
   getPaymentMethods,
@@ -249,9 +244,7 @@ export default function ManageBookingAddExtras() {
 
   useEffect(() => {
     if (manageBookingId == null) return;
-    const variant = resolveMockManageBookingVariant();
     setManageOptions(null);
-    if (variant) resetMockManageBookingVariant(variant);
     queryClient.removeQueries({ queryKey: ['manage-options', manageBookingId], exact: true });
     setEntryReady(true);
   }, [manageBookingId, queryClient, setManageOptions]);
@@ -770,8 +763,6 @@ export default function ManageBookingAddExtras() {
       const status = (response.payment?.status as PaymentStatus | undefined) ?? null;
       setPaymentUiState((current) => ({ ...current, paymentStatusOverride: status }));
       if (status === 'SUCCESS') {
-        const variant = resolveMockManageBookingVariant();
-        if (variant) commitMockManageBookingVariant(variant);
         await refreshSelectionsFromServer();
       }
       const nextVariant = mapPaymentStatusToResultVariant(status);
@@ -835,8 +826,6 @@ export default function ManageBookingAddExtras() {
         void (
           resolvedStatus === 'SUCCESS'
             ? (() => {
-                const variant = resolveMockManageBookingVariant();
-                if (variant) commitMockManageBookingVariant(variant);
                 return refreshSelectionsFromServer();
               })()
             : Promise.resolve()

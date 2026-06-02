@@ -403,24 +403,8 @@ function resolveImplicitMockManageBookingVariant(
   payload?: BookingLookupRequest,
   bookingId?: string | number
 ): ManageBookingMockVariant | null {
-  if (!isDevLocalhostManageBooking()) return null;
-
-  if (payload) {
-    const pnrCode = normalizeLookupToken(payload.pnrCode);
-    if (pnrCode === DEFAULT_IMPLICIT_MOCK_PNR && foldAsciiUpper(payload.lastName) === 'NGUYEN') {
-      implicitMockManageBookingVariant = DEFAULT_IMPLICIT_MOCK_VARIANT;
-      return DEFAULT_IMPLICIT_MOCK_VARIANT;
-    }
-  }
-
-  if (bookingId != null) {
-    const normalizedBookingId = typeof bookingId === 'string' ? Number(bookingId) : bookingId;
-    if (normalizedBookingId === DEFAULT_IMPLICIT_MOCK_LOOKUP.booking.bookingId) {
-      implicitMockManageBookingVariant ??= DEFAULT_IMPLICIT_MOCK_VARIANT;
-      return implicitMockManageBookingVariant;
-    }
-  }
-
+  void payload;
+  void bookingId;
   return null;
 }
 
@@ -444,21 +428,8 @@ export function resolveManageBookingRouteSeed(
       };
     }
   }
-
-  const mockVariant =
-    resolveMockManageBookingVariant() ??
-    resolveImplicitMockManageBookingVariant(undefined, normalizedBookingId ?? undefined) ??
-    (normalizedPnrCode === DEFAULT_IMPLICIT_MOCK_PNR ? DEFAULT_IMPLICIT_MOCK_VARIANT : null);
-  if (!mockVariant) return null;
-
-  const lookup = getMockManageBookingSession(mockVariant).lookup;
-  return {
-    bookingId: lookup.booking.bookingId,
-    pnrCode: lookup.booking.pnrCode,
-    lastName: lookup.passengers[0]?.lastName ?? '',
-    expiresAt: lookup.booking.expiresAt ?? null,
-    primaryFlightId: lookup.itineraries[0]?.flightId ?? null,
-  };
+  void normalizedPnrCode;
+  return null;
 }
 
 function recomputeMockLookupTotals(session: ManageBookingMockSession): void {
@@ -1111,46 +1082,15 @@ function buildMockCheckInConfirmResponse(
  * or via the URL (`?mockManageBooking=1[&mockManageVariant=PENDING_PAYMENT]`).
  */
 export function resolveMockManageBookingVariant(): ManageBookingMockVariant | null {
-  const isDevLocal =
-    import.meta.env.DEV &&
-    typeof window !== 'undefined' &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  const isManageRoute = isManageBookingRoute();
-  if (!isManageRoute) return null;
-  const envFlag = import.meta.env?.VITE_MOCK_MANAGE_BOOKING === 'true';
-  let urlFlag = false;
-  let urlVariant: string | null = null;
-  if (typeof window !== 'undefined' && window.location?.search) {
-    const params = new URLSearchParams(window.location.search);
-    urlFlag = params.get('mockManageBooking') === '1';
-    urlVariant = params.get('mockManageVariant');
-  }
-  const { bookingLookup, lookupCriteria, manageOptions, mockManageBookingMode } =
-    useBookingStore.getState();
-  const looksLikePersistedMock =
-    isDevLocal &&
-    (bookingLookup?.booking?.pnrCode?.trim().toUpperCase() === 'ABC123' ||
-      lookupCriteria?.pnrCode?.trim().toUpperCase() === 'ABC123' ||
-      manageOptions?.bookingId === 90210);
-
-  if (!envFlag && !urlFlag && !mockManageBookingMode && !looksLikePersistedMock) return null;
-  if (urlVariant && isManageBookingMockVariant(urlVariant)) return urlVariant;
-  if (
-    (manageOptions?.passengers?.length ?? 0) === 1 &&
-    (manageOptions?.itineraries?.length ?? 0) === 1
-  ) {
-    return 'CHECKIN_SINGLE';
-  }
-  return 'CONFIRMED';
+  return null;
 }
 
 export function resetMockManageBookingVariant(variant: ManageBookingMockVariant): void {
-  implicitMockManageBookingVariant = variant;
-  mockManageBookingSessions.set(variant, cloneMock(getCommittedMockManageBookingSession(variant)));
+  void variant;
 }
 
 export function commitMockManageBookingVariant(variant: ManageBookingMockVariant): void {
-  commitMockManageBookingSession(variant);
+  void variant;
 }
 
 export async function createBooking(payload: BookingCreateRequest): Promise<BookingCreateResponse> {

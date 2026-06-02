@@ -1,13 +1,5 @@
 import api from '../api/axios';
 import { FARE_FAMILY_POLICIES } from '../data/fareBenefits';
-import {
-  getMockSeatMapResponse,
-  getMockServiceCatalogResponse,
-  isManageBookingMockVariant,
-  type ManageBookingMockVariant,
-} from '../mocks/manageBooking';
-import { getMockReservedSeatsForFlight } from './booking.service';
-import { useBookingStore } from '../stores/useBookingStore';
 import type {
   FareFamilyCatalogResponseDto,
   FareFamilyDto,
@@ -152,53 +144,7 @@ function normalizeFareFamilies(raw: unknown): FareFamilyDto[] {
   return body.filter((item): item is FareFamilyDto => !!item && typeof item === 'object');
 }
 
-function resolveMockManageVariantForFlights(): ManageBookingMockVariant | null {
-  const isDevLocal =
-    import.meta.env.DEV &&
-    typeof window !== 'undefined' &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  const isManageRoute =
-    typeof window !== 'undefined' && window.location.pathname.startsWith('/manage-booking');
-  if (!isManageRoute) return null;
-  const envFlag = import.meta.env?.VITE_MOCK_MANAGE_BOOKING === 'true';
-  let urlFlag = false;
-  let urlVariant: string | null = null;
-  if (typeof window !== 'undefined' && window.location?.search) {
-    const params = new URLSearchParams(window.location.search);
-    urlFlag = params.get('mockManageBooking') === '1';
-    urlVariant = params.get('mockManageVariant');
-  }
-  const { mockManageBookingMode, manageOptions, bookingLookup, lookupCriteria } =
-    useBookingStore.getState();
-  const looksLikePersistedMock =
-    isDevLocal &&
-    (bookingLookup?.booking?.pnrCode?.trim().toUpperCase() === 'ABC123' ||
-      lookupCriteria?.pnrCode?.trim().toUpperCase() === 'ABC123' ||
-      manageOptions?.bookingId === 90210);
-  if (urlFlag || envFlag) {
-    if (urlVariant && isManageBookingMockVariant(urlVariant)) return urlVariant;
-    if (mockManageBookingMode || looksLikePersistedMock) {
-      if (
-        (manageOptions?.passengers?.length ?? 0) === 1 &&
-        (manageOptions?.itineraries?.length ?? 0) === 1
-      ) {
-        return 'CHECKIN_SINGLE';
-      }
-      return 'CONFIRMED';
-    }
-    return 'CONFIRMED';
-  }
-
-  if (mockManageBookingMode || looksLikePersistedMock) {
-    if (
-      (manageOptions?.passengers?.length ?? 0) === 1 &&
-      (manageOptions?.itineraries?.length ?? 0) === 1
-    ) {
-      return 'CHECKIN_SINGLE';
-    }
-    return 'CONFIRMED';
-  }
-
+function resolveMockManageVariantForFlights(): null {
   return null;
 }
 
@@ -871,12 +817,6 @@ export async function revalidateItineraryMapped(
 }
 
 export async function getSeatMapMapped(flightId: number, fareId: number): Promise<SeatMapResponse> {
-  const mockVariant = resolveMockManageVariantForFlights();
-  if (mockVariant) {
-    const reservedOverrides = getMockReservedSeatsForFlight(mockVariant, flightId);
-    const mockSeatMap = getMockSeatMapResponse(mockVariant, flightId, fareId, reservedOverrides);
-    if (mockSeatMap) return normalizeSeatMap(mockSeatMap);
-  }
   const res = await api.get<SeatMapResponse | { data?: SeatMapResponse }>(
     `/api/flights/${flightId}/seats`,
     {
@@ -894,11 +834,6 @@ export async function getServicesMapped(
   flightId: number,
   fareId: number
 ): Promise<ServiceCatalogResponse> {
-  const mockVariant = resolveMockManageVariantForFlights();
-  if (mockVariant) {
-    const mockCatalog = getMockServiceCatalogResponse(mockVariant, flightId, fareId);
-    if (mockCatalog) return normalizeServiceCatalog(mockCatalog);
-  }
   const res = await api.get<ServiceCatalogResponse | { data?: ServiceCatalogResponse }>(
     '/api/services',
     {

@@ -44,7 +44,7 @@ export default function PasswordResetConfirm() {
         token: values.token.trim(),
         password: values.password,
       });
-      toast.success('Đặt lại mật khẩu thành công. Vui lòng đăng nhập.');
+      toast.success('Password reset successful. Please sign in.');
       navigate('/login', { replace: true });
     } catch (error) {
       applyBackendFieldErrors<PasswordResetConfirmFormValues>(error, setError, [
@@ -57,22 +57,23 @@ export default function PasswordResetConfirm() {
 
   return (
     <AuthLayout
-      title="Đặt lại mật khẩu"
-      subtitle="Nhập mã từ email và mật khẩu mới của bạn."
+      title="Reset password"
+      subtitle="Enter the code from your email and your new password."
       showAuthTabs={false}
     >
       {!tokenFromUrl && (
         <p className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Thiếu mã xác nhận trong đường dẫn. Kiểm tra link trong email hoặc dán mã vào ô bên dưới.
+          The confirmation code is missing from the link. Check the link in your email or paste the
+          code into the field below.
         </p>
       )}
       <form className="flex flex-col gap-5" onSubmit={handleSubmit(onSubmit)}>
         <div>
-          <FieldLabel htmlFor="reset-token">Mã xác nhận</FieldLabel>
+          <FieldLabel htmlFor="reset-token">Confirmation code</FieldLabel>
           <TextInput
             id="reset-token"
             type="text"
-            placeholder="Dán mã từ email"
+            placeholder="Paste the code from your email"
             hasError={!!errors.token}
             aria-describedby={errors.token ? 'reset-token-error' : undefined}
             autoComplete="one-time-code"
@@ -85,7 +86,7 @@ export default function PasswordResetConfirm() {
           )}
         </div>
         <div>
-          <FieldLabel htmlFor="reset-password">Mật khẩu mới</FieldLabel>
+          <FieldLabel htmlFor="reset-password">New password</FieldLabel>
           <TextInput
             id="reset-password"
             type="password"
@@ -102,7 +103,7 @@ export default function PasswordResetConfirm() {
           )}
         </div>
         <div>
-          <FieldLabel htmlFor="reset-confirm-password">Xác nhận mật khẩu</FieldLabel>
+          <FieldLabel htmlFor="reset-confirm-password">Confirm password</FieldLabel>
           <TextInput
             id="reset-confirm-password"
             type="password"
@@ -119,11 +120,11 @@ export default function PasswordResetConfirm() {
           )}
         </div>
         <Button type="submit" disabled={isSubmitting}>
-          Xác nhận đặt lại mật khẩu
+          Confirm password reset
         </Button>
         <p className="text-center text-sm text-on-surface-variant">
           <Link to="/login" className="font-bold text-secondary hover:underline">
-            Quay lại đăng nhập
+            Back to sign in
           </Link>
         </p>
       </form>

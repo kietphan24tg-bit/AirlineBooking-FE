@@ -440,7 +440,9 @@ export default function Landing() {
       return;
     }
     if (!state.paymentExpired) return;
-    toast.error('Phiên thanh toán đã hết hạn. Ghế/đặt chỗ không còn được giữ. Vui lòng đặt lại.');
+    toast.error(
+      'Your payment session has expired. The seat/booking is no longer held. Please book again.'
+    );
     navigate('/', { replace: true, state: null });
   }, [location.state, navigate]);
 

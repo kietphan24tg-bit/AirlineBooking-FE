@@ -56,9 +56,36 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * Replace axios's generic "Request failed with status code N" with the backend's
+ * specific error message so UI fallbacks that read `error.message` (inline catches,
+ * react-query `query.error.message`) surface a meaningful, user-facing message.
+ */
+function applyBackendErrorMessage(error: AxiosError): void {
+  const data = error.response?.data as
+    | { error?: { message?: unknown }; message?: unknown }
+    | undefined;
+  if (!data || typeof data !== 'object') return;
+  const nested =
+    data.error && typeof data.error === 'object'
+      ? (data.error as { message?: unknown }).message
+      : undefined;
+  const message =
+    typeof nested === 'string' && nested.trim()
+      ? nested.trim()
+      : typeof data.message === 'string' && data.message.trim()
+        ? data.message.trim()
+        : null;
+  if (message) {
+    error.message = message;
+  }
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    applyBackendErrorMessage(error);
+
     const originalRequest = error.config as RetryableRequestConfig | undefined;
     const requestUrl = originalRequest?.url ?? '';
 

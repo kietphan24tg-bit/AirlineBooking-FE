@@ -35,16 +35,16 @@ export function TicketCard({
           <TicketsPlaneIcon className="fixed w-50 h-40 opacity-6 stroke-luxury-gold" />
           <div className="flex flex-col justify-between">
             <div>
-              <p>Hành khách: </p>
+              <p>Passenger: </p>
               <p className="text-2xl font-bold mb-3">{passengerName}</p>
             </div>
             <div>
               <div className="flex flex-row items-center">
-                <p className="text-xl font-bold mr-2">Từ:</p>
+                <p className="text-xl font-bold mr-2">From:</p>
                 <p>{from ?? '—'}</p>
               </div>
               <div className="flex flex-row items-center">
-                <p className="text-xl font-bold mr-2">Đến:</p>
+                <p className="text-xl font-bold mr-2">To:</p>
                 <p>{to ?? '—'}</p>
               </div>
             </div>

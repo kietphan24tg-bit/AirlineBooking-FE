@@ -50,10 +50,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       await authService.signOut();
       get().clearStore();
-      toast.success('Đăng xuất thành công!');
+      toast.success('Signed out successfully!');
     } catch (error) {
       console.error(error);
-      toast.error('Đăng xuất thất bại. Vui lòng thử lại.');
+      toast.error('Sign-out failed. Please try again.');
     }
   },
   fetchMe: async () => {
@@ -62,7 +62,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       const res = await authService.fetchMe();
       const payload =
         res && typeof res === 'object' && 'user' in res
-          ? (res as { user?: unknown }).user ?? res
+          ? ((res as { user?: unknown }).user ?? res)
           : res;
       const user = normalizeUser(payload);
       if (user) set({ user });
@@ -83,7 +83,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     } catch (error) {
       console.error(error);
       if (!options?.silent) {
-        toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
+        toast.error('Your session has expired. Please sign in again!');
       }
       if (options?.silent) {
         set({ user: null, accessToken: null });

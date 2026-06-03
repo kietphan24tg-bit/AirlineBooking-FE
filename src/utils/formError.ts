@@ -16,13 +16,14 @@ export function applyBackendFieldErrors<T extends FieldValues>(
   validFields: readonly string[]
 ) {
   if (!axios.isAxiosError<BackendErrorPayload>(error)) {
-    toast.error('Có lỗi xảy ra. Vui lòng thử lại.');
+    toast.error('Something went wrong. Please try again.');
     return;
   }
 
   const payload = error.response?.data;
   const details = payload?.error?.details;
-  const message = payload?.error?.message || payload?.message || 'Có lỗi xảy ra. Vui lòng thử lại.';
+  const message =
+    payload?.error?.message || payload?.message || 'Something went wrong. Please try again.';
 
   if (!details || typeof details !== 'object') {
     toast.error(message);

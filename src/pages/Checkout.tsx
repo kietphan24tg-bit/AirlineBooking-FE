@@ -112,7 +112,7 @@ function isPayLaterMethod(method?: PaymentMethod | null): boolean {
 }
 
 function isSelectableMethod(method?: PaymentMethod | null): boolean {
-  return !!method && (method.supported || isPayLaterMethod(method));
+  return !!method && method.supported;
 }
 
 function parseIsoTime(value: unknown): number | null {

@@ -1,0 +1,100 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-deploy-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy-staging:
+    name: Build, Push and Deploy Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: staging
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Verify frontend
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          BE_URL: ${{ secrets.BE_URL }}
+
+      - name: Validate Docker Hub configuration
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_REPOSITORY: ${{ secrets.DOCKERHUB_REPOSITORY }}
+        run: |
+          test -n "$DOCKERHUB_USERNAME"
+          test -n "$DOCKERHUB_TOKEN"
+          test -n "$DOCKERHUB_REPOSITORY"
+
+      - name: Validate frontend build variables
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          BE_URL: ${{ secrets.BE_URL }}
+        run: |
+          test -n "$VITE_API_URL"
+          test -n "$BE_URL"
+
+      - name: Validate Coolify configuration
+        env:
+          COOLIFY_DEPLOY_WEBHOOK: ${{ secrets.COOLIFY_DEPLOY_WEBHOOK }}
+        run: |
+          test -n "$COOLIFY_DEPLOY_WEBHOOK"
+          case "$COOLIFY_DEPLOY_WEBHOOK" in
+            http://*|https://*) ;;
+            *)
+              echo "COOLIFY_DEPLOY_WEBHOOK must be the full Coolify Deploy Webhook URL."
+              exit 1
+              ;;
+          esac
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push staging image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_REPOSITORY }}:dev
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+            BE_URL=${{ secrets.BE_URL }}
+
+      - name: Trigger Coolify deploy (staging)
+        env:
+          COOLIFY_DEPLOY_WEBHOOK: ${{ secrets.COOLIFY_DEPLOY_WEBHOOK }}
+        run: |
+          set -e
+          curl -fsS "$COOLIFY_DEPLOY_WEBHOOK"

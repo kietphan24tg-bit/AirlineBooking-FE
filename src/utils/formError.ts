@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { FieldPath, FieldValues, UseFormSetError } from 'react-hook-form';
+import { toast } from 'sonner';
 
 type BackendErrorPayload = {
   error?: {
@@ -15,10 +16,7 @@ export function applyBackendFieldErrors<T extends FieldValues>(
   validFields: readonly string[]
 ) {
   if (!axios.isAxiosError<BackendErrorPayload>(error)) {
-    setError('root.serverError' as FieldPath<T>, {
-      type: 'server',
-      message: 'Có lỗi xảy ra. Vui lòng thử lại.',
-    });
+    toast.error('Có lỗi xảy ra. Vui lòng thử lại.');
     return;
   }
 
@@ -27,7 +25,7 @@ export function applyBackendFieldErrors<T extends FieldValues>(
   const message = payload?.error?.message || payload?.message || 'Có lỗi xảy ra. Vui lòng thử lại.';
 
   if (!details || typeof details !== 'object') {
-    setError('root.serverError' as FieldPath<T>, { type: 'server', message });
+    toast.error(message);
     return;
   }
 
@@ -43,6 +41,6 @@ export function applyBackendFieldErrors<T extends FieldValues>(
   }
 
   if (!mapped) {
-    setError('root.serverError' as FieldPath<T>, { type: 'server', message });
+    toast.error(message);
   }
 }

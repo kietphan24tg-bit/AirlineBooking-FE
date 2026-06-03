@@ -22,7 +22,6 @@ export default function PasswordResetConfirm() {
   const {
     register,
     setValue,
-    clearErrors,
     setError,
     handleSubmit,
     formState: { errors, isSubmitting },
@@ -40,7 +39,6 @@ export default function PasswordResetConfirm() {
   }, [tokenFromUrl, setValue]);
 
   const onSubmit = async (values: PasswordResetConfirmFormValues) => {
-    clearErrors('root.serverError');
     try {
       await authService.confirmPasswordReset({
         token: values.token.trim(),
@@ -69,11 +67,6 @@ export default function PasswordResetConfirm() {
         </p>
       )}
       <form className="flex flex-col gap-5" onSubmit={handleSubmit(onSubmit)}>
-        {errors.root?.serverError && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
-            {errors.root.serverError.message}
-          </p>
-        )}
         <div>
           <FieldLabel htmlFor="reset-token">Mã xác nhận</FieldLabel>
           <TextInput

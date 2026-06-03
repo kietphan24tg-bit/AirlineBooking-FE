@@ -34,7 +34,6 @@ export default function Login() {
   const {
     register,
     getValues,
-    clearErrors,
     setError,
     handleSubmit,
     formState: { errors, isSubmitting },
@@ -58,7 +57,6 @@ export default function Login() {
   });
 
   const onSubmit = async (values: LoginFormValues) => {
-    clearErrors('root.serverError');
     try {
       await signIn(values.email, values.password);
       navigate('/', { replace: true });
@@ -87,7 +85,9 @@ export default function Login() {
         } else if (code === 'PASSWORD_RESET_EMAIL_FAILED') {
           toast.error('Unable to send reset email. Please try again later.');
         } else {
-          toast.error(apiMessage || 'Unable to send password reset instructions. Please try again.');
+          toast.error(
+            apiMessage || 'Unable to send password reset instructions. Please try again.'
+          );
         }
       } else {
         toast.error('Unable to send password reset instructions. Please try again.');
@@ -96,17 +96,8 @@ export default function Login() {
   };
 
   return (
-    <AuthLayout
-      title="Sign In"
-      subtitle="Welcome back to your private sky."
-      activeTab="login"
-    >
+    <AuthLayout title="Sign In" subtitle="Welcome back to your private sky." activeTab="login">
       <form className="flex flex-col gap-5" onSubmit={handleSubmit(onSubmit)}>
-        {errors.root?.serverError && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
-            {errors.root.serverError.message}
-          </p>
-        )}
         <div>
           <FieldLabel htmlFor="login-email">Email Address</FieldLabel>
           <TextInput

@@ -79,7 +79,7 @@ export default function Register() {
 
   // Set initial dial code for default nationality
   useEffect(() => {
-    const defaultCountry = nationalityOptions.find(c => c.value === DEFAULT_NATIONALITY_CODE);
+    const defaultCountry = nationalityOptions.find((c) => c.value === DEFAULT_NATIONALITY_CODE);
     if (defaultCountry?.dialCode) {
       setPhonePrefix(defaultCountry.dialCode);
       setValue('phone', defaultCountry.dialCode + ' ');
@@ -87,7 +87,6 @@ export default function Register() {
   }, [nationalityOptions, setValue]);
 
   const onSubmit = async (values: RegisterFormValues) => {
-    clearErrors('root.serverError');
     try {
       await registerAccount({
         email: values.email,
@@ -119,11 +118,6 @@ export default function Register() {
       activeTab="register"
     >
       <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)}>
-        {errors.root?.serverError && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
-            {errors.root.serverError.message}
-          </p>
-        )}
         <div>
           <FieldLabel htmlFor="register-email">Email Address</FieldLabel>
           <TextInput
@@ -187,15 +181,13 @@ export default function Register() {
                 isLoading={countriesQuery.isLoading}
                 isDisabled={countriesQuery.isLoading}
                 styles={selectStyles}
-                value={
-                  nationalityOptions.find((country) => country.value === field.value) ?? null
-                }
+                value={nationalityOptions.find((country) => country.value === field.value) ?? null}
                 onChange={(option) => {
                   const selectedValue = option?.value ?? DEFAULT_NATIONALITY_CODE;
                   field.onChange(selectedValue);
 
                   // Update phone prefix when country changes
-                  const selectedCountry = nationalityOptions.find(c => c.value === selectedValue);
+                  const selectedCountry = nationalityOptions.find((c) => c.value === selectedValue);
                   if (selectedCountry?.dialCode) {
                     setPhonePrefix(selectedCountry.dialCode);
                     // Replace the entire phone value with new dial code

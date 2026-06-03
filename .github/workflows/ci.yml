@@ -2,29 +2,37 @@ name: Frontend CI
 
 on:
   push:
-    branches: [ "main" ] # Chạy khi push vào nhánh main
+    branches:
+      - dev
+      - main
   pull_request:
-    branches: [ "main" ] # Chạy khi tạo PR vào nhánh main
+    branches:
+      - dev
+      - main
 
 jobs:
-  build-and-test:
+  verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22.12.0
-          cache: 'npm'
+          node-version: 20
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci --ignore-scripts
 
-      - name: Check Lint (Kiểm tra chuẩn code)
+      - name: Lint
         run: npm run lint
 
-      - name: Run Unit Tests (Quan trọng nhất)
-        run: npm test
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build

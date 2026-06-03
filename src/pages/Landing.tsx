@@ -19,10 +19,14 @@ import {
   Gift,
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { toast } from 'sonner';
 import MarketingNav from '../components/layout/MarketingNav';
 import SiteFooter from '../components/layout/SiteFooter';
+import sky4 from '../assets/sky4.jpg';
+import wing from '../assets/wing.png';
+import wingFlash from '../assets/wing1.png';
+import windowImg from '../assets/window.png';
 import { airportService, type Airport } from '../services/airport.service';
 import { flightService } from '../services/flight.service';
 import type { FlightSearchCriteria, FlightSearchFilters } from '../types/flight.types';
@@ -561,7 +565,7 @@ export default function Landing() {
     return excludeAirport(source, airportExcludedFromPicker);
   }, [selectedRegionKey, airportsByRegion, airportExcludedFromPicker]);
 
-  const resetAirportPickerUi = () => {
+  const resetAirportPickerUi = useCallback(() => {
     setIsFromPicking(false);
     setIsToPicking(false);
     setRegionsModalOpen(false);
@@ -569,11 +573,11 @@ export default function Landing() {
     setHoveredAirportId(null);
     setHoveredModalAirportId(null);
     pickerContextRef.current = null;
-  };
+  }, []);
 
-  const closeAirportPicker = () => {
+  const closeAirportPicker = useCallback(() => {
     resetAirportPickerUi();
-  };
+  }, [resetAirportPickerUi]);
 
   const closeRegionsModal = () => {
     setRegionsModalOpen(false);
@@ -617,6 +621,28 @@ export default function Landing() {
     const id = requestAnimationFrame(() => airportSearchInputRef.current?.focus());
     return () => cancelAnimationFrame(id);
   }, [isFromPicking, isToPicking, closeAirportPicker]);
+
+  // Nudge the page down by just enough to reveal the downward popup — without yanking the
+  // whole hero out of view.
+  useEffect(() => {
+    if (!isFromPicking && !isToPicking) return;
+    const fieldEl = isFromPicking ? fromFieldRef.current : toFieldRef.current;
+    if (!fieldEl) return;
+    const id = requestAnimationFrame(() => {
+      const panel = fieldEl.querySelector('[role="listbox"]') as HTMLElement | null;
+      const rect = (panel ?? fieldEl).getBoundingClientRect();
+      const bottomMargin = 16; // breathing room below the popup
+      const navClearance = 96; // keep the field below the fixed nav
+      const overflowBottom = rect.bottom - (window.innerHeight - bottomMargin);
+      if (overflowBottom <= 0) return;
+      // Never scroll so far that the field tucks under the nav.
+      const maxScroll = Math.max(0, fieldEl.getBoundingClientRect().top - navClearance);
+      const delta = Math.min(overflowBottom, maxScroll);
+      if (delta > 0) window.scrollBy({ top: delta, behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(id);
+    // Re-run once the async airport list renders (the panel grows taller then).
+  }, [isFromPicking, isToPicking, pickerLoading, mainPickerAirports.length]);
 
   useEffect(() => {
     if (!isFromPicking && !isToPicking) return;
@@ -733,23 +759,15 @@ export default function Landing() {
           }`}
         >
           <div className="absolute inset-0 z-0 overflow-hidden">
-            <img alt="" src="/src/assets/sky4.jpg" className="sky-flow-track" />
+            <img alt="" src={sky4} className="sky-flow-track" />
             <div className="absolute inset-0 bg-linear-to-t from-black/30 to-white/10" />
+            <img alt="" src={wing} className="absolute inset-0 pl-70 h-full w-full object-cover" />
             <img
               alt=""
-              src="/src/assets/wing.png"
-              className="absolute inset-0 pl-70 h-full w-full object-cover"
-            />
-            <img
-              alt=""
-              src="/src/assets/wing1.png"
+              src={wingFlash}
               className="absolute inset-0 pl-70 h-full w-full object-cover opacity-0 animate-wing-flash"
             />
-            <img
-              alt=""
-              src="/src/assets/window.png"
-              className="absolute inset-0 h-full w-full object-cover"
-            />
+            <img alt="" src={windowImg} className="absolute inset-0 h-full w-full object-cover" />
           </div>
           <div className="landing-hero-shell relative mx-auto flex w-full min-w-0 max-w-480 flex-col px-4 pb-6 pt-24 sm:px-6 md:px-20 md:pb-6">
             <div className="landing-hero-copy mt-32 max-w-full pt-4 md:pt-6">

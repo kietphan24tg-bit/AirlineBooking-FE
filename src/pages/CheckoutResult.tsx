@@ -299,27 +299,15 @@ function StateCard({
 }
 
 function LoadingSpinnerState({
-  title = 'Loading payment details',
-  message = 'Please wait while we fetch the latest booking and payment information.',
+  title: _title = 'Loading payment details',
+  message: _message = 'Please wait while we fetch the latest booking and payment information.',
 }: {
   title?: string;
   message?: string;
 }) {
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
-      <div className="flex flex-col items-center gap-5 rounded-[2rem] border border-luxury-gold/15 bg-white/92 px-10 py-12 text-center shadow-[0_24px_60px_rgba(62,16,30,0.10)] backdrop-blur-sm">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-cabin-burgundy/8">
-          <Loader2 className="h-10 w-10 animate-spin text-cabin-burgundy" strokeWidth={2.4} />
-        </div>
-        <div className="space-y-2">
-          <h1 className="font-headline text-2xl font-black text-on-surface sm:text-3xl">
-            {title}
-          </h1>
-          <p className="max-w-xl text-sm leading-7 text-on-surface-variant sm:text-base">
-            {message}
-          </p>
-        </div>
-      </div>
+      <Loader2 className="h-10 w-10 animate-spin text-cabin-burgundy" strokeWidth={2.4} />
     </div>
   );
 }
@@ -1120,15 +1108,15 @@ function PayLaterResultView({
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-[2rem] border border-luxury-gold/15 bg-white/92 shadow-[0_24px_60px_rgba(62,16,30,0.10)] backdrop-blur-sm">
+      <section className="overflow-hidden rounded-[2rem] border border-outline-variant/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(249,249,249,0.98))] shadow-[0_24px_60px_rgba(62,16,30,0.08)] backdrop-blur-sm">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1.2fr)_24rem]">
           <div className="relative px-7 py-8 sm:px-10 sm:py-10">
-            <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-luxury-gold/50 to-transparent" />
-            <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-sm font-black uppercase tracking-[0.18em] text-amber-700">
+            <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary/35 to-transparent" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/12 bg-primary/6 px-4 py-2 text-sm font-black uppercase tracking-[0.18em] text-primary">
               <Clock3 className="h-4 w-4" strokeWidth={2.2} />
               Held for 1 hour
             </div>
-            <p className="mt-6 font-headline text-sm font-black uppercase tracking-[0.22em] text-midnight-burgundy">
+            <p className="mt-6 font-headline text-sm font-black uppercase tracking-[0.22em] text-primary">
               The Sovereign
             </p>
             <h1 className="mt-3 max-w-3xl font-headline text-3xl font-black tracking-tight text-on-surface sm:text-4xl lg:text-[2.8rem]">
@@ -1140,15 +1128,15 @@ function PayLaterResultView({
             </p>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
+              <div className="rounded-2xl border border-outline-variant/15 bg-white/80 px-4 py-4 shadow-[0_10px_24px_rgba(26,28,28,0.04)]">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
                   Booking code
                 </p>
-                <p className="mt-2 font-mono text-xl font-black tracking-[0.18em] text-midnight-burgundy">
+                <p className="mt-2 font-mono text-xl font-black tracking-[0.18em] text-primary">
                   {statusData.pnrCode || '--'}
                 </p>
               </div>
-              <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
+              <div className="rounded-2xl border border-outline-variant/15 bg-white/80 px-4 py-4 shadow-[0_10px_24px_rgba(26,28,28,0.04)]">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
                   Expires at
                 </p>
@@ -1156,7 +1144,7 @@ function PayLaterResultView({
                   {formatDateTime(statusData.expireAt)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-luxury-gold/12 bg-surface-container-lowest/90 px-4 py-4">
+              <div className="rounded-2xl border border-outline-variant/15 bg-white/80 px-4 py-4 shadow-[0_10px_24px_rgba(26,28,28,0.04)]">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
                   Status
                 </p>
@@ -1166,13 +1154,13 @@ function PayLaterResultView({
               </div>
             </div>
 
-            <div className="mt-8 rounded-[1.5rem] border border-amber-200/70 bg-amber-50/80 p-5">
+            <div className="mt-8 rounded-[1.5rem] border border-primary/12 bg-[linear-gradient(135deg,rgba(255,223,158,0.18),rgba(255,255,255,0.96))] p-5">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-800/80">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary/80">
                     Time remaining
                   </p>
-                  <p className="mt-2 font-mono text-3xl font-black tracking-[0.14em] text-cabin-burgundy">
+                  <p className="mt-2 font-mono text-3xl font-black tracking-[0.14em] text-primary">
                     {formatTimeLeft(msLeft)}
                   </p>
                   <p className="mt-2 text-sm leading-6 text-on-surface-variant">
@@ -1183,7 +1171,7 @@ function PayLaterResultView({
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <Button
                     type="button"
-                    className="sm:w-auto"
+                    className="sm:w-auto shadow-[0_12px_24px_rgba(161,36,40,0.14)]"
                     onClick={onRefresh}
                     disabled={refreshing}
                     icon={<RefreshCcw className={`h-4 w-4${refreshing ? ' animate-spin' : ''}`} />}
@@ -1195,24 +1183,25 @@ function PayLaterResultView({
             </div>
           </div>
 
-          <div className="relative overflow-hidden border-t border-luxury-gold/10 bg-[linear-gradient(180deg,rgba(125,6,51,0.96),rgba(62,16,30,0.96))] px-7 py-8 text-white lg:border-l lg:border-t-0 lg:px-8 lg:py-10">
-            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-luxury-gold/10 blur-3xl" />
-            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-luxury-gold/80">
+          <div className="relative overflow-hidden border-t border-outline-variant/12 bg-[linear-gradient(180deg,rgba(161,36,40,0.98),rgba(125,6,51,0.94))] px-7 py-8 text-white lg:border-l lg:border-t-0 lg:border-l-primary/10 lg:px-8 lg:py-10">
+            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-secondary-fixed/12 blur-3xl" />
+            <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-secondary-fixed/60 to-transparent lg:hidden" />
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-secondary-fixed/82">
               Total payment
             </p>
-            <p className="mt-3 font-headline text-4xl font-black tracking-tight text-luxury-gold">
+            <p className="mt-3 font-headline text-4xl font-black tracking-tight text-white">
               {formatCurrency(statusData.amount, statusData.currency ?? 'VND')}
             </p>
 
-            <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-5">
-              <p className="text-center text-[11px] font-black uppercase tracking-[0.18em] text-white/70">
+            <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-black/5 p-5 backdrop-blur-sm">
+              <p className="text-center text-[11px] font-black uppercase tracking-[0.18em] text-secondary-fixed/80">
                 Payment QR code
               </p>
               {qrImageUrl ? (
                 <img
                   src={qrImageUrl}
                   alt="Payment QR code"
-                  className="mx-auto mt-4 aspect-square w-full max-w-[220px] rounded-2xl bg-white p-3 shadow-lg"
+                  className="mx-auto mt-4 aspect-square w-full max-w-[220px] rounded-2xl bg-white p-3 shadow-[0_20px_40px_rgba(26,28,28,0.18)]"
                 />
               ) : (
                 <div className="mx-auto mt-4 flex aspect-square w-full max-w-[220px] items-center justify-center rounded-2xl bg-white/10 text-sm text-white/70">
@@ -1221,27 +1210,27 @@ function PayLaterResultView({
               )}
             </div>
 
-            <div className="mt-6 space-y-4 border-t border-luxury-gold/15 pt-6">
+            <div className="mt-6 space-y-4 border-t border-white/12 pt-6">
               <div className="flex items-center justify-between gap-4 text-sm">
-                <span className="text-white/70">Status</span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-luxury-gold">
+                <span className="text-white/72">Status</span>
+                <span className="inline-flex items-center gap-2 rounded-full bg-secondary-fixed/14 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-secondary-fixed">
                   <Clock3 className="h-4 w-4" />
                   {expiredLocally ? 'Expired' : 'Awaiting payment'}
                 </span>
               </div>
               <div className="flex items-start justify-between gap-4 text-sm">
-                <span className="text-white/70">Payment method</span>
-                <span className="max-w-[11rem] text-right font-semibold text-white">
+                <span className="shrink-0 text-white/72">Payment method</span>
+                <span className="min-w-0 max-w-[11rem] text-right font-semibold text-white break-words">
                   {paymentMethodLabel(statusData.method)}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-4 text-sm">
-                <span className="text-white/70">Payment ID</span>
+                <span className="text-white/72">Payment ID</span>
                 <span className="font-semibold text-white">#{statusData.paymentId}</span>
               </div>
               <div className="flex items-start justify-between gap-4 text-sm">
-                <span className="text-white/70">Transaction ID</span>
-                <span className="max-w-[11rem] text-right font-semibold text-white">
+                <span className="shrink-0 text-white/72">Transaction ID</span>
+                <span className="min-w-0 max-w-[11rem] text-right font-semibold leading-5 text-white break-all">
                   {statusData.transactionId || '--'}
                 </span>
               </div>

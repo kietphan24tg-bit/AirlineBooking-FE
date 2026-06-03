@@ -726,7 +726,7 @@ export default function Landing() {
           aria-hidden
         />
         <section
-          className={`landing-hero-section relative flex h-260 w-full items-stretch ${
+          className={`landing-hero-section relative flex min-h-dvh w-full items-stretch ${
             isFromPicking || isToPicking || travelersMenuOpen
               ? 'overflow-visible'
               : 'overflow-hidden'
@@ -751,8 +751,8 @@ export default function Landing() {
               className="absolute inset-0 h-full w-full object-cover"
             />
           </div>
-          <div className="landing-hero-shell relative mx-auto flex h-220 w-full min-w-0 max-w-480 flex-col px-4 pb-0 pt-24 sm:px-6 md:px-20 md:pb-0">
-            <div className="landing-hero-copy mt-50 max-w-full pt-4 md:pt-6">
+          <div className="landing-hero-shell relative mx-auto flex w-full min-w-0 max-w-480 flex-col px-4 pb-6 pt-24 sm:px-6 md:px-20 md:pb-6">
+            <div className="landing-hero-copy mt-32 max-w-full pt-4 md:pt-6">
               <h1 className="mb-4 font-headline text-4xl font-black leading-[0.92] tracking-tighter text-white md:mb-5 md:text-7xl drop-shadow-2xl">
                 REDEFINING <br />
                 THE <span className="text-luxury-gold">EXCEPTIONAL</span>
@@ -808,7 +808,7 @@ export default function Landing() {
                 {/* From */}
                 <div
                   ref={fromFieldRef}
-                    className={`booking-field booking-field--from relative space-y-1 p-3 sm:min-h-[9rem] sm:p-4 ${isFromPicking ? 'z-30' : ''} ${
+                  className={`booking-field booking-field--from relative space-y-1 p-3 sm:min-h-[9rem] sm:p-4 ${isFromPicking ? 'z-30' : ''} ${
                     tripType === 'round-trip'
                       ? 'sm:border-b sm:border-luxury-gold/10 xl:border-b-0'
                       : 'sm:border-b sm:border-luxury-gold/10 lg:border-b-0'
@@ -877,7 +877,7 @@ export default function Landing() {
                 {/* To */}
                 <div
                   ref={toFieldRef}
-                    className={`booking-field booking-field--to relative space-y-1 p-3 sm:min-h-[9rem] sm:p-4 ${isToPicking ? 'z-30' : ''} ${
+                  className={`booking-field booking-field--to relative space-y-1 p-3 sm:min-h-[9rem] sm:p-4 ${isToPicking ? 'z-30' : ''} ${
                     tripType === 'round-trip'
                       ? 'sm:border-b sm:border-luxury-gold/10 xl:border-b-0'
                       : 'sm:border-b sm:border-luxury-gold/10 lg:border-b-0'
@@ -1291,14 +1291,7 @@ export default function Landing() {
                       {d.tag}
                     </span>
                     <h3 className="mb-2 font-headline text-3xl font-black text-white">{d.city}</h3>
-                    <p className="mb-6 font-medium text-white/70">{d.line}</p>
-                    <button
-                      type="button"
-                      className="flex h-12 w-12 items-center justify-center rounded-full bg-luxury-gold text-midnight-burgundy shadow-lg transition-colors hover:brightness-110"
-                      aria-label={`Explore ${d.city}`}
-                    >
-                      <Plus className="h-6 w-6" strokeWidth={2} />
-                    </button>
+                    <p className="mb-0 font-medium text-white/70">{d.line}</p>
                   </div>
                 </div>
               ))}

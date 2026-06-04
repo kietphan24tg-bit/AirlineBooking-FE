@@ -336,6 +336,8 @@ export default function FlightResults() {
   );
   const priceDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearBooking = useBookingStore((state) => state.clearBooking);
+  const bookingDraft = useBookingStore((state) => state.bookingDraft);
+  const isRevalidateExpired = useBookingStore((state) => state.isRevalidateExpired);
   const priceRangeFilters = useMemo<FlightSearchFilters>(
     () => ({
       ...filters,
@@ -436,6 +438,7 @@ export default function FlightResults() {
 
   const sortedOutbound = searchQuery.data?.outbound ?? [];
   const sortedInbound = searchQuery.data?.inbound ?? [];
+  const currentOriginPath = `${location.pathname}${location.search}`;
 
   const loading = searchQuery.isPending;
   const searchError =
@@ -449,6 +452,44 @@ export default function FlightResults() {
     if (!searchError) return;
     toast.error(searchError, { id: 'flight-results-search-error' });
   }, [searchError]);
+
+  useEffect(() => {
+    if (
+      !criteria ||
+      criteria.tripType !== 'ROUND_TRIP' ||
+      !bookingDraft.revalidateId ||
+      isRevalidateExpired() ||
+      bookingDraft.originPath !== currentOriginPath
+    ) {
+      return;
+    }
+
+    const outboundSegment =
+      bookingDraft.segments.find((segment) => segment.direction === 'OUTBOUND') ??
+      bookingDraft.segments[0];
+    if (!outboundSegment) return;
+
+    const fareKey = `${outboundSegment.flightId}:${outboundSegment.fareId}`;
+    setSelectedOutboundFareKey((current) => current ?? fareKey);
+
+    if (selectedOutboundRef.current || sortedOutbound.length === 0) return;
+    const outboundLeg = sortedOutbound.find((leg) => Number(leg.id) === outboundSegment.flightId);
+    if (!outboundLeg) return;
+
+    selectedOutboundRef.current = {
+      leg: outboundLeg,
+      fareId: outboundSegment.fareId,
+      fareKey,
+    };
+  }, [
+    bookingDraft.originPath,
+    bookingDraft.revalidateId,
+    bookingDraft.segments,
+    criteria,
+    currentOriginPath,
+    isRevalidateExpired,
+    sortedOutbound,
+  ]);
 
   const availableOutboundRange = useMemo(
     () =>

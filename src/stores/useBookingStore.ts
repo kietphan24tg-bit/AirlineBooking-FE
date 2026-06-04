@@ -33,12 +33,14 @@ export interface BookingPersistedDraft {
   revalidateId: string | null;
   expiresAt: number | null;
   tripType: 'ONE_WAY' | 'ROUND_TRIP';
+  promoCode: string | null;
   flightId: number | null;
   fareId: number | null;
   fareCode: string | null;
   segments: BookingDraftSegment[];
   passengerSummary: FlightRevalidatePassengerSummary | null;
   pricing: FlightRevalidatePricing | null;
+  originPath: string | null;
   contacts: BookingContactPayload[];
   passengers: BookingPassengerPayload[];
 }
@@ -84,7 +86,8 @@ interface BookingStore {
   setBookingLookup: (data: BookingLookupResponse) => void;
   setManageOptions: (data: BookingManageOptionsResponse | null) => void;
   setRevalidationDraft: (
-    data: FlightRevalidateFareResponse | FlightRevalidateItineraryResponse
+    data: FlightRevalidateFareResponse | FlightRevalidateItineraryResponse,
+    options?: { originPath?: string | null }
   ) => void;
   setBookingRequestDraft: (data: {
     contacts: BookingContactPayload[];
@@ -109,12 +112,14 @@ const initialDraftState: BookingPersistedDraft = {
   revalidateId: null,
   expiresAt: null,
   tripType: 'ONE_WAY',
+  promoCode: null,
   flightId: null,
   fareId: null,
   fareCode: null,
   segments: [],
   passengerSummary: null,
   pricing: null,
+  originPath: null,
   contacts: [],
   passengers: [],
 };
@@ -253,7 +258,7 @@ export const useBookingStore = create<BookingStore>()(
       setLookupCriteria: (data) => set({ lookupCriteria: data }),
       setBookingLookup: (data) => set({ bookingLookup: data }),
       setManageOptions: (data) => set({ manageOptions: data }),
-      setRevalidationDraft: (data) =>
+      setRevalidationDraft: (data, options) =>
         set((state) => ({
           bookingResponse: null,
           bookingLookup: null,
@@ -264,6 +269,10 @@ export const useBookingStore = create<BookingStore>()(
             revalidateId: data.revalidateId,
             expiresAt: Date.now() + data.expiresInSeconds * 1000,
             tripType: 'tripType' in data ? data.tripType : 'ONE_WAY',
+            promoCode:
+              typeof data.promoCode === 'string' && data.promoCode.trim()
+                ? data.promoCode.trim()
+                : null,
             flightId:
               'flightId' in data
                 ? data.flightId
@@ -285,6 +294,7 @@ export const useBookingStore = create<BookingStore>()(
             segments: normalizeDraftSegmentsFromRevalidate(data),
             passengerSummary: data.passengerSummary,
             pricing: data.pricing,
+            originPath: options?.originPath ?? state.bookingDraft.originPath,
           },
         })),
       setBookingRequestDraft: (data) =>
@@ -382,6 +392,8 @@ export const useBookingStore = create<BookingStore>()(
                 ...initialDraftState,
                 ...state.bookingDraft,
                 tripType: state.bookingDraft.tripType ?? 'ONE_WAY',
+                promoCode: state.bookingDraft.promoCode ?? null,
+                originPath: state.bookingDraft.originPath ?? null,
                 segments:
                   state.bookingDraft.segments && state.bookingDraft.segments.length > 0
                     ? state.bookingDraft.segments

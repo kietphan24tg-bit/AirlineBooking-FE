@@ -176,6 +176,10 @@ function createPassengerFormEntry(
   };
 }
 
+function normalizeOriginPath(value: string | null | undefined): string {
+  return typeof value === 'string' && value.trim() ? value : '/flights';
+}
+
 export default function PassengerInfo() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -190,6 +194,9 @@ export default function PassengerInfo() {
   const isSubmittingRef = useRef(false);
   const locationState = location.state as PassengerInfoLocationState | null;
   const pendingRevalidation = locationState?.pendingRevalidation ?? null;
+  const backToSearchPath = normalizeOriginPath(
+    pendingRevalidation?.originPath ?? bookingDraft.originPath
+  );
   const [isPreparingSelection, setIsPreparingSelection] = useState(Boolean(pendingRevalidation));
   const previewPassengerSummary = useMemo<FlightRevalidatePassengerSummary>(
     () => ({
@@ -261,9 +268,9 @@ export default function PassengerInfo() {
       if (!isPreviewMode) {
         toast.error('Your fare hold has expired. Please select your flight again.');
       }
-      navigate('/flights', { replace: true });
+      navigate(backToSearchPath, { replace: true });
     }
-  }, [hasValidRevalidation, isPreviewMode, navigate]);
+  }, [backToSearchPath, hasValidRevalidation, isPreviewMode, navigate]);
 
   useEffect(() => {
     if (isPreviewMode || !pendingRevalidation) return;
@@ -282,7 +289,7 @@ export default function PassengerInfo() {
                 signal: controller.signal,
               });
 
-        setRevalidationDraft(response);
+        setRevalidationDraft(response, { originPath: pendingRevalidation.originPath });
         setIsPreparingSelection(false);
         navigate('/booking/passengers', { replace: true, state: null });
       } catch (error) {
@@ -758,7 +765,7 @@ export default function PassengerInfo() {
 
           <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:justify-end">
             <Link
-              to="/flights"
+              to={backToSearchPath}
               className="inline-flex min-h-12 items-center justify-center rounded-md border border-outline-variant/30 px-5 py-3 text-center text-sm font-semibold text-on-surface hover:bg-surface-container-low sm:min-w-28 sm:whitespace-nowrap"
             >
               Back

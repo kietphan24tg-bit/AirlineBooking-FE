@@ -6,7 +6,11 @@ import BookingResultCard from '../components/booking/BookingResultCard';
 import MarketingNav from '../components/layout/MarketingNav';
 import SiteFooter from '../components/layout/SiteFooter';
 import TextInput from '../components/ui/TextInput';
-import { bookingService, resolveManageBookingRouteSeed } from '../services/booking.service';
+import {
+  bookingService,
+  resolveManageBookingRouteSeed,
+  resolveMockManageBookingVariant,
+} from '../services/booking.service';
 import { useBookingStore } from '../stores/useBookingStore';
 
 export default function ManageBooking() {
@@ -16,7 +20,6 @@ export default function ManageBooking() {
   const [name, setName] = useState('');
   const [showResult, setShowResult] = useState(false);
   const [searching, setSearching] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const setBookingLookup = useBookingStore((state) => state.setBookingLookup);
   const setLookupCriteria = useBookingStore((state) => state.setLookupCriteria);
   const setManageOptions = useBookingStore((state) => state.setManageOptions);
@@ -27,7 +30,8 @@ export default function ManageBooking() {
   const routeParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const rawRoutePnrCode = routeParams.get('pnr') ?? '';
   const rawRouteLastName = routeParams.get('lastName') ?? '';
-  const shouldResolveRouteSeed = routeBookingId != null || Boolean(rawRoutePnrCode || rawRouteLastName);
+  const shouldResolveRouteSeed =
+    routeBookingId != null || Boolean(rawRoutePnrCode || rawRouteLastName);
   const routeSeed = useMemo(
     () =>
       shouldResolveRouteSeed
@@ -52,11 +56,10 @@ export default function ManageBooking() {
     setName('');
     setShowResult(false);
     setSearching(false);
-    setErrorMessage(null);
   }
 
   useEffect(() => {
-    setMockManageBookingMode(false);
+    setMockManageBookingMode(Boolean(resolveMockManageBookingVariant()));
   }, [setMockManageBookingMode]);
 
   useEffect(() => {
@@ -65,7 +68,6 @@ export default function ManageBooking() {
       if (routeTargetBookingId != null) {
         const message =
           'Missing PNR or last name in the URL. Open this booking from My Trips or search manually.';
-        setErrorMessage(message);
         showErrorToast(message);
       }
       return;
@@ -78,7 +80,6 @@ export default function ManageBooking() {
     setPnr(pnrCode);
     setName(lastName);
     setSearching(true);
-    setErrorMessage(null);
 
     void (async () => {
       try {
@@ -99,7 +100,6 @@ export default function ManageBooking() {
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Unable to load booking information.';
-        setErrorMessage(message);
         showErrorToast(message);
       } finally {
         setSearching(false);
@@ -124,7 +124,6 @@ export default function ManageBooking() {
     }
 
     setSearching(true);
-    setErrorMessage(null);
     setManageOptions(null);
 
     try {
@@ -154,7 +153,6 @@ export default function ManageBooking() {
       setShowResult(false);
       const message =
         error instanceof Error ? error.message : 'Booking information could not be found.';
-      setErrorMessage(message);
       showErrorToast(message);
     } finally {
       setSearching(false);

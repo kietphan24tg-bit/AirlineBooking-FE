@@ -8,11 +8,7 @@ import {
   getMockFlightChangeQuoteResponse,
   getMockManageOptionsResponse,
   getMockServiceCatalogResponse,
-  getMockServiceChangeConfirmResponse,
-  getMockServiceChangePreviewResponse,
   getMockSeatMapResponse,
-  getMockSeatChangeConfirmResponse,
-  getMockSeatChangePreviewResponse,
   isManageBookingMockVariant,
   type ManageBookingMockVariant,
 } from '../mocks/manageBooking';
@@ -111,7 +107,10 @@ function createMockManageBookingSession(
   };
 }
 
-function getPersistedMockStoreSession(): Pick<ManageBookingMockSession, 'lookup' | 'manageOptions'> | null {
+function getPersistedMockStoreSession(): Pick<
+  ManageBookingMockSession,
+  'lookup' | 'manageOptions'
+> | null {
   const { bookingLookup, manageOptions } = useBookingStore.getState();
   const normalizedPnr = bookingLookup?.booking?.pnrCode?.trim().toUpperCase() ?? null;
   const looksLikeMockLookup = normalizedPnr === DEFAULT_IMPLICIT_MOCK_PNR;
@@ -209,7 +208,11 @@ function applyMockServiceChangeRequest(
     >
   >();
   for (const itinerary of session.manageOptions.itineraries) {
-    const catalog = getMockServiceCatalogResponse(session.variant, itinerary.flightId, itinerary.fareId);
+    const catalog = getMockServiceCatalogResponse(
+      session.variant,
+      itinerary.flightId,
+      itinerary.fareId
+    );
     optionCatalogByFlightId.set(
       itinerary.flightId,
       new Map(
@@ -271,15 +274,19 @@ function applyMockFlightChangeRequest(
   const newFlightId = Number(matches[2]);
   const newFareId = Number(matches[3]);
   const alignedSession = ensureMockManageBookingSession(session.variant, currentFlightId);
-  const quote = getMockFlightChangeQuoteResponse(session.variant, {
-    ticketIds: getMockBookingTicketsResponse(session.variant).tickets.map((ticket) => ticket.id),
-    currentFlightId,
-    newFlightId,
-    newFareId,
-  }, {
-    lookup: alignedSession.lookup,
-    manageOptions: alignedSession.manageOptions,
-  });
+  const quote = getMockFlightChangeQuoteResponse(
+    session.variant,
+    {
+      ticketIds: getMockBookingTicketsResponse(session.variant).tickets.map((ticket) => ticket.id),
+      currentFlightId,
+      newFlightId,
+      newFareId,
+    },
+    {
+      lookup: alignedSession.lookup,
+      manageOptions: alignedSession.manageOptions,
+    }
+  );
   const replacementFlight = quote.newFlight;
 
   alignedSession.lookup.itineraries = alignedSession.lookup.itineraries.map((itinerary) =>
@@ -295,18 +302,19 @@ function applyMockFlightChangeRequest(
         }
   );
 
-  alignedSession.manageOptions.itineraries = alignedSession.manageOptions.itineraries.map((itinerary) =>
-    itinerary.flightId !== currentFlightId
-      ? itinerary
-      : {
-          ...itinerary,
-          flightId: replacementFlight.flightId,
-          fareId: newFareId,
-          flightNumber: replacementFlight.flightNumber,
-          departureTime: replacementFlight.departureTime,
-          departureAirportCode: replacementFlight.from,
-          arrivalAirportCode: replacementFlight.to,
-        }
+  alignedSession.manageOptions.itineraries = alignedSession.manageOptions.itineraries.map(
+    (itinerary) =>
+      itinerary.flightId !== currentFlightId
+        ? itinerary
+        : {
+            ...itinerary,
+            flightId: replacementFlight.flightId,
+            fareId: newFareId,
+            flightNumber: replacementFlight.flightNumber,
+            departureTime: replacementFlight.departureTime,
+            departureAirportCode: replacementFlight.from,
+            arrivalAirportCode: replacementFlight.to,
+          }
   );
 
   alignedSession.lookup.passengers = alignedSession.lookup.passengers.map((passenger) => ({
@@ -323,7 +331,9 @@ function applyMockFlightChangeRequest(
           }
     ),
     selections: {
-      seats: (passenger.selections?.seats ?? []).filter((seat) => seat.flightId !== currentFlightId),
+      seats: (passenger.selections?.seats ?? []).filter(
+        (seat) => seat.flightId !== currentFlightId
+      ),
       services: (passenger.selections?.services ?? []).filter(
         (service) => service.flightId !== currentFlightId
       ),
@@ -336,27 +346,31 @@ function applyMockFlightChangeRequest(
     ),
   }));
 
-  alignedSession.manageOptions.passengers = alignedSession.manageOptions.passengers.map((passenger) => ({
-    ...passenger,
-    segments: (passenger.segments ?? []).map((segment) =>
-      segment.flightId !== currentFlightId
-        ? segment
-        : {
-            ...segment,
-            flightId: replacementFlight.flightId,
-            seatAssigned: false,
-            seatNumber: null,
-            warnings: [],
-          }
-    ),
-  }));
+  alignedSession.manageOptions.passengers = alignedSession.manageOptions.passengers.map(
+    (passenger) => ({
+      ...passenger,
+      segments: (passenger.segments ?? []).map((segment) =>
+        segment.flightId !== currentFlightId
+          ? segment
+          : {
+              ...segment,
+              flightId: replacementFlight.flightId,
+              seatAssigned: false,
+              seatNumber: null,
+              warnings: [],
+            }
+      ),
+    })
+  );
 
-  alignedSession.manageOptions.seatAssignments = alignedSession.manageOptions.seatAssignments.filter(
-    (seat) => seat.flightId !== currentFlightId
-  );
-  alignedSession.manageOptions.serviceSelections = alignedSession.manageOptions.serviceSelections.filter(
-    (service) => service.flightId !== currentFlightId
-  );
+  alignedSession.manageOptions.seatAssignments =
+    alignedSession.manageOptions.seatAssignments.filter(
+      (seat) => seat.flightId !== currentFlightId
+    );
+  alignedSession.manageOptions.serviceSelections =
+    alignedSession.manageOptions.serviceSelections.filter(
+      (service) => service.flightId !== currentFlightId
+    );
 
   syncMockLookupPassengerSelections(alignedSession);
   return quote;
@@ -381,11 +395,6 @@ function isDevLocalhostManageBooking(): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1';
 }
 
-function isManageBookingRoute(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.location.pathname.startsWith('/manage-booking');
-}
-
 function isDevLocalhostTripHistory(): boolean {
   if (!import.meta.env.DEV || typeof window === 'undefined') return false;
   const hostname = window.location.hostname;
@@ -399,13 +408,61 @@ function normalizeLookupToken(value: string): string {
   return value.trim().toUpperCase();
 }
 
+function resolveConfiguredMockVariant(): ManageBookingMockVariant {
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    const rawVariant = params.get('mockManageVariant');
+    if (isManageBookingMockVariant(rawVariant)) {
+      return rawVariant;
+    }
+  }
+  return implicitMockManageBookingVariant ?? DEFAULT_IMPLICIT_MOCK_VARIANT;
+}
+
+function isMockManageBookingExplicitlyEnabled(): boolean {
+  if (import.meta.env.VITE_MOCK_MANAGE_BOOKING === 'true') {
+    return true;
+  }
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const urlFlag = params.get('mockManageBooking');
+  if (urlFlag === '1' || urlFlag === 'true') {
+    return true;
+  }
+
+  return useBookingStore.getState().mockManageBookingMode;
+}
+
 function resolveImplicitMockManageBookingVariant(
   payload?: BookingLookupRequest,
   bookingId?: string | number
 ): ManageBookingMockVariant | null {
-  void payload;
-  void bookingId;
-  return null;
+  const normalizedRequestedPnr =
+    typeof payload?.pnrCode === 'string' ? normalizeLookupToken(payload.pnrCode) : null;
+  const normalizedMockLastName = foldAsciiUpper(
+    DEFAULT_IMPLICIT_MOCK_LOOKUP.passengers[0]?.lastName ?? ''
+  );
+  const normalizedRequestedLastName =
+    typeof payload?.lastName === 'string' ? foldAsciiUpper(payload.lastName) : null;
+  const normalizedBookingId =
+    bookingId == null ? null : typeof bookingId === 'string' ? Number(bookingId) : bookingId;
+
+  const matchesMockLookup =
+    normalizedRequestedPnr === DEFAULT_IMPLICIT_MOCK_PNR &&
+    normalizedRequestedLastName === normalizedMockLastName;
+  const matchesMockBookingId =
+    typeof normalizedBookingId === 'number' &&
+    Number.isFinite(normalizedBookingId) &&
+    normalizedBookingId === DEFAULT_IMPLICIT_MOCK_LOOKUP.booking.bookingId;
+
+  if (!matchesMockLookup && !matchesMockBookingId) {
+    return null;
+  }
+
+  return implicitMockManageBookingVariant ?? DEFAULT_IMPLICIT_MOCK_VARIANT;
 }
 
 export function resolveManageBookingRouteSeed(
@@ -655,7 +712,11 @@ function buildMockServiceChangePreviewResponse(
     >
   >();
   for (const itinerary of session.manageOptions.itineraries) {
-    const catalog = getMockServiceCatalogResponse(session.variant, itinerary.flightId, itinerary.fareId);
+    const catalog = getMockServiceCatalogResponse(
+      session.variant,
+      itinerary.flightId,
+      itinerary.fareId
+    );
     optionCatalogByFlightId.set(
       itinerary.flightId,
       new Map(
@@ -1082,15 +1143,22 @@ function buildMockCheckInConfirmResponse(
  * or via the URL (`?mockManageBooking=1[&mockManageVariant=PENDING_PAYMENT]`).
  */
 export function resolveMockManageBookingVariant(): ManageBookingMockVariant | null {
-  return null;
+  if (!isMockManageBookingExplicitlyEnabled()) {
+    return implicitMockManageBookingVariant;
+  }
+  const variant = resolveConfiguredMockVariant();
+  implicitMockManageBookingVariant = variant;
+  return variant;
 }
 
 export function resetMockManageBookingVariant(variant: ManageBookingMockVariant): void {
-  void variant;
+  implicitMockManageBookingVariant = variant;
+  mockManageBookingSessions.set(variant, cloneMock(getCommittedMockManageBookingSession(variant)));
 }
 
 export function commitMockManageBookingVariant(variant: ManageBookingMockVariant): void {
-  void variant;
+  implicitMockManageBookingVariant = variant;
+  commitMockManageBookingSession(variant);
 }
 
 export async function createBooking(payload: BookingCreateRequest): Promise<BookingCreateResponse> {
@@ -1117,6 +1185,7 @@ export async function lookupBooking(payload: BookingLookupRequest): Promise<Book
   const mockVariant =
     resolveMockManageBookingVariant() ?? resolveImplicitMockManageBookingVariant(payload);
   if (mockVariant) {
+    implicitMockManageBookingVariant = mockVariant;
     return Promise.resolve(cloneMock(getMockManageBookingSession(mockVariant).lookup));
   }
   const res = await api.post<BookingLookupResponse | { data?: BookingLookupResponse }>(
@@ -1143,9 +1212,12 @@ export async function getMyTrips(query: TripHistoryQuery = {}): Promise<TripHist
   if (query.cursor) params.set('cursor', query.cursor);
   if (typeof query.limit === 'number') params.set('limit', String(query.limit));
 
-  const res = await api.get<TripHistoryResult | { data?: TripHistoryResult }>('/api/bookings/my-trips', {
-    params,
-  });
+  const res = await api.get<TripHistoryResult | { data?: TripHistoryResult }>(
+    '/api/bookings/my-trips',
+    {
+      params,
+    }
+  );
   const raw = unwrapData(res.data) as TripHistoryResult;
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.items) || !raw.pageInfo) {
     throw new Error('Trip history fetch failed');
@@ -1328,8 +1400,7 @@ export async function confirmFlightChange(
             : 'COMPLETED',
       refundStatus: body.expectedNetAmount < 0 ? 'SUCCEEDED' : null,
       provider: body.expectedNetAmount < 0 ? 'STRIPE' : null,
-      providerRefundId:
-        body.expectedNetAmount < 0 ? `mock_refund_${Date.now()}` : null,
+      providerRefundId: body.expectedNetAmount < 0 ? `mock_refund_${Date.now()}` : null,
       errorCode: null,
       errorMessage: null,
       refundMethod:
@@ -1440,8 +1511,7 @@ export async function confirmSeatChanges(
               : 'COMPLETED',
         refundStatus: preview.settlementType === 'REFUND' ? 'SUCCEEDED' : null,
         provider: preview.settlementType === 'REFUND' ? 'STRIPE' : null,
-        providerRefundId:
-          preview.settlementType === 'REFUND' ? `mock_refund_${Date.now()}` : null,
+        providerRefundId: preview.settlementType === 'REFUND' ? `mock_refund_${Date.now()}` : null,
         errorCode: null,
         errorMessage: null,
         refundMethod:
@@ -1478,7 +1548,9 @@ export async function previewServiceChanges(
     resolveImplicitMockManageBookingVariant(undefined, bookingId);
   if (mockVariant) {
     return Promise.resolve(
-      cloneMock(buildMockServiceChangePreviewResponse(getMockManageBookingSession(mockVariant), body))
+      cloneMock(
+        buildMockServiceChangePreviewResponse(getMockManageBookingSession(mockVariant), body)
+      )
     );
   }
   const id = typeof bookingId === 'string' ? bookingId : String(bookingId);
@@ -1521,8 +1593,7 @@ export async function confirmServiceChanges(
             : 'COMPLETED',
       refundStatus: preview.settlementType === 'REFUND' ? 'SUCCEEDED' : null,
       provider: preview.settlementType === 'REFUND' ? 'STRIPE' : null,
-      providerRefundId:
-        preview.settlementType === 'REFUND' ? `mock_refund_${Date.now()}` : null,
+      providerRefundId: preview.settlementType === 'REFUND' ? `mock_refund_${Date.now()}` : null,
       errorCode: null,
       errorMessage: null,
       refundMethod:

@@ -1,5 +1,10 @@
 import api from '../api/axios';
 import { FARE_FAMILY_POLICIES } from '../data/fareBenefits';
+import { resolveMockManageBookingVariant } from './booking.service';
+import {
+  getMockSeatMapResponse,
+  getMockServiceCatalogResponse,
+} from '../mocks/manageBooking';
 import type {
   FareFamilyCatalogResponseDto,
   FareFamilyDto,
@@ -144,8 +149,8 @@ function normalizeFareFamilies(raw: unknown): FareFamilyDto[] {
   return body.filter((item): item is FareFamilyDto => !!item && typeof item === 'object');
 }
 
-function resolveMockManageVariantForFlights(): null {
-  return null;
+function resolveMockManageVariantForFlights() {
+  return resolveMockManageBookingVariant();
 }
 
 function formatMoney(amount: number, currency: string): string {
@@ -817,6 +822,15 @@ export async function revalidateItineraryMapped(
 }
 
 export async function getSeatMapMapped(flightId: number, fareId: number): Promise<SeatMapResponse> {
+  const mockVariant = resolveMockManageVariantForFlights();
+  if (mockVariant) {
+    const mockSeatMap = getMockSeatMapResponse(mockVariant, flightId, fareId);
+    if (!mockSeatMap?.layout?.columns?.length || !Array.isArray(mockSeatMap.rows)) {
+      throw new Error('Seat map is unavailable for this fare');
+    }
+    return normalizeSeatMap(mockSeatMap);
+  }
+
   const res = await api.get<SeatMapResponse | { data?: SeatMapResponse }>(
     `/api/flights/${flightId}/seats`,
     {
@@ -834,6 +848,15 @@ export async function getServicesMapped(
   flightId: number,
   fareId: number
 ): Promise<ServiceCatalogResponse> {
+  const mockVariant = resolveMockManageVariantForFlights();
+  if (mockVariant) {
+    const mockServices = getMockServiceCatalogResponse(mockVariant, flightId, fareId);
+    if (!mockServices || !Array.isArray(mockServices.services)) {
+      throw new Error('Service catalog is unavailable for this fare');
+    }
+    return normalizeServiceCatalog(mockServices);
+  }
+
   const res = await api.get<ServiceCatalogResponse | { data?: ServiceCatalogResponse }>(
     '/api/services',
     {

@@ -5,6 +5,7 @@ import {
   isPaymentResultMockVariant,
   type PaymentResultMockVariant,
 } from '../mocks/paymentResult';
+import { resolveMockManageBookingVariant } from './booking.service';
 import type { PaymentMethodsResponse } from '../types/payment.types';
 import type {
   CancelPaymentResponse,
@@ -269,6 +270,14 @@ function createMockSeatChangePaymentResponse(
   return buildMockPaymentResponse(paymentId, Number(payload.bookingId), payload.method);
 }
 
+function createMockServiceChangePaymentResponse(
+  payload: CreateServiceChangePaymentRequest
+): CreatePaymentResponse {
+  const paymentId = nextMockSeatChangePaymentId();
+  initializeMockSeatChangePaymentState(paymentId, Number(payload.bookingId), payload.method);
+  return buildMockPaymentResponse(paymentId, Number(payload.bookingId), payload.method);
+}
+
 function getMockPaymentStatusResponse(paymentId: string | number): GetPaymentResponse {
   const variant = resolveMockPaymentResultVariant() ?? 'PENDING';
   const mock = getMockCreatePaymentResponse({ bookingId: 90210, method: 'PAYOS_QR' });
@@ -380,6 +389,18 @@ export async function getPaymentMethods(
   options?: { onlySupported?: boolean }
 ): Promise<PaymentMethodsResponse> {
   const onlySupported = options?.onlySupported ?? false;
+  if (resolveMockManageBookingVariant()) {
+    if (!onlySupported) return Promise.resolve(MOCK_PAYMENT_METHODS);
+    return Promise.resolve({
+      ...MOCK_PAYMENT_METHODS,
+      groups: MOCK_PAYMENT_METHODS.groups
+        .map((group) => ({
+          ...group,
+          methods: group.methods.filter((method) => method.supported),
+        }))
+        .filter((group) => group.methods.length > 0),
+    });
+  }
   const res = await api.get<ApiEnvelope<PaymentMethodsResponse>>('/api/payment-methods', {
     params: { bookingId, onlySupported },
     timeout: PAYMENT_METHODS_TIMEOUT_MS,
@@ -406,6 +427,9 @@ export async function createPaymentLink(
 export async function createSeatChangePaymentLink(
   payload: CreateSeatChangePaymentRequest
 ): Promise<CreatePaymentResponse> {
+  if (shouldUseMockSeatChangePayment() || shouldAutoFallbackToSeatChangeMock()) {
+    return Promise.resolve(createMockSeatChangePaymentResponse(payload));
+  }
   const res = await api.post<ApiEnvelope<CreatePaymentResponse> | CreatePaymentResponse>(
     '/api/seat-change-payments',
     payload,
@@ -417,6 +441,9 @@ export async function createSeatChangePaymentLink(
 export async function createServiceChangePaymentLink(
   payload: CreateServiceChangePaymentRequest
 ): Promise<CreatePaymentResponse> {
+  if (resolveMockManageBookingVariant()) {
+    return Promise.resolve(createMockServiceChangePaymentResponse(payload));
+  }
   const res = await api.post<ApiEnvelope<CreatePaymentResponse> | CreatePaymentResponse>(
     '/api/service-change-payments',
     payload,
@@ -440,6 +467,9 @@ export async function createFlightChangePaymentLink(
  * GET /api/payments/{paymentId} — check payment status.
  */
 export async function getPaymentStatus(paymentId: string | number): Promise<GetPaymentResponse> {
+  if (getStoredMockSeatChangePaymentState(paymentId)) {
+    return Promise.resolve(getMockSeatChangePaymentStatusResponse(paymentId));
+  }
   const res = await api.get<
     ApiEnvelope<GetPaymentResponse | PaymentEntity> | GetPaymentResponse | PaymentEntity
   >(`/api/payments/${paymentId}`, { timeout: SEAT_CHANGE_PAYMENT_TIMEOUT_MS });
@@ -453,6 +483,10 @@ export async function cancelPayment(
   paymentId: string | number,
   reason = 'User cancelled payment'
 ): Promise<CancelPaymentResponse> {
+  if (getStoredMockSeatChangePaymentState(paymentId)) {
+    void reason;
+    return Promise.resolve(getMockCancelPaymentResponse(paymentId));
+  }
   const res = await api.post<ApiEnvelope<CancelPaymentResponse> | CancelPaymentResponse>(
     `/api/payments/${paymentId}/cancel`,
     { reason },

@@ -1500,6 +1500,7 @@ export async function confirmSeatChanges(
     }
     return Promise.resolve(
       cloneMock({
+        settlementId: preview.settlementType === 'COLLECT_PAYMENT' ? Date.now() : null,
         bookingId: preview.bookingId,
         currency: preview.currency,
         settlementType: preview.settlementType,
@@ -1523,6 +1524,25 @@ export async function confirmSeatChanges(
                 estimatedDays: '3-7 business days',
               }
             : null,
+        paymentMethods:
+          preview.settlementType === 'COLLECT_PAYMENT'
+            ? [
+                {
+                  code: 'PAYOS_QR',
+                  label: 'Mobile Banking (VietQR)',
+                  provider: 'PAYOS',
+                  icon: null,
+                  supported: true,
+                },
+                {
+                  code: 'STRIPE_CARD',
+                  label: 'International credit or debit card',
+                  provider: 'STRIPE',
+                  icon: null,
+                  supported: true,
+                },
+              ]
+            : [],
         summary: preview.summary,
       } satisfies SeatChangeConfirmResponse)
     );

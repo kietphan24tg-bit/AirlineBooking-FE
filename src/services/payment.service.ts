@@ -427,7 +427,11 @@ export async function createPaymentLink(
 export async function createSeatChangePaymentLink(
   payload: CreateSeatChangePaymentRequest
 ): Promise<CreatePaymentResponse> {
-  if (shouldUseMockSeatChangePayment() || shouldAutoFallbackToSeatChangeMock()) {
+  if (
+    resolveMockManageBookingVariant() ||
+    shouldUseMockSeatChangePayment() ||
+    shouldAutoFallbackToSeatChangeMock()
+  ) {
     return Promise.resolve(createMockSeatChangePaymentResponse(payload));
   }
   const res = await api.post<ApiEnvelope<CreatePaymentResponse> | CreatePaymentResponse>(

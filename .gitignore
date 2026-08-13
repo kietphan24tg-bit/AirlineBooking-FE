@@ -2,3 +2,12 @@ node_modules
 dist
 .DS_Store
 coverage
+
+# Local/dev artifacts
+.codex/
+tmp/
+tmp-*.log
+*.log
+playwright-artifacts/
+stitch_plane/
+code.html

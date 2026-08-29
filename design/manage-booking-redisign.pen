@@ -1,5 +1,5 @@
 {
-  "version": "2.11",
+  "version": "2.17",
   "children": [
     {
       "type": "rectangle",
@@ -10,5 +10,6 @@
       "width": 116,
       "height": 114
     }
-  ]
+  ],
+  "fileToken": "e5128d4d-80c8-4cab-adf4-0603409de38b"
 }

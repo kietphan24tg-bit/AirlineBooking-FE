@@ -1872,12 +1872,18 @@ export default function ChangeFlight() {
     setQuoteError(null);
     setFlightChangeQuote(null);
     try {
-      const tickets = await bookingService.getBookingTickets(bookingLookup.booking.bookingId);
-      if (!tickets.tickets.length) {
+      const tripDetail = await bookingService.getTripDetail(
+        bookingLookup.booking.bookingId,
+        selectedFlight.flightId
+      );
+      const ticketIds = tripDetail.passengers
+        .map((passenger) => passenger.ticket?.ticketId)
+        .filter((ticketId): ticketId is number => typeof ticketId === 'number' && ticketId > 0);
+      if (!ticketIds.length) {
         throw new Error('No valid ticket found to create a change quote.');
       }
       const quote = await bookingService.quoteFlightChange(bookingLookup.booking.bookingId, {
-        ticketIds: tickets.tickets.map((ticket) => ticket.id),
+        ticketIds,
         currentFlightId: selectedFlight.flightId,
         newFlightId: selectedNewOption.flightId,
         newFareId: selectedNewOption.fareId,

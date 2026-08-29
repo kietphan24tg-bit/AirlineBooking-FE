@@ -21,11 +21,24 @@ import CheckoutResult from '../pages/CheckoutResult';
 import Checkin from '../pages/Checkin';
 import CancelFlight from '../pages/CancelFlight';
 import ChangeFlight from '../pages/ChangeFlight';
+import Assistant from '../pages/Assistant';
 
 const AppRouter = createBrowserRouter([
   {
     path: '/',
     element: <Landing />,
+  },
+  {
+    path: '/assistant',
+    element: <Assistant />,
+  },
+  {
+    path: '/chat',
+    element: <Assistant />,
+  },
+  {
+    path: '/ai-assistant',
+    element: <Assistant />,
   },
   {
     path: '/login',

@@ -1,12 +1,4 @@
-import {
-  Bot,
-  History,
-  MessageCircle,
-  PlusCircle,
-  RefreshCw,
-  Send,
-  X,
-} from 'lucide-react';
+import { Bot, History, MessageCircle, PlusCircle, RefreshCw, Send, X } from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { chatbotService } from '../../services/chatbot.service';
 import type {
@@ -23,6 +15,7 @@ import {
   ToolResultCard,
 } from './ChatbotMessageCards';
 import { ChatHistoryModal } from './ChatHistoryModal';
+import { createUuid } from '../../utils/createUuid';
 
 const SUGGESTIONS = [
   'Hỏi chính sách hành lý',
@@ -58,12 +51,14 @@ export default function ChatbotWidget() {
     try {
       setLoading(true);
       const pageView = await chatbotService.getConversationMessages(conversationId);
-      const loadedMessages: ChatbotMessage[] = (pageView.items ?? []).map((msg: ChatMessageView) => ({
-        id: `msg-${msg.sequenceNumber}-${msg.createdAt}`,
-        role: msg.role.toLowerCase() === 'user' ? 'user' : 'assistant',
-        text: msg.content,
-        createdAt: msg.createdAt,
-      }));
+      const loadedMessages: ChatbotMessage[] = (pageView.items ?? []).map(
+        (msg: ChatMessageView) => ({
+          id: `msg-${msg.sequenceNumber}-${msg.createdAt}`,
+          role: msg.role.toLowerCase() === 'user' ? 'user' : 'assistant',
+          text: msg.content,
+          createdAt: msg.createdAt,
+        })
+      );
       setMessages(loadedMessages);
     } catch {
       setError('Không thể tải lịch sử tin nhắn.');
@@ -104,8 +99,8 @@ export default function ChatbotWidget() {
     setError(null);
     setLastFailedText(null);
 
-    const userMsgId = crypto.randomUUID();
-    const clientMessageId = crypto.randomUUID();
+    const userMsgId = createUuid();
+    const clientMessageId = createUuid();
 
     const newUserMsg: ChatbotMessage = {
       id: userMsgId,
@@ -128,7 +123,7 @@ export default function ChatbotWidget() {
       }
 
       const assistantMsg: ChatbotMessage = {
-        id: crypto.randomUUID(),
+        id: createUuid(),
         role: 'assistant',
         text: reply.answer || 'Tôi đã xử lý yêu cầu của bạn.',
         reply,
@@ -276,7 +271,8 @@ export default function ChatbotWidget() {
                   <span>Xin chào! Tôi có thể hỗ trợ gì cho bạn?</span>
                 </div>
                 <p className="text-xs text-on-surface-variant leading-relaxed">
-                  Tôi có thể giúp bạn giải đáp chính sách hành lý, tìm kiếm chuyến bay, tra cứu thông tin đặt vé hoặc hỗ trợ thủ tục đổi ghế.
+                  Tôi có thể giúp bạn giải đáp chính sách hành lý, tìm kiếm chuyến bay, tra cứu
+                  thông tin đặt vé hoặc hỗ trợ thủ tục đổi ghế.
                 </p>
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   {SUGGESTIONS.map((suggestion) => (

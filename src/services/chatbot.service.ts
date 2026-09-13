@@ -12,6 +12,20 @@ const isMockEnabled = (): boolean => {
   return import.meta.env.DEV && import.meta.env.VITE_CHATBOT_MOCK === 'true';
 };
 
+/** Backend success responses wrap chat DTOs in { success, data, message }. */
+function unwrapChatPayload<T>(payload: T): T {
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'success' in payload &&
+    payload.success === true &&
+    'data' in payload
+  ) {
+    return payload.data as T;
+  }
+  return payload;
+}
+
 function toAscii(str: string): string {
   return str
     .toLowerCase()
@@ -50,11 +64,17 @@ export const chatbotService = {
         ascii.includes('xem thong tin booking')
       ) {
         response = {
-          answer: 'Thông tin đặt vé của bạn (Mã: BK-8892): Chuyến bay VN123 (TP.HCM -> Hà Nội), khởi hành 14:30 15/09/2026.',
+          answer:
+            'Thông tin đặt vé của bạn (Mã: BK-8892): Chuyến bay VN123 (TP.HCM -> Hà Nội), khởi hành 14:30 15/09/2026.',
           answerType: 'TOOL_RESULT',
           grounded: true,
           trace: [
-            { type: 'tool_call', label: 'Tra cứu booking BK-8892', status: 'ok', tool: 'getBookingDetails' },
+            {
+              type: 'tool_call',
+              label: 'Tra cứu booking BK-8892',
+              status: 'ok',
+              tool: 'getBookingDetails',
+            },
           ],
         };
       } else if (
@@ -89,11 +109,17 @@ export const chatbotService = {
         ascii.includes('han')
       ) {
         response = {
-          answer: 'Kết quả tìm kiếm chuyến bay TP.HCM (SGN) đi Hà Nội (HAN):\n- VN123 (08:00 - 10:15) giá từ 1.250.000 VND\n- VN125 (14:30 - 16:45) giá từ 1.450.000 VND',
+          answer:
+            'Kết quả tìm kiếm chuyến bay TP.HCM (SGN) đi Hà Nội (HAN):\n- VN123 (08:00 - 10:15) giá từ 1.250.000 VND\n- VN125 (14:30 - 16:45) giá từ 1.450.000 VND',
           answerType: 'TOOL_RESULT',
           grounded: true,
           trace: [
-            { type: 'tool_call', label: 'Tìm kiếm chuyến bay SGN -> HAN', status: 'ok', tool: 'searchFlights' },
+            {
+              type: 'tool_call',
+              label: 'Tìm kiếm chuyến bay SGN -> HAN',
+              status: 'ok',
+              tool: 'searchFlights',
+            },
           ],
         };
       } else {
@@ -130,18 +156,20 @@ export const chatbotService = {
     }
 
     const response = await api.post<RagChatResponse>('/api/chatbot/messages', request);
-    return response.data;
+    return unwrapChatPayload(response.data);
   },
 
   async getActiveConversation(): Promise<ChatConversationView | null> {
     if (isMockEnabled()) {
       return mockActiveConversation;
     }
-    const response = await api.get<ChatConversationView | null>('/api/chatbot/conversations/active');
+    const response = await api.get<ChatConversationView | null>(
+      '/api/chatbot/conversations/active'
+    );
     if (response.status === 204 || !response.data) {
       return null;
     }
-    return response.data;
+    return unwrapChatPayload(response.data);
   },
 
   async listConversations(cursor?: string, limit = 20): Promise<ChatConversationListView> {
@@ -158,7 +186,7 @@ export const chatbotService = {
     const response = await api.get<ChatConversationListView>('/api/chatbot/conversations', {
       params: { cursor, limit },
     });
-    return response.data;
+    return unwrapChatPayload(response.data);
   },
 
   async getConversationMessages(
@@ -173,7 +201,7 @@ export const chatbotService = {
       `/api/chatbot/conversations/${conversationId}/messages`,
       { params: { beforeSequence, limit } }
     );
-    return response.data;
+    return unwrapChatPayload(response.data);
   },
 
   async archiveActiveConversation(): Promise<ChatConversationView | null> {
@@ -193,7 +221,7 @@ export const chatbotService = {
     if (response.status === 204 || !response.data) {
       return null;
     }
-    return response.data;
+    return unwrapChatPayload(response.data);
   },
 
   async deleteConversation(conversationId: string): Promise<void> {
@@ -219,7 +247,7 @@ export const chatbotService = {
       };
     }
     const response = await api.get<ToolProposalView>(`/api/chatbot/proposals/${proposalId}`);
-    return response.data;
+    return unwrapChatPayload(response.data);
   },
 
   async confirmProposal(proposalId: string): Promise<ToolProposalView> {
@@ -230,8 +258,10 @@ export const chatbotService = {
         summary: 'Đã xác nhận thành công.',
       };
     }
-    const response = await api.post<ToolProposalView>(`/api/chatbot/proposals/${proposalId}/confirm`);
-    return response.data;
+    const response = await api.post<ToolProposalView>(
+      `/api/chatbot/proposals/${proposalId}/confirm`
+    );
+    return unwrapChatPayload(response.data);
   },
 
   async rejectProposal(proposalId: string): Promise<ToolProposalView> {
@@ -242,7 +272,9 @@ export const chatbotService = {
         summary: 'Đã từ chối yêu cầu.',
       };
     }
-    const response = await api.post<ToolProposalView>(`/api/chatbot/proposals/${proposalId}/reject`);
-    return response.data;
+    const response = await api.post<ToolProposalView>(
+      `/api/chatbot/proposals/${proposalId}/reject`
+    );
+    return unwrapChatPayload(response.data);
   },
 };

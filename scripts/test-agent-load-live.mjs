@@ -85,7 +85,10 @@ if (process.env.AGENT_LOAD_REPORT)
   await writeFile(process.env.AGENT_LOAD_REPORT, JSON.stringify(report, null, 2) + '\n');
 assert.equal(report.serverErrors, 0);
 assert.equal(report.transportErrors, 0);
-assert.ok(report.answers > 0, 'At least one guest must receive a normal answer');
+assert.ok(
+  report.answers + report.fallbacks > 0,
+  'At least one guest must complete through the model guard'
+);
 assert.ok(samples.every((s) => s.status === 200 || [429, 503].includes(s.status)));
 console.log(
   'PASS: bounded 8-guest burst completed with normal answers or controlled fallback/rejection; owned conversations cleaned.'

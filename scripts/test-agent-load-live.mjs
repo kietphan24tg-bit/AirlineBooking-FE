@@ -30,13 +30,22 @@ const samples = await Promise.all(
         }),
         signal: AbortSignal.timeout(120_000),
       });
-      const raw = await response.json();
+      const responseText = await response.text();
+      let raw = {};
+      try {
+        raw = JSON.parse(responseText);
+      } catch {
+        raw = {};
+      }
       const body = raw.data ?? raw;
       conversationId = body.conversation?.id;
       sample = {
         status: response.status,
         answerType: body.answerType ?? null,
         fallbackReason: body.fallbackReason ?? null,
+        errorCode: raw.error?.code ?? null,
+        requestId: raw.requestId ?? null,
+        responsePreview: response.ok ? null : responseText.slice(0, 500),
         durationMs: Math.round(performance.now() - started),
       };
     } catch (error) {

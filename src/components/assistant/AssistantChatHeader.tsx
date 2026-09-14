@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Sparkles,
-  MoreVertical,
-  RotateCcw,
-  Download,
-  Sliders,
-} from 'lucide-react';
+import { Sparkles, MoreVertical, RotateCcw, Download, Sliders } from 'lucide-react';
 import { AssistantLanguage } from '../../types/assistant';
 
 interface AssistantChatHeaderProps {
@@ -36,9 +30,7 @@ export const AssistantChatHeader: React.FC<AssistantChatHeaderProps> = ({
 
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
-            <h2 className="font-sans text-sm font-bold text-slate-900">
-              AirlineBooking Assistant
-            </h2>
+            <h2 className="font-sans text-sm font-bold text-slate-900">AirlineBooking Assistant</h2>
             <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wider text-sky-800">
               AI Agent Pipeline
             </span>
@@ -81,7 +73,9 @@ export const AssistantChatHeader: React.FC<AssistantChatHeaderProps> = ({
 
           {showMenu && (
             <>
-              <div
+              <button
+                type="button"
+                aria-label="Close menu"
                 className="fixed inset-0 z-30"
                 onClick={() => setShowMenu(false)}
               />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plane, ArrowRight, Clock, Users, ArrowUpRight } from 'lucide-react';
+import { Plane, Clock, Users, ArrowUpRight } from 'lucide-react';
 import { FlightResultData, AssistantLanguage } from '../../types/assistant';
 import { toast } from 'sonner';
 
@@ -44,7 +44,10 @@ export const AssistantFlightCard: React.FC<AssistantFlightCardProps> = ({ data, 
         <div className="flex flex-col">
           <span className="font-mono text-xl font-black text-slate-900">{data.originCode}</span>
           <span className="text-xs font-semibold text-slate-700">{data.departureTime}</span>
-          <span className="text-[0.68rem] text-slate-500 truncate max-w-[120px]" title={data.originCity}>
+          <span
+            className="text-[0.68rem] text-slate-500 truncate max-w-[120px]"
+            title={data.originCity}
+          >
             {data.originCity}
           </span>
         </div>
@@ -64,9 +67,14 @@ export const AssistantFlightCard: React.FC<AssistantFlightCardProps> = ({ data, 
 
         {/* Destination */}
         <div className="flex flex-col text-right">
-          <span className="font-mono text-xl font-black text-slate-900">{data.destinationCode}</span>
+          <span className="font-mono text-xl font-black text-slate-900">
+            {data.destinationCode}
+          </span>
           <span className="text-xs font-semibold text-slate-700">{data.arrivalTime}</span>
-          <span className="text-[0.68rem] text-slate-500 truncate max-w-[120px]" title={data.destinationCity}>
+          <span
+            className="text-[0.68rem] text-slate-500 truncate max-w-[120px]"
+            title={data.destinationCity}
+          >
             {data.destinationCity}
           </span>
         </div>

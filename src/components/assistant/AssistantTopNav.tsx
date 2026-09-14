@@ -140,7 +140,9 @@ export const AssistantTopNav: React.FC<AssistantTopNavProps> = ({
             {/* Dropdown Menu */}
             {showUserMenu && (
               <>
-                <div
+                <button
+                  type="button"
+                  aria-label="Close user menu"
                   className="fixed inset-0 z-40"
                   onClick={() => setShowUserMenu(false)}
                 />

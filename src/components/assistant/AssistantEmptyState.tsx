@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plane, Compass, Sparkles, MessageSquare } from 'lucide-react';
+import { Plane, Sparkles, MessageSquare } from 'lucide-react';
 import { AssistantLanguage } from '../../types/assistant';
 
 interface AssistantEmptyStateProps {

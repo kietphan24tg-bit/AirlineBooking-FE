@@ -3,7 +3,7 @@ import type { ChatRequest, RagChatResponse, ToolProposalView } from '../../types
 
 // Simple unit tests for Chatbot service contract & responses
 export async function testChatbotServiceContract() {
-  const request: ChatRequest = {
+  const _request: ChatRequest = {
     message: 'Chính sách hành lý',
     clientMessageId: 'test-client-id-123',
   };

@@ -1,13 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Sparkles,
-  User,
-  Copy,
-  Check,
-  ThumbsUp,
-  ThumbsDown,
-  ShieldCheck,
-} from 'lucide-react';
+import { Sparkles, Copy, Check, ThumbsUp, ThumbsDown, ShieldCheck } from 'lucide-react';
 import { ChatMessage, AssistantLanguage } from '../../types/assistant';
 import { AssistantSourceList } from './AssistantSourceList';
 import { AssistantFlightCard } from './AssistantFlightCard';
@@ -44,9 +36,7 @@ export const AssistantMessageCard: React.FC<AssistantMessageCardProps> = ({
     if (message.text) {
       navigator.clipboard.writeText(message.text);
       setCopied(true);
-      toast.success(
-        language === 'en' ? 'Copied answer to clipboard' : 'Đã sao chép câu trả lời'
-      );
+      toast.success(language === 'en' ? 'Copied answer to clipboard' : 'Đã sao chép câu trả lời');
       setTimeout(() => setCopied(false), 2000);
     }
   };
@@ -59,8 +49,8 @@ export const AssistantMessageCard: React.FC<AssistantMessageCardProps> = ({
           ? 'Thank you for your feedback!'
           : 'Cảm ơn đánh giá của bạn!'
         : language === 'en'
-        ? 'Feedback logged. We will improve our response.'
-        : 'Đã ghi nhận góp ý.'
+          ? 'Feedback logged. We will improve our response.'
+          : 'Đã ghi nhận góp ý.'
     );
   };
 
@@ -104,10 +94,7 @@ export const AssistantMessageCard: React.FC<AssistantMessageCardProps> = ({
           <div className="rounded-2xl rounded-tl-none border border-slate-200/90 bg-white p-4 shadow-sm text-xs text-slate-800">
             {/* Welcome State */}
             {message.messageType === 'welcome' && (
-              <AssistantWelcomeState
-                language={language}
-                onSelectPrompt={onSelectPrompt}
-              />
+              <AssistantWelcomeState language={language} onSelectPrompt={onSelectPrompt} />
             )}
 
             {/* Standard Text or RAG Answer */}
@@ -121,7 +108,11 @@ export const AssistantMessageCard: React.FC<AssistantMessageCardProps> = ({
                       </p>
                     );
                   }
-                  return <p key={i} className="my-0.5">{line}</p>;
+                  return (
+                    <p key={i} className="my-0.5">
+                      {line}
+                    </p>
+                  );
                 })}
               </div>
             )}
@@ -140,7 +131,9 @@ export const AssistantMessageCard: React.FC<AssistantMessageCardProps> = ({
                       <ShieldCheck className="h-3 w-3 text-emerald-600" />
                       <span>
                         {Math.round(message.confidenceScore * 100)}%{' '}
-                        {language === 'en' ? 'Grounded in Official Policy' : 'Chính xác theo quy định'}
+                        {language === 'en'
+                          ? 'Grounded in Official Policy'
+                          : 'Chính xác theo quy định'}
                       </span>
                     </div>
                   )}
@@ -203,10 +196,7 @@ export const AssistantMessageCard: React.FC<AssistantMessageCardProps> = ({
 
             {/* Confirmation Required State */}
             {message.messageType === 'confirmation' && message.confirmationData && (
-              <AssistantConfirmationCard
-                data={message.confirmationData}
-                language={language}
-              />
+              <AssistantConfirmationCard data={message.confirmationData} language={language} />
             )}
 
             {/* Authentication Required State */}

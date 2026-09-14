@@ -112,7 +112,9 @@ export function ChatHistoryModal({
         {loading && <p className="text-xs text-on-surface-variant p-2">Đang tải danh sách...</p>}
 
         {!loading && conversations.length === 0 && (
-          <p className="text-xs text-on-surface-variant text-center py-6">Chưa có lịch sử trò chuyện nào.</p>
+          <p className="text-xs text-on-surface-variant text-center py-6">
+            Chưa có lịch sử trò chuyện nào.
+          </p>
         )}
 
         {conversations.map((conv) => {
@@ -120,9 +122,18 @@ export function ChatHistoryModal({
           return (
             <div
               key={conv.id}
+              role="button"
+              tabIndex={0}
               onClick={() => {
                 onSelectConversation(conv.id);
                 onClose();
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelectConversation(conv.id);
+                  onClose();
+                }
               }}
               className={`group flex items-center justify-between rounded-xl p-3 text-xs cursor-pointer border transition-colors ${
                 isActive

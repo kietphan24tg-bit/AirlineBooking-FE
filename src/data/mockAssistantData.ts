@@ -1,4 +1,9 @@
-import { Conversation, ChatMessage, FlightResultData, BookingStatusData, ConfirmationData } from '../types/assistant';
+import {
+  Conversation,
+  FlightResultData,
+  BookingStatusData,
+  ConfirmationData,
+} from '../types/assistant';
 
 export const MOCK_FLIGHT_DATA: FlightResultData = {
   flightNumber: 'VN-234',

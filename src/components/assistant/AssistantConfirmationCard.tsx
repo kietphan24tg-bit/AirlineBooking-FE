@@ -20,17 +20,16 @@ export const AssistantConfirmationCard: React.FC<AssistantConfirmationCardProps>
   useEffect(() => {
     if (status !== 'PENDING') return;
     const timer = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setStatus('CANCELLED');
-          return 0;
-        }
-        return prev - 1;
-      });
+      setSecondsLeft((prev) => Math.max(0, prev - 1));
     }, 1000);
     return () => clearInterval(timer);
   }, [status]);
+
+  useEffect(() => {
+    if (status === 'PENDING' && secondsLeft === 0) {
+      setStatus('CANCELLED');
+    }
+  }, [secondsLeft, status]);
 
   const formatTimer = (sec: number) => {
     const mins = Math.floor(sec / 60);
@@ -52,9 +51,7 @@ export const AssistantConfirmationCard: React.FC<AssistantConfirmationCardProps>
     setStatus('CANCELLED');
     if (onUpdateStatus) onUpdateStatus('CANCELLED');
     toast.info(
-      language === 'en'
-        ? `Seat change proposal cancelled.`
-        : `Đã hủy yêu cầu thay đổi ghế.`
+      language === 'en' ? `Seat change proposal cancelled.` : `Đã hủy yêu cầu thay đổi ghế.`
     );
   };
 
@@ -64,8 +61,8 @@ export const AssistantConfirmationCard: React.FC<AssistantConfirmationCardProps>
         status === 'PENDING'
           ? 'border-amber-400/90 bg-amber-50/40 ring-1 ring-amber-400/20'
           : status === 'COMPLETED'
-          ? 'border-emerald-300 bg-emerald-50/50'
-          : 'border-slate-300 bg-slate-100/60 opacity-85'
+            ? 'border-emerald-300 bg-emerald-50/50'
+            : 'border-slate-300 bg-slate-100/60 opacity-85'
       }`}
     >
       {/* Top Banner */}
@@ -76,8 +73,8 @@ export const AssistantConfirmationCard: React.FC<AssistantConfirmationCardProps>
               status === 'PENDING'
                 ? 'bg-amber-500 text-white shadow-xs'
                 : status === 'COMPLETED'
-                ? 'bg-emerald-600 text-white'
-                : 'bg-slate-500 text-white'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-500 text-white'
             }`}
           >
             {status === 'PENDING' ? (

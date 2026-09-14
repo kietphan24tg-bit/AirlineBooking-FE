@@ -126,6 +126,8 @@ export const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
                   return (
                     <div
                       key={conv.id}
+                      role="button"
+                      tabIndex={0}
                       className={`group relative flex items-center justify-between rounded-xl px-3 py-2 text-xs transition-all cursor-pointer ${
                         isActive
                           ? 'bg-sky-950/70 font-semibold text-white ring-1 ring-sky-500/40'
@@ -134,6 +136,13 @@ export const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
                       onClick={() => {
                         onSelectConversation(conv.id);
                         if (isMobileOpen) onCloseMobile();
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          onSelectConversation(conv.id);
+                          if (isMobileOpen) onCloseMobile();
+                        }
                       }}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -230,7 +239,9 @@ export const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
       {isMobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           {/* Backdrop */}
-          <div
+          <button
+            type="button"
+            aria-label="Close conversation drawer"
             className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity"
             onClick={onCloseMobile}
           />

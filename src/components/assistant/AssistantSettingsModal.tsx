@@ -23,7 +23,9 @@ export const AssistantSettingsModal: React.FC<AssistantSettingsModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div
+      <button
+        type="button"
+        aria-label="Close settings"
         className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       />
@@ -154,8 +156,8 @@ export const AssistantSettingsModal: React.FC<AssistantSettingsModalProps> = ({
                 the AirlineBooking Assistant are protected using end-to-end SSL encryption.
               </p>
               <p className="text-slate-400">
-                Action proposals (e.g. seat changes or ticket cancellations) require explicit two-factor
-                user confirmation before backend execution.
+                Action proposals (e.g. seat changes or ticket cancellations) require explicit
+                two-factor user confirmation before backend execution.
               </p>
             </div>
           )}
@@ -164,10 +166,12 @@ export const AssistantSettingsModal: React.FC<AssistantSettingsModalProps> = ({
             <div className="space-y-2">
               <p className="font-bold text-white">❓ Frequently Asked Questions</p>
               <div className="rounded-lg bg-slate-950 p-2.5 border border-slate-800">
-                <span className="font-semibold text-sky-400 block">Q: Can the AI change my seat directly?</span>
+                <span className="font-semibold text-sky-400 block">
+                  Q: Can the AI change my seat directly?
+                </span>
                 <span className="text-slate-300 block mt-0.5">
-                  A: The AI generates a confirmation proposal. No seat change is finalized until you click
-                  &quot;Confirm change&quot;.
+                  A: The AI generates a confirmation proposal. No seat change is finalized until you
+                  click &quot;Confirm change&quot;.
                 </span>
               </div>
             </div>

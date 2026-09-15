@@ -28,10 +28,23 @@ const server = createServer(async (req, res) => {
 });
 await new Promise((done) => server.listen(0, '127.0.0.1', done));
 let browser;
+const launchOptions = {
+  args: ['--host-resolver-rules=MAP http-chat.test 127.0.0.1', '--no-proxy-server'],
+};
+
+async function launchBrowser() {
+  try {
+    return await chromium.launch(launchOptions);
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes("Executable doesn't exist")) {
+      throw error;
+    }
+    return chromium.launch({ ...launchOptions, channel: 'chrome' });
+  }
+}
+
 try {
-  browser = await chromium.launch({
-    args: ['--host-resolver-rules=MAP http-chat.test 127.0.0.1', '--no-proxy-server'],
-  });
+  browser = await launchBrowser();
   const page = await browser.newPage();
   const errors = [];
   const requests = [];
